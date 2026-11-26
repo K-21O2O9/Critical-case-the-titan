@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: titan-multiplayer
+    runtime: node
+    plan: starter
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /
+    envVars:
+      - key: TITAN_HOST_KEY
+        generateValue: true

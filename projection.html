@@ -1308,6 +1308,146 @@
       var titan = buildTitan();
       map.add(titan);
 
+      // Multiplayer world adapter: keep projection.html as the real map renderer.
+      // Networked vessels are independent instances of this page's original Titan mesh.
+      var mpEmbedded = new URLSearchParams(window.location.search).get('multiplayer') === '1' && window.parent !== window;
+      var mpNetworkShips = {};
+      var mpPlayerMarkers = new Map();
+      var mpFlyActive = false;
+      var mpFlyKeys = Object.create(null);
+      var mpFlyLastAt = 0;
+      function mpMakeShip(team) {
+        var group = buildTitan();
+        group.name = 'TITAN_MULTIPLAYER_SHIP_' + team;
+        group.traverse(function (obj) {
+          if (!obj.isMesh) return;
+          if (obj.material) {
+            obj.material = Array.isArray(obj.material) ? obj.material.map(function (m) { return m.clone(); }) : obj.material.clone();
+            var materials = Array.isArray(obj.material) ? obj.material : [obj.material];
+            materials.forEach(function (m) {
+              if (m.color) m.color.lerp(new THREE.Color(team === 'A' ? 0x148ca9 : 0xc18a37), 0.20);
+              if (m.emissive) m.emissive.setHex(team === 'A' ? 0x063c55 : 0x49300b);
+            });
+          }
+        });
+        // A real raycastable hull footprint; it follows this vessel's independent transform.
+        var hitbox = new THREE.Mesh(
+          new THREE.BoxGeometry(4.95, 1.15, 1.05),
+          new THREE.MeshBasicMaterial({ color: team === 'A' ? 0x31d8ff : 0xffc46b, transparent: true, opacity: 0.001, colorWrite: false, depthWrite: false })
+        );
+        hitbox.name = 'MP_HULL_HITBOX_' + team;
+        hitbox.position.y = 0.58;
+        hitbox.userData.multiplayerShipHitbox = true;
+        group.add(hitbox);
+        var crewGroup = new THREE.Group(); crewGroup.name = 'MP_CREW_' + team; group.add(crewGroup);
+        var ring = new THREE.Mesh(new THREE.RingGeometry(2.55, 2.72, 48), new THREE.MeshBasicMaterial({ color: team === 'A' ? 0x00d9ff : 0xffbb55, transparent: true, opacity: 0.65, side: THREE.DoubleSide }));
+        ring.rotation.x = -Math.PI / 2; ring.position.y = 0.10; group.add(ring);
+        map.add(group);
+        return { group: group, crew: crewGroup, hitbox: hitbox, ring: ring, team: team };
+      }
+      function mpUpdateWorld(packet) {
+        if (!mpEmbedded || !packet || !packet.state) return;
+        var snap = packet.state;
+        ['A', 'B'].forEach(function (team) {
+          if (!mpNetworkShips[team]) mpNetworkShips[team] = mpMakeShip(team);
+          var netShip = snap.ships && snap.ships[team];
+          var entry = mpNetworkShips[team];
+          if (netShip) {
+            entry.group.position.set(Number(netShip.x) || 0, 0.38, Number(netShip.z) || 0);
+            entry.group.rotation.y = -(Number(netShip.yaw) || 0);
+            if (entry.ring && entry.ring.material && entry.ring.material.color) {
+              entry.ring.material.color.setHex(netShip.grounded ? 0xff5548 : (team === 'A' ? 0x00d9ff : 0xffbb55));
+              entry.ring.material.opacity = netShip.grounded ? 0.95 : 0.65;
+            }
+            entry.group.visible = true;
+          }
+          var presentIds = new Set();
+          (snap.players || []).filter(function (p) { return p.team === team && p.connected; }).forEach(function (p) {
+            presentIds.add(p.id);
+            var dot = mpPlayerMarkers.get(p.id);
+            if (!dot) {
+              dot = new THREE.Mesh(new THREE.SphereGeometry(p.isHost ? 0.17 : 0.12, 10, 8), new THREE.MeshBasicMaterial({ color: p.isHost ? 0xffffff : (team === 'A' ? 0x55e4ff : 0xffd17a), emissive: team === 'A' ? 0x0d5e78 : 0x72450e }));
+              dot.userData.playerId = p.id;
+              mpPlayerMarkers.set(p.id, dot);
+              entry.crew.add(dot);
+            }
+            // Main Deck axes: ship length is local Z; projection Titan length is map X.
+            dot.position.set(-(Number(p.z) || 0) * 0.075, p.area === 'main-deck' ? 0.78 : 1.0, (Number(p.x) || 0) * 0.17);
+            dot.userData.playerName = p.name; dot.userData.area = p.area || 'main-deck';
+            dot.visible = true;
+          });
+          Array.from(mpPlayerMarkers.entries()).forEach(function (pair) {
+            var id = pair[0], dot = pair[1];
+            if (!presentIds.has(id) && dot.parent === entry.crew) { entry.crew.remove(dot); mpPlayerMarkers.delete(id); dot.geometry.dispose(); dot.material.dispose(); }
+          });
+        });
+      }
+      function mpUpdateFly(dt) {
+        if (!mpEmbedded || !mpFlyActive) return;
+        var step = 22 * Math.min(dt, 0.05);
+        var forward = (mpFlyKeys.KeyW || mpFlyKeys.ArrowUp ? 1 : 0) - (mpFlyKeys.KeyS || mpFlyKeys.ArrowDown ? 1 : 0);
+        var side = (mpFlyKeys.KeyD || mpFlyKeys.ArrowRight ? 1 : 0) - (mpFlyKeys.KeyA || mpFlyKeys.ArrowLeft ? 1 : 0);
+        var len = Math.hypot(forward, side) || 1;
+        var fx = -Math.sin(camState.theta), fz = -Math.cos(camState.theta);
+        var rx = Math.cos(camState.theta), rz = -Math.sin(camState.theta);
+        camState.goalTarget.x += (fx * forward / len + rx * side / len) * step;
+        camState.goalTarget.z += (fz * forward / len + rz * side / len) * step;
+        if (mpFlyKeys.Space) camState.goalRadius = Math.max(16, camState.goalRadius - step * 1.35);
+        if (mpFlyKeys.ShiftLeft || mpFlyKeys.ShiftRight) camState.goalRadius = Math.min(150, camState.goalRadius + step * 1.35);
+        if (mpFlyKeys.KeyQ) camState.goalPhi = Math.max(0.22, camState.goalPhi - dt * 0.55);
+        if (mpFlyKeys.KeyE) camState.goalPhi = Math.min(1.42, camState.goalPhi + dt * 0.55);
+        camState.goalTarget.x = Math.max(-58, Math.min(58, camState.goalTarget.x));
+        camState.goalTarget.z = Math.max(-48, Math.min(48, camState.goalTarget.z));
+      }
+      if (mpEmbedded) {
+        document.body.classList.add('mp-embedded');
+        $('left').style.display = 'none'; $('right').style.display = 'none'; $('topbar').style.display = 'none';
+        $('bottom').textContent = 'TITAN MULTIPLAYER WORLD · projection.html · Shared live ship positions';
+        titan.visible = false; shipSonarGroup.visible = false;
+        camState.goalRadius = camState.radius = 70;
+        // Touch flight controls for hosts on phones/tablets; keyboard remains supported.
+        var mpFlyPad = document.createElement('div');
+        mpFlyPad.style.cssText = 'position:fixed;right:16px;bottom:34px;z-index:9999;display:none;grid-template-columns:repeat(3,48px);grid-template-rows:repeat(3,44px);gap:5px;padding:8px;border:1px solid #76dbe888;border-radius:14px;background:#061a2bda;backdrop-filter:blur(8px);touch-action:none;user-select:none;';
+        var mpFlyButtons = [
+          { label: '▲', key: 'KeyW', col: 2, row: 1 },
+          { label: '◀', key: 'KeyA', col: 1, row: 2 },
+          { label: '▼', key: 'KeyS', col: 2, row: 2 },
+          { label: '▶', key: 'KeyD', col: 3, row: 2 },
+          { label: '+', key: 'Space', col: 1, row: 3 },
+          { label: '−', key: 'ShiftLeft', col: 3, row: 3 }
+        ];
+        mpFlyButtons.forEach(function (item) {
+          var button = document.createElement('button');
+          button.type = 'button'; button.textContent = item.label;
+          button.setAttribute('aria-label', item.key === 'Space' ? 'Zoom in' : item.key === 'ShiftLeft' ? 'Zoom out' : 'Fly ' + item.key);
+          button.style.cssText = 'grid-column:' + item.col + ';grid-row:' + item.row + ';border:1px solid #67cddc;color:#f3ffff;background:#0c4054;border-radius:10px;font:700 17px system-ui;touch-action:none;';
+          var press = function (e) { e.preventDefault(); mpFlyKeys[item.key] = true; if (button.setPointerCapture && e.pointerId !== undefined) button.setPointerCapture(e.pointerId); };
+          var release = function (e) { if (e) e.preventDefault(); mpFlyKeys[item.key] = false; };
+          button.addEventListener('pointerdown', press);
+          ['pointerup', 'pointercancel', 'lostpointercapture', 'pointerleave'].forEach(function (name) { button.addEventListener(name, release); });
+          mpFlyPad.appendChild(button);
+        });
+        document.body.appendChild(mpFlyPad);
+        window.addEventListener('message', function (event) {
+          if (event.origin !== window.location.origin || !event.data || event.data.source !== 'TITAN_MULTIPLAYER') return;
+          if (event.data.type === 'STATE') mpUpdateWorld(event.data.packet);
+          if (event.data.type === 'FLY_MODE') {
+            mpFlyActive = !!event.data.enabled;
+            mpFlyKeys = Object.create(null);
+            mpFlyPad.style.display = mpFlyActive ? 'grid' : 'none';
+            if (mpFlyActive) { camState.goalRadius = Math.min(camState.goalRadius, 58); }
+          }
+          if (event.data.type === 'MAP_FOCUS') { camState.goalTarget.set(0, 1, 0); camState.goalRadius = 70; camState.goalPhi = 0.78; }
+        });
+        window.addEventListener('keydown', function (event) {
+          if (!mpFlyActive) return;
+          if (['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space','ShiftLeft','ShiftRight','KeyQ','KeyE'].includes(event.code)) { mpFlyKeys[event.code] = true; event.preventDefault(); }
+        });
+        window.addEventListener('keyup', function (event) { if (mpFlyActive) mpFlyKeys[event.code] = false; });
+        window.addEventListener('blur', function () { mpFlyKeys = Object.create(null); });
+        window.parent.postMessage({ source: 'TITAN_PROJECTION', type: 'MAP_READY' }, window.location.origin);
+      }
+
       // Funnel Exhaust Particle Pool (Realistic Engine Load Smoke)
       var exhaustParticles = [];
       for (var ep = 0; ep < 16; ep++) {
@@ -2757,6 +2897,33 @@
       }
       setDefaultMap();
 
+      // Send the live projection's actual navigation geometry to the authoritative
+      // room server. No duplicate/hardcoded obstacle catalogue is maintained here.
+      function mpSendMapGeometry() {
+        if (!mpEmbedded || !window.parent || window.parent === window) return;
+        var obstacles = objects.filter(function (o) {
+          return o && o.mesh && ['island', 'reef', 'rock', 'typhoon'].includes(o.type);
+        }).map(function (o) {
+          var scale = Number(o.mesh.userData.scale) || 1;
+          var radii = getObstacleRadii(o.type, scale);
+          return {
+            type: o.type,
+            x: Number(o.mesh.position.x) || 0,
+            z: Number(o.mesh.position.z) || 0,
+            scale: scale,
+            solidR: radii.solidR,
+            shallowDangerR: radii.shallowDangerR,
+            shallowWarnR: radii.shallowWarnR
+          };
+        });
+        var route = DEFAULT_PATH.map(function (point) { return [Number(point[0]), Number(point[1])]; });
+        window.parent.postMessage({
+          source: 'TITAN_PROJECTION', type: 'MAP_GEOMETRY',
+          geometry: { source: 'projection.html', bounds: { minX: -41, maxX: 41, minZ: -32, maxZ: 32 }, obstacles: obstacles, route: route }
+        }, window.location.origin);
+      }
+      if (mpEmbedded) mpSendMapGeometry();
+
       // ── Ghost Preview Mesh for Pre-Placement Customization ───
       function rebuildGhostPreview() {
         if (ghostPreview) {
@@ -4093,6 +4260,7 @@
           }
         }
 
+        mpUpdateFly(dt);
         applyCameraTransform(false);
         renderer.render(scene, camera);
       }

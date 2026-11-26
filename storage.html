@@ -52,12 +52,16 @@
       var el = document.getElementById(id);
       if (!el) return;
       var href = resolveSameDirFile(file);
+      var mp = new URLSearchParams(window.location.search);
+      if (mp.get('multiplayer') === '1') href += '?multiplayer=1&team=' + encodeURIComponent(mp.get('team') || 'A') + '&room=' + encodeURIComponent(mp.get('room') || '') + '&player=' + encodeURIComponent(mp.get('player') || '');
       el.setAttribute('href', href);
       el.addEventListener('click', function (e) {
         e.preventDefault();
         try { window.location.assign(href); } catch (_) { window.location.href = href; }
       });
     }
+    var mp = new URLSearchParams(window.location.search);
+    if (mp.get('multiplayer') === '1' && window.parent !== window) { try { window.parent.postMessage({ source: 'TITAN_MAIN_DECK', type: 'AREA_CHANGE', area: 'storage' }, window.location.origin); } catch (_) {} }
     wire('link-main', 'main-deck.html');
     wire('link-engine', 'engine-room.html');
   })();

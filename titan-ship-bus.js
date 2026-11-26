@@ -53,6 +53,47 @@
     this._heartbeat = null;
     this._publishFn = null;
     this._cmdHandler = null;
+    this._mpParams = new URLSearchParams(window.location.search);
+    this._mpEnabled = this._mpParams.get('multiplayer') === '1' && window.parent !== window;
+    this._mpTeam = this._mpParams.get('team') === 'B' ? 'B' : 'A';
+    this._mpStateHandler = (ev) => {
+      if (!this._mpEnabled || ev.origin !== window.location.origin || !ev.data || ev.data.source !== 'TITAN_MULTIPLAYER' || ev.data.type !== 'STATE') return;
+      const ship = ev.data.packet && ev.data.packet.state && ev.data.packet.state.ships && ev.data.packet.state.ships[this._mpTeam];
+      const systems = ship && ship.systems;
+      // Engine Room pages consume server-owned bridge orders. Only the command
+      // handler is invoked; it updates the local plant model without echoing a
+      // second command back to the room.
+      if (this.role === 'engine' && systems && this._cmdHandler) {
+        const engine = systems.engine || {};
+        if (Number.isFinite(Number(engine.throttle)) && this._mpAppliedThrottle !== Number(engine.throttle)) {
+          this._mpAppliedThrottle = Number(engine.throttle);
+          this._cmdHandler({ action: 'setThrottle', value: this._mpAppliedThrottle, from: 'multiplayer-server' });
+        }
+        if (Number.isFinite(Number(engine.rudder)) && this._mpAppliedRudder !== Number(engine.rudder)) {
+          this._mpAppliedRudder = Number(engine.rudder);
+          this._cmdHandler({ action: 'setRudder', value: this._mpAppliedRudder, from: 'multiplayer-server' });
+        }
+        if (systems.power && typeof systems.power.online === 'boolean' && this._mpAppliedPower !== systems.power.online) {
+          this._mpAppliedPower = systems.power.online;
+          this._cmdHandler({ action: 'setElectrics', key: 'main', value: this._mpAppliedPower, from: 'multiplayer-server' });
+        }
+        if (systems.cooling && typeof systems.cooling.online === 'boolean' && this._mpAppliedCooling !== systems.cooling.online) {
+          this._mpAppliedCooling = systems.cooling.online;
+          this._cmdHandler({ action: 'setCooling', key: 'swPump', value: this._mpAppliedCooling, from: 'multiplayer-server' });
+          this._cmdHandler({ action: 'setCooling', key: 'lubPump', value: this._mpAppliedCooling, from: 'multiplayer-server' });
+        }
+        if (systems.reactor && typeof systems.reactor.online === 'boolean' && this._mpAppliedReactor !== systems.reactor.online) {
+          this._mpAppliedReactor = systems.reactor.online;
+          this._cmdHandler({ action: 'setReactor', key: 'generator', value: this._mpAppliedReactor, from: 'multiplayer-server' });
+        }
+      }
+      const telemetry = systems && systems.telemetry;
+      if (telemetry && typeof telemetry === 'object') {
+        Object.assign(this.telemetry, telemetry, { ts: Date.now(), connected: true, source: 'multiplayer-server' });
+        this._emit('telemetry', this.telemetry); this._emit('status', { connected: true, role: 'multiplayer-server' });
+      }
+    };
+    if (this._mpEnabled) { window.addEventListener('message', this._mpStateHandler); setTimeout(() => { const area = /engine-room\.html/i.test(location.pathname) ? 'engine-room' : (/storage\.html/i.test(location.pathname) ? 'storage' : 'main-deck'); try { window.parent.postMessage({ source: 'TITAN_MAIN_DECK', type: 'AREA_CHANGE', area: area }, window.location.origin); } catch (e) {} }, 0); }
     this._storageHandler = this._onStorage.bind(this);
 
     try {
@@ -154,6 +195,7 @@
       localStorage.setItem(STORAGE_KEY, JSON.stringify(snap));
     } catch (e) {}
     this._emit('telemetry', snap);
+    if (this._mpEnabled && this.role === 'engine') { try { window.parent.postMessage({ source: 'TITAN_ENGINE_ROOM', type: 'TELEMETRY', telemetry: { shipSpeedKn: snap.shipSpeedKn, headingDeg: snap.headingDeg, rpm: snap.rpm, powerKw: snap.powerKw, elecPowerKw: snap.elecPowerKw, temperatureC: snap.temperatureC, fuelPercent: snap.fuelPercent, loadDemandKw: snap.loadDemandKw, mainPower: !!(snap.electrics && snap.electrics.main), motor1: !!(snap.electrics && snap.electrics.motor1), motor2: !!(snap.electrics && snap.electrics.motor2), generator: !!(snap.reactor && snap.reactor.generator), clutch: !!(snap.motors && snap.motors.clutch), lubPump: !!(snap.cooling && snap.cooling.lubPump), swPump: !!(snap.cooling && snap.cooling.swPump) } }, window.location.origin); } catch (e) {} }
   };
 
   TitanShipBus.prototype.sendCommand = function (action, value, extra) {
@@ -175,6 +217,11 @@
         // main deck does not handle its own cmds
       }
     } catch (e) {}
+    // In a multiplayer iframe the parent owns the server WebSocket. Forward
+    // ship control intent to it; never create a second client-side simulation.
+    if (this._mpEnabled) {
+      try { window.parent.postMessage({ source: 'TITAN_SHIP_BUS', type: 'COMMAND', payload: cmd }, window.location.origin); } catch (e) {}
+    }
     return cmd;
   };
 
@@ -219,6 +266,7 @@
     if (this._heartbeat) clearInterval(this._heartbeat);
     try { if (this._bc) this._bc.close(); } catch (e) {}
     try { window.removeEventListener('storage', this._storageHandler); } catch (e) {}
+    try { if (this._mpStateHandler) window.removeEventListener('message', this._mpStateHandler); } catch (e) {}
   };
 
   global.TitanShipBus = TitanShipBus;

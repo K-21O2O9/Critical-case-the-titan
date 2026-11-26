@@ -4904,7 +4904,9 @@ const LadderUI = {
       }
     }
     function go(filename) {
-      const target = resolveSameDirFile(filename);
+      let target = resolveSameDirFile(filename);
+      const mp = new URLSearchParams(window.location.search);
+      if (mp.get('multiplayer') === '1') target += '?multiplayer=1&team=' + encodeURIComponent(mp.get('team') || 'A') + '&room=' + encodeURIComponent(mp.get('room') || '') + '&player=' + encodeURIComponent(mp.get('player') || '');
       try { window.location.assign(target); } catch (_) { window.location.href = target; }
     }
     if (dest === "main-deck") {
@@ -7497,6 +7499,20 @@ const SceneManager = {
       this.walkCam.rotation.order = "YXZ";
       this.walkCam.rotation.y = this.walkYaw;
       this.walkCam.rotation.x = this.walkPitch;
+
+      // Send this crew member's engine-room position to the room server via
+      // the multiplayer parent page (which owns the WebSocket connection).
+      const mpQuery = new URLSearchParams(window.location.search);
+      if (mpQuery.get("multiplayer") === "1" && window.parent !== window &&
+          performance.now() - (window.__titanMpPoseLastAt || 0) > 75) {
+        window.__titanMpPoseLastAt = performance.now();
+        try {
+          window.parent.postMessage({
+            source: "TITAN_MAIN_DECK", type: "POSE",
+            pose: { x: pos.x, z: pos.z, yaw: this.walkYaw, area: "engine-room", moving: Math.abs(moveX) + Math.abs(moveZ) > 0.001 }
+          }, window.location.origin);
+        } catch (_) {}
+      }
     }
 
     // Smoke when critically overheating (lightweight points)
@@ -10368,6 +10384,77 @@ if (document.readyState === "loading") {
 
   const bus = window.createTitanShipBus('engine');
   window.TitanEngineBus = bus;
+
+  // Render same-ship crew inside the original Engine Room scene. Their
+  // authoritative local poses arrive through the multiplayer parent frame.
+  const mpQuery = new URLSearchParams(window.location.search);
+  const mpEnabled = mpQuery.get('multiplayer') === '1' && window.parent !== window;
+  const mpTeam = mpQuery.get('team') === 'B' ? 'B' : 'A';
+  const mpPlayerId = mpQuery.get('player') || '';
+  const mpCrewActors = new Map();
+  let mpCrewSnapshot = null;
+  function makeEngineCrewActor(player) {
+    const group = new THREE.Group();
+    group.name = 'TITAN_MP_ENGINE_CREW_' + player.id;
+    const tint = /^#[0-9a-f]{6}$/i.test(String(player.character?.outfitColor || '')) ? player.character.outfitColor : (mpTeam === 'A' ? '#238fa7' : '#b98335');
+    const bodyMat = new THREE.MeshStandardMaterial({ color: tint, roughness: .76, metalness: .08 });
+    const skinMat = new THREE.MeshStandardMaterial({ color: player.character?.skinColor || '#d9a47f', roughness: .88 });
+    const darkMat = new THREE.MeshStandardMaterial({ color: '#26343b', roughness: .9 });
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(.22, .27, .78, 8), bodyMat);
+    body.position.y = .93; body.castShadow = true; group.add(body);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(.18, 10, 8), skinMat);
+    head.position.y = 1.43; head.castShadow = true; group.add(head);
+    const legs = [];
+    [-.12, .12].forEach(x => {
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(.075, .085, .48, 7), darkMat);
+      leg.position.set(x, .34, 0); leg.castShadow = true; group.add(leg); legs.push(leg);
+    });
+    group.userData.mpLegs = legs;
+    group.userData.mpBaseY = 0.02;
+    const scene = window.SceneManager?.scenes?.engine;
+    if (scene) scene.add(group);
+    return { group, bodyMat, skinMat, darkMat, targetX: Number(player.x) || 0, targetZ: Number(player.z) || 0 };
+  }
+  function updateEngineCrew() {
+    if (!mpEnabled || !mpCrewSnapshot || !window.SceneManager?.scenes?.engine) return;
+    const live = new Set();
+    (mpCrewSnapshot.players || []).filter(p => p.team === mpTeam && p.id !== mpPlayerId && p.connected && p.area === 'engine-room').forEach(p => {
+      live.add(p.id);
+      let actor = mpCrewActors.get(p.id);
+      if (!actor) { actor = makeEngineCrewActor(p); mpCrewActors.set(p.id, actor); }
+      actor.targetX = Math.max(-13.2, Math.min(13.2, Number(p.x) || 0));
+      actor.targetZ = Math.max(-6.6, Math.min(6.6, Number(p.z) || 0));
+      actor.group.rotation.y = Number(p.yaw) || 0;
+      actor.group.userData.mpMoving = Date.now() < (p.movingUntil || 0);
+    });
+    for (const [id, actor] of mpCrewActors) {
+      if (!live.has(id)) {
+        actor.group.parent?.remove(actor.group);
+        actor.group.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); });
+        mpCrewActors.delete(id);
+      }
+    }
+  }
+  if (mpEnabled) {
+    window.addEventListener('message', event => {
+      if (event.origin !== window.location.origin || !event.data || event.data.source !== 'TITAN_MULTIPLAYER' || event.data.type !== 'STATE') return;
+      mpCrewSnapshot = event.data.packet?.state || null;
+      updateEngineCrew();
+    });
+    setInterval(() => {
+      updateEngineCrew();
+      const t = performance.now() / 1000;
+      mpCrewActors.forEach(actor => {
+        const moving = actor.group.userData.mpMoving;
+        const desiredY = actor.group.userData.mpBaseY + (moving ? Math.abs(Math.sin(t * 8)) * .035 : 0);
+        actor.group.position.y += (desiredY - actor.group.position.y) * .35;
+        const legs = actor.group.userData.mpLegs || [];
+        legs.forEach((leg, i) => { leg.rotation.x = moving ? Math.sin(t * 8 + i * Math.PI) * .32 : 0; });
+        actor.group.position.x += (actor.targetX - actor.group.position.x) * .45;
+        actor.group.position.z += (actor.targetZ - actor.group.position.z) * .45;
+      });
+    }, 50);
+  }
 
   function snapshotFromGame() {
     const st = (window.Game && Game.state) ? Game.state : null;

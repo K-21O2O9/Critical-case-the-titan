@@ -1,59 +1,57 @@
-# THE TITAN — Multiplayer v2 setup
+# THE TITAN — Multiplayer World v3 setup
 
-## What is fixed in this build
+## What this build integrates
 
-- The main menu now has a dedicated **MULTIPLAYER RACE** entry. The normal character workshop remains available for single-player use.
-- Multiplayer opens on a role-selection screen: Host a Race, Join a Crew, or Spectator Display. It no longer opens the host screen by default.
-- Players must enter the room code, enter a name, and explicitly select Ship A or Ship B before they can proceed.
-- The character-creation route remembers the selected room, name, team, and server in the current browser tab. Saving the character returns to the crew lobby and automatically attempts the join.
-- Players with an existing saved character can join directly.
-- Host and spectator sessions do not consume one of the 30 player places. Each ship has a hard limit of 15.
-- The server returns clear room-not-found, team-full, already-connected, host-key and start-readiness errors.
-- Starting requires at least one connected, ready player on each ship and every player must be connected and ready.
-- Player positions and character profiles are included in room state. The multiplayer shared-world preview renders both ships and the players' custom character models; movement is broadcast to the other connected clients.
-- Host rejoin is supported with the room code and host key. A player can reconnect using the same browser/device identity during the reconnection grace period.
+- The multiplayer server creates exactly two independent ship records when a host creates a room. Each ship has its own transform, speed, throttle, rudder, progress, hull health, system state, telemetry snapshot and collision metadata.
+- The authenticated host receives a server-owned Captain avatar on Ship A. The host is not counted against the 15 crew seats per ship.
+- The lobby requires a connected player on Ship A and Ship B, with every joined player READY, before START GAME is enabled. The server enforces the same checks.
+- START GAME starts a server-controlled five-second countdown. All clients enter gameplay when the server changes the room to `racing`; player clients open their assigned `main-deck.html`, and the host opens Ship A's Main Deck.
+- `projection.html` is the shared world map. Multiplayer renders two independent instances of its existing Titan vessel model and follows server transforms. It does not replace the projection with a simplified ocean preview.
+- Before the host can start, the embedded projection reports its actual islands, reefs, rocks, typhoon hazard, world bounds and original route to the server. The server derives safe separated ship starts from that data and enforces oriented hull-vs-obstacle collisions while vessels move. The same route data drives progress calculations.
+- `main-deck.html` remains the actual deck experience. Player positions are synchronized in ship-local coordinates; the server clamps players to the deck outline and resolves its mirrored static obstacle boxes. Each ship has independent doors, hatch, propulsion orders, system state and crew actors.
+- Same-ship crew are rendered as character models on the Main Deck and as lightweight crew avatars in the Engine Room. The map shows live ship transforms and connected crew markers, including their current area.
+- Main Deck ↔ Engine Room / Storage navigation preserves multiplayer room, team and player identity.
+- Engine Room throttle/rudder, selected electrical/cooling/reactor commands and telemetry are relayed through the parent WebSocket session and the room server.
+- Host **FLY MODE** moves the original projection camera only. Keyboard controls are WASD/arrows, Space/Shift to zoom and Q/E to tilt; touch devices get an on-screen directional/zoom pad. It does not alter player pose or ship physics. Turning it off returns to the host's normal walking deck.
+- Player rejoin uses the same device identity during the 60-second reconnect grace period. A reconnect cannot change the player's ship assignment.
 
 ## Deploy the website to Netlify
 
-1. Upload the **contents** of this project to the GitHub repository (not only the ZIP file).
-2. In Netlify, import that GitHub repository.
-3. Set Base directory to blank, Build command to blank, and Publish directory to `.` (project root).
-4. Deploy. The public multiplayer page is `/multiplayer.html`.
-5. After updating these files in GitHub, Netlify should create a new production deployment. Confirm its deploy status is Published before testing.
+1. Upload the extracted project files to the existing GitHub repository, preserving all folders (not just the ZIP).
+2. Netlify Base directory: blank.
+3. Build command: blank.
+4. Publish directory: `.` (project root).
+5. Deploy and open `/multiplayer.html` on the published Netlify site.
 
-## Deploy/update the Render multiplayer server
+## Deploy/update Render
 
-The Render Web Service must use the `multiplayer-server` folder as its Root Directory:
+Use the existing Render Web Service:
 
 - Root Directory: `multiplayer-server`
 - Runtime: Node
 - Build command: `npm install`
 - Start command: `npm start`
-- Health check path: `/healthz` (or `/`)
-- Environment variable: `TITAN_HOST_KEY` = your private host key (keep it in Render only)
+- Health check path: `/healthz`
+- Environment variable `TITAN_HOST_KEY`: keep your existing secret value in Render only.
 
-The service uses the `PORT` supplied by Render. Do not hard-code a public port.
-
-To update an existing Render service, commit/push the changed `multiplayer-server/server.js` and `multiplayer-server/package.json` to the same connected GitHub repository, then allow Render to deploy the latest commit. Keep your existing `TITAN_HOST_KEY` value; do not paste it into GitHub or Netlify. After deployment, open the Render URL with `/healthz`; the response should include `protocol: "titan-room-v2"`.
-
-The browser automatically defaults to `wss://titan-multiplayer.onrender.com`. It can be changed in the host/player/spectator URL field if your Render hostname is different. HTTPS Netlify pages must use `wss://`, not `ws://`.
+After the deploy, `/healthz` must return `protocol: "titan-world-v3"`. The default client WebSocket URL is `wss://titan-multiplayer.onrender.com`; change it on the lobby page if your Render hostname differs.
 
 ## Correct event flow
 
-1. Open `https://YOUR-NETLIFY-SITE.netlify.app/multiplayer.html` on the host device.
-2. Select **Host a Race**, enter your Render WebSocket URL and the private host key, then create one room.
-3. Share the six-character room code or copied invite link. Do not ask players to create rooms.
-4. Each player opens the same `/multiplayer.html`, selects **Join a Crew**, enters that same room code and their name, and selects exactly one ship.
-5. A player without a saved character chooses **Create / Customise Character**. On save, the page returns to the crew setup and submits the join. A player with a saved character can press **Join Room** directly.
-6. The host sees team counts and the crew manifest. Players press **I'm Ready**.
-7. Start becomes available only when there is at least one connected and ready player on both teams and all joined players are ready.
-8. The projector opens **Spectator Display** and connects with the same room code. It does not use a player slot.
+1. Host opens `/multiplayer.html`, chooses **Host a Race**, enters the private host key and creates a single room.
+2. Share the room's six-character code. Players must join this room; players must not create separate rooms.
+3. Each player chooses Ship A or Ship B, enters their name, and creates/saves a character before joining (or uses an existing saved character). Assignment remains fixed for that player's room identity.
+4. Host is automatically assigned to Ship A and appears as Captain. Host does not use a 15-person crew slot.
+5. Keep the host page open until the projection has reported map geometry; START GAME stays disabled until that step is complete. A connected player must occupy Ship B (the host Captain is on Ship A); every joined crew member must be online and READY.
+6. Host presses START GAME. The server runs the countdown, changes the shared room status, and broadcasts the state. Each browser enters its assigned Main Deck.
+7. Players use **WORLD MAP** to see both vessels on `projection.html` and **MAIN DECK** to return to their ship interior. The host additionally uses **FLY MODE** to inspect the world, then toggles it off to return to walking.
+8. Spectator Display joins the same code and follows the live world map without taking a crew slot.
 
-## Local test
+## Local test commands
 
-Requirements: Node.js 20+.
+Requirements: Node.js 20+ and npm.
 
-Terminal 1:
+Terminal 1 (server):
 
 ```bash
 cd multiplayer-server
@@ -65,18 +63,18 @@ export TITAN_HOST_KEY="replace-with-a-long-random-secret"
 npm start
 ```
 
-Terminal 2, from the project root:
+Terminal 2 (project root):
 
 ```bash
 python -m http.server 8080
 ```
 
-Open `http://localhost:8080/multiplayer.html`. Host uses `ws://localhost:2567`. Use the exact same room code on two other browser sessions. To test across phones on the same Wi-Fi, use the computer's LAN IP address in the website URL and the server WebSocket URL, and ensure the local firewall permits the ports.
+Open `http://localhost:8080/multiplayer.html` in three separate browser sessions. The host uses `ws://localhost:2567`. Do not use `ws://` from an HTTPS Netlify page; use the secure Render `wss://` URL.
 
-## Important limitations and event readiness
+## Limits to understand before an event
 
-This build fixes the room entry, team choice, character return flow, player state, and shared multiplayer 3D lobby view. It does **not yet network every pre-existing Main Deck, Engine Room, reactor, cooling, voice or ship-equipment control** from the original single-player simulation. Those systems still need a dedicated integration pass before they affect race physics.
-
-Rooms are stored in server memory. A Render restart/deploy will clear live rooms and disconnect active matches. Do not deploy during an event. Keep this service at **one instance**: scaling this in-memory build to multiple instances would put clients in separate room stores. Multi-instance scaling requires shared room state (for example, a Redis-backed room driver) first. This is not a guarantee of flawless 30-device operation: first test on two phones, then 5–10, then do a full 30-client test on the actual event network. Measure Render CPU/memory, WebSocket stability, latency, and Netlify/mobile browser performance. Have a backup internet connection.
-
-Do not publish the host key. Do not share it with players. The player-side source code does not contain the host key.
+- Rooms are in memory. Render restarts and redeployments clear them. Keep one Render instance and do not redeploy while a match is active.
+- Do not scale Render horizontally until a shared room store and cross-instance broadcast driver are added.
+- Main Deck fixed obstacle/deck bounds are checked by both the local game and the server. Engine Room's detailed machinery hitboxes remain local; its network movement is clamped to the room envelope by the server. Storage remains a lightweight transition page, not a fully modelled walkable area.
+- The server synchronizes engine orders, selected on/off system flags, last interaction and telemetry snapshots, but the complete Engine Room machinery simulation is not yet a deterministic server-authoritative physics model. Multiple clients' engine telemetry can still reflect their local simulation timing.
+- A browser-driven end-to-end run against the actual Render service and Netlify site, and a 30-device load test, remain to be performed after deployment. Do not treat static syntax validation as certification for an event.

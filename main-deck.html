@@ -812,7 +812,13 @@ html, body {
 
   /** Navigate to a same-folder HTML page (hatch ladder destinations). */
   function goToSameDirPage(filename, label) {
-    const target = resolveSameDirFile(filename);
+    let target = resolveSameDirFile(filename);
+    const mpNav = new URLSearchParams(window.location.search);
+    if (mpNav.get('multiplayer') === '1' && window.parent !== window) {
+      const area = filename === 'engine-room.html' ? 'engine-room' : (filename === 'storage.html' ? 'storage' : 'main-deck');
+      try { window.parent.postMessage({ source: 'TITAN_MAIN_DECK', type: 'AREA_CHANGE', area: area }, window.location.origin); } catch (_) {}
+      target += '?multiplayer=1&team=' + encodeURIComponent(mpNav.get('team') || 'A') + '&room=' + encodeURIComponent(mpNav.get('room') || '') + '&player=' + encodeURIComponent(mpNav.get('player') || '');
+    }
     try {
       if (typeof showToast === 'function') {
         showToast((label || filename) + ' · loading…');
@@ -3712,16 +3718,96 @@ html, body {
   }
 
   /* Shared character bridge used by the menu and companion TITAN pages. */
+  const mpQuery = new URLSearchParams(window.location.search);
+  const mpEnabled = mpQuery.get('multiplayer') === '1' && window.parent !== window;
+  const mpTeam = mpQuery.get('team') === 'B' ? 'B' : 'A';
+  const mpRemoteActors = new Map();
+  let mpPendingState = null;
+  let mpLocalPlayerId = mpQuery.get('player') || '';
+  let mpLastPoseAt = 0;
+  let mpServerShip = null;
+  let mpLastInteractionAt = 0;
+  let mpLastMapPose = 0;
+  function mpPost(payload) {
+    if (mpEnabled) window.parent.postMessage(Object.assign({ source: 'TITAN_MAIN_DECK' }, payload), window.location.origin);
+  }
+  function mpDisposeActor(actor) {
+    if (!actor) return;
+    if (ship) ship.remove(actor.model);
+    actor.model.traverse(o => {
+      if (o.geometry) o.geometry.dispose();
+      if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => m.dispose());
+    });
+  }
+  function mpApplyState(packet) {
+    if (!packet || !packet.state) return;
+    mpPendingState = packet;
+    mpLocalPlayerId = packet.playerId || mpLocalPlayerId;
+    const shipState = packet.state.ships && packet.state.ships[mpTeam];
+    if (shipState) mpServerShip = shipState;
+    const self = (packet.state.players || []).find(p => p.id === mpLocalPlayerId);
+    if (self && state.ready) {
+      state.playerLocal.x = Math.max(-3.9, Math.min(3.9, Number(self.x) || 0));
+      state.playerLocal.z = Math.max(-17.65, Math.min(22.1, Number(self.z) || 0));
+      state.yaw = Number(self.yaw) || 0;
+    }
+    const systems = shipState && shipState.systems;
+    if (systems) {
+      state.doorOpen = !!systems.doorOpen;
+      state.hatchOpen = !!systems.hatchOpen;
+      if (systems.engine) { state.throttle = Number(systems.engine.throttle) || 0; state.rudder = Number(systems.engine.rudder) || 0; }
+      const interaction = systems.lastInteraction;
+      if (interaction && interaction.at && interaction.at !== mpLastInteractionAt) {
+        mpLastInteractionAt = interaction.at;
+        if (interaction.target === 'crane') state.craneDeployed = !!interaction.value;
+        if (interaction.target === 'windlass') state.windlassRunning = !!interaction.value;
+        if (interaction.target === 'capstan') state.capstanRunning = !!interaction.value;
+      }
+      const th = $('helm-throttle'), ru = $('helm-rudder');
+      if (th && document.activeElement !== th) th.value = String(state.throttle);
+      if (ru && document.activeElement !== ru) ru.value = String(state.rudder);
+    }
+    mpUpdateRemoteActors();
+  }
+  function mpUpdateRemoteActors() {
+    if (!mpEnabled || !ship || !window.TitanCharacterRuntime || !mpPendingState) return;
+    const stateSnap = mpPendingState.state;
+    const players = (stateSnap.players || []).filter(p => p.team === mpTeam && p.id !== mpLocalPlayerId && p.connected && (p.area || 'main-deck') === 'main-deck');
+    const alive = new Set();
+    players.forEach(p => {
+      alive.add(p.id);
+      let actor = mpRemoteActors.get(p.id);
+      if (!actor) {
+        const model = window.TitanCharacterRuntime.createModel(THREE, p.character || { name: p.name }, { scale: .78 });
+        model.name = 'MP_REMOTE_' + p.id;
+        ship.add(model);
+        actor = { model, moving: false, speed: p.character && p.character.animationSpeed || 1 };
+        mpRemoteActors.set(p.id, actor);
+      }
+      actor.model.position.set(Number(p.x) || 0, .06, Number(p.z) || 0);
+      actor.model.rotation.y = Number(p.yaw) || 0;
+      actor.moving = Date.now() < (p.movingUntil || 0);
+      actor.speed = p.character && p.character.animationSpeed || 1;
+    });
+    for (const [id, actor] of mpRemoteActors) {
+      if (!alive.has(id)) { mpDisposeActor(actor); mpRemoteActors.delete(id); }
+    }
+  }
+  if (mpEnabled) {
+    window.addEventListener('message', event => {
+      if (event.origin !== window.location.origin || !event.data || event.data.source !== 'TITAN_MULTIPLAYER') return;
+      if (event.data.type === 'STATE') mpApplyState(event.data.packet);
+    });
+    mpPost({ type: 'DECK_READY', team: mpTeam });
+  }
   window.TitanDeckGame = {
     get scene() { return scene; },
     get camera() { return camera; },
     get ship() { return ship; },
     getPose() {
-      return {
-        x: state.playerLocal.x, z: state.playerLocal.z, yaw: state.yaw,
-        scale: SHIP_SCALE, deckY: 3.372
-      };
-    }
+      return { x: state.playerLocal.x, z: state.playerLocal.z, yaw: state.yaw, scale: SHIP_SCALE, deckY: 3.372 };
+    },
+    setMultiplayerState: mpApplyState
   };
 
   function updateDoor(dt) {
@@ -3914,12 +4000,14 @@ html, body {
     if (window.TitanCharacterRuntime && window.TitanDeckArms) window.TitanCharacterRuntime.playFirstPersonAction(window.TitanDeckArms);
     if (actionType === 'door') {
       state.doorOpen = !state.doorOpen;
+      mpPost({ type: 'INTERACTION', target: 'door', action: 'doorOpen', value: state.doorOpen });
       SoundFX.play('door');
       return true;
     }
     if (actionType === 'hatch') {
       if (!state.hatchOpen) {
         state.hatchOpen = true;
+        mpPost({ type: 'INTERACTION', target: 'hatch', action: 'hatchOpen', value: true });
         SoundFX.play('hatch');
         showToast('DECK ACCESS HATCH OPENED · Press USE again to descend ladder');
       } else {
@@ -3990,18 +4078,21 @@ html, body {
     }
     if (actionType === 'crane') {
       state.craneDeployed = !state.craneDeployed;
+      mpPost({ type: 'INTERACTION', target: 'crane', value: state.craneDeployed });
       SoundFX.play('hatch');
       showToast(state.craneDeployed ? 'DECK CARGO CRANE · Slewing boom outboard' : 'DECK CARGO CRANE · Stowing boom amidships');
       return true;
     }
     if (actionType === 'windlass') {
       state.windlassRunning = !state.windlassRunning;
+      mpPost({ type: 'INTERACTION', target: 'windlass', value: state.windlassRunning });
       SoundFX.play('hatch');
       showToast(state.windlassRunning ? 'ANCHOR WINDLASS · Chain gypsies engaged' : 'ANCHOR WINDLASS · Brake locked & standby');
       return true;
     }
     if (actionType === 'capstan') {
       state.capstanRunning = !state.capstanRunning;
+      mpPost({ type: 'INTERACTION', target: 'capstan', value: state.capstanRunning });
       SoundFX.play('hatch');
       showToast(state.capstanRunning ? 'AFT WARPING CAPSTAN · Hauling hawser line' : 'AFT WARPING CAPSTAN · Stopped');
       return true;
@@ -4075,6 +4166,13 @@ html, body {
     updateDoor(dt);
     updateHatchAndDeckAnimations(dt, state.time);
     updateShipMotion(dt);
+    if (mpEnabled && mpServerShip && ship) {
+      ship.position.x = Number(mpServerShip.x) || 0;
+      ship.position.z = Number(mpServerShip.z) || 0;
+      ship.rotation.y = Number(mpServerShip.yaw) || 0;
+      state.shipSpeed = Number(mpServerShip.speed) || 0;
+    }
+    mpUpdateRemoteActors();
     updateLiveScreens(dt, state.time);
     if (radarSweepMesh) radarSweepMesh.rotation.y = state.time * 1.65;
     if (ship) ship.rotation.z = Math.sin(state.time * 0.4) * 0.0014;
@@ -4108,6 +4206,13 @@ html, body {
       window.TitanCharacterRuntime.updateFirstPersonArms(window.TitanDeckArms, state.time, titanWalkAmount, (window.TitanDeckCharacterConfig && window.TitanDeckCharacterConfig.animationSpeed) || 1);
     }
     checkProximity();
+    if (mpEnabled && performance.now() - mpLastPoseAt > 75) {
+      mpLastPoseAt = performance.now();
+      mpPost({ type: 'POSE', pose: { x: state.playerLocal.x, z: state.playerLocal.z, yaw: state.yaw, area: 'main-deck', moving: titanWalkAmount > .02 } });
+    }
+    for (const actor of mpRemoteActors.values()) {
+      if (window.TitanCharacterRuntime) window.TitanCharacterRuntime.animateModel(actor.model, state.time, actor.moving ? 1 : 0, actor.speed || 1);
+    }
 
     renderer.render(scene, camera);
     if (cssRenderer) cssRenderer.render(camera);

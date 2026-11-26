@@ -7,7 +7,7 @@
 <title>THE TITAN — Multiplayer</title>
 <style>
 :root{color-scheme:dark;--bg:#061522;--panel:#0c2434;--line:#24495b;--teal:#56d5d0;--muted:#9bb4be;--gold:#d9bb79;--blue:#49b9e9;--amber:#e5ae58;--red:#ef7777;--green:#69d5ad}
-*{box-sizing:border-box}html,body{margin:0;min-height:100%;background:radial-gradient(ellipse at 75% 0,#12384a,var(--bg) 58%);color:#effafa;font:14px/1.45 Inter,system-ui,-apple-system,"Segoe UI",sans-serif}body{min-height:100dvh}button,input{font:inherit}button{cursor:pointer;touch-action:manipulation}a{color:inherit}.topbar{padding:14px max(16px,4vw);border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;background:#04131fe8;position:sticky;top:0;z-index:5;backdrop-filter:blur(12px)}.brand{display:flex;gap:10px;align-items:center;text-decoration:none}.mark{width:36px;height:36px;border-radius:10px;background:linear-gradient(145deg,#258a91,#0c3045);display:grid;place-items:center;border:1px solid #58d3cb80;font-size:19px}.brand b{letter-spacing:.18em;font-size:12px}.brand small{display:block;color:#85aeb8;font:8px ui-monospace,monospace;letter-spacing:.14em;margin-top:3px}.top-link{font-size:11px;color:#9bb9c3;text-decoration:none}main{width:min(1120px,94vw);margin:28px auto 54px}.eyebrow{color:var(--teal);font:9px ui-monospace,monospace;letter-spacing:.19em}.hero h1{font-size:clamp(29px,5vw,48px);line-height:1.02;margin:8px 0}.muted{color:var(--muted)}.hero p{max-width:670px;margin:0 0 22px;color:var(--muted);line-height:1.65}.panel{background:linear-gradient(155deg,rgba(12,36,52,.98),rgba(5,20,32,.98));border:1px solid var(--line);border-radius:16px;padding:clamp(15px,3vw,24px);box-shadow:0 16px 45px #0003;margin:14px 0}.hidden{display:none!important}.section-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px}.section-head h2{font-size:13px;letter-spacing:.12em;margin:0}.step{color:#83a9b5;font:8px ui-monospace,monospace;letter-spacing:.12em}.role-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.role-card{border:1px solid #35586a;background:linear-gradient(150deg,#102e40,#081d2c);color:#eafafa;border-radius:13px;min-height:155px;padding:19px;text-align:left;display:flex;flex-direction:column;align-items:flex-start;gap:8px;transition:.18s}.role-card:hover{border-color:var(--teal);transform:translateY(-2px)}.role-icon{font-size:24px}.role-card strong{font-size:13px;letter-spacing:.08em}.role-card span:last-child{font-size:11px;color:var(--muted);line-height:1.5}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.field{display:grid;gap:6px;margin:10px 0;color:#c1d7df;font-size:11px}.field input{width:100%;padding:12px;border:1px solid #34576a;border-radius:9px;background:#061925;color:#f5fbfc;min-height:44px;outline:none}.field input:focus{border-color:var(--teal);box-shadow:0 0 0 3px #56d5d015}.field input::placeholder{color:#607f8c}.btn{border:1px solid #3b6477;background:#102e40;color:#eafafa;border-radius:9px;padding:11px 14px;font-weight:750;font-size:11px;letter-spacing:.04em;min-height:42px}.btn.primary{background:linear-gradient(110deg,#218e93,#15596d);border-color:#56d5d0;color:white}.btn.gold{border-color:#b58b4e;color:#f2d9a7}.btn.ghost{background:transparent}.btn:disabled{opacity:.42;cursor:not-allowed}.btn-row{display:flex;gap:9px;flex-wrap:wrap;align-items:center;margin-top:13px}.status{min-height:20px;color:var(--teal);font-size:11px;margin:10px 0 0;white-space:pre-wrap}.status.error{color:#ff9b9b}.status.ok{color:#8ee1bb}.team-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:12px 0}.team-choice{border:2px solid #35586a;border-radius:12px;background:#091f2e;color:#eafafa;padding:16px;text-align:left;min-height:100px}.team-choice[data-team="A"]{--team:var(--blue)}.team-choice[data-team="B"]{--team:var(--amber)}.team-choice.selected{border-color:var(--team);background:color-mix(in srgb,var(--team) 13%,#091f2e);box-shadow:inset 0 0 0 1px var(--team)}.team-choice strong{display:block;font-size:15px;letter-spacing:.08em}.team-choice small{display:block;color:var(--muted);margin-top:5px}.team-choice .ship-icon{font-size:20px;display:block;margin-bottom:5px}.badge{display:inline-block;border:1px solid #406174;border-radius:40px;padding:3px 8px;font:9px ui-monospace,monospace;color:#a9c5cf}.code{font-size:clamp(31px,6vw,44px);letter-spacing:.2em;font-weight:900;color:var(--gold);line-height:1.15}.code-row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}.teams-status{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:15px 0}.team-stat{padding:13px;border:1px solid var(--line);border-radius:11px;background:#081d2b}.team-stat h3{font-size:10px;letter-spacing:.1em;margin:0 0 4px}.team-stat .number{font-size:27px;font-weight:850}.bar{height:6px;background:#1b3949;border-radius:8px;overflow:hidden;margin-top:7px}.bar i{display:block;height:100%;width:0;background:var(--teal);transition:width .15s}.manifest{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:7px;margin-top:9px}.manifest-item{border:1px solid #244557;background:#081d2b;border-radius:8px;padding:8px 10px;font-size:10px;display:flex;justify-content:space-between;gap:8px;align-items:center}.manifest-item small{color:#8eabb5}.avatar-swatch{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:5px}.room-meta{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:10px 0}.room-meta .badge{font-size:10px}#player-world,#spectator-world{width:100%;height:clamp(250px,45vw,390px);display:block;background:linear-gradient(#1c566a,#071923);border:1px solid #2d596b;border-radius:12px;touch-action:pan-y}.world-help{font-size:10px;color:#90aeb8;margin:8px 0}.movement{display:grid;grid-template-columns:repeat(3,52px);gap:7px;justify-content:center;margin:13px auto}.movement button{min-height:45px;border:1px solid #426a7a;border-radius:10px;background:#102e40;color:white;font-size:16px}.movement .empty{visibility:hidden}.player-lobby{margin-top:14px}.notice{background:#091f2d;border-left:3px solid var(--teal);border-radius:7px;padding:10px 12px;color:#a6c4cd;font-size:10px;line-height:1.5;margin-top:12px}footer{text-align:center;color:#688b98;font:8px ui-monospace,monospace;letter-spacing:.1em;padding:0 14px 22px}.field-inline{display:flex;gap:8px;align-items:end;flex-wrap:wrap}.field-inline .field{flex:1;min-width:180px}.camera-controls{color:#93b0ba;font-size:10px;margin-top:8px}
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;background:radial-gradient(ellipse at 75% 0,#12384a,var(--bg) 58%);color:#effafa;font:14px/1.45 Inter,system-ui,-apple-system,"Segoe UI",sans-serif}body{min-height:100dvh}button,input{font:inherit}button{cursor:pointer;touch-action:manipulation}a{color:inherit}.topbar{padding:14px max(16px,4vw);border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;background:#04131fe8;position:sticky;top:0;z-index:5;backdrop-filter:blur(12px)}.brand{display:flex;gap:10px;align-items:center;text-decoration:none}.mark{width:36px;height:36px;border-radius:10px;background:linear-gradient(145deg,#258a91,#0c3045);display:grid;place-items:center;border:1px solid #58d3cb80;font-size:19px}.brand b{letter-spacing:.18em;font-size:12px}.brand small{display:block;color:#85aeb8;font:8px ui-monospace,monospace;letter-spacing:.14em;margin-top:3px}.top-link{font-size:11px;color:#9bb9c3;text-decoration:none}main{width:min(1120px,94vw);margin:28px auto 54px}.eyebrow{color:var(--teal);font:9px ui-monospace,monospace;letter-spacing:.19em}.hero h1{font-size:clamp(29px,5vw,48px);line-height:1.02;margin:8px 0}.muted{color:var(--muted)}.hero p{max-width:670px;margin:0 0 22px;color:var(--muted);line-height:1.65}.panel{background:linear-gradient(155deg,rgba(12,36,52,.98),rgba(5,20,32,.98));border:1px solid var(--line);border-radius:16px;padding:clamp(15px,3vw,24px);box-shadow:0 16px 45px #0003;margin:14px 0}.hidden{display:none!important}.section-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px}.section-head h2{font-size:13px;letter-spacing:.12em;margin:0}.step{color:#83a9b5;font:8px ui-monospace,monospace;letter-spacing:.12em}.role-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.role-card{border:1px solid #35586a;background:linear-gradient(150deg,#102e40,#081d2c);color:#eafafa;border-radius:13px;min-height:155px;padding:19px;text-align:left;display:flex;flex-direction:column;align-items:flex-start;gap:8px;transition:.18s}.role-card:hover{border-color:var(--teal);transform:translateY(-2px)}.role-icon{font-size:24px}.role-card strong{font-size:13px;letter-spacing:.08em}.role-card span:last-child{font-size:11px;color:var(--muted);line-height:1.5}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.field{display:grid;gap:6px;margin:10px 0;color:#c1d7df;font-size:11px}.field input{width:100%;padding:12px;border:1px solid #34576a;border-radius:9px;background:#061925;color:#f5fbfc;min-height:44px;outline:none}.field input:focus{border-color:var(--teal);box-shadow:0 0 0 3px #56d5d015}.field input::placeholder{color:#607f8c}.btn{border:1px solid #3b6477;background:#102e40;color:#eafafa;border-radius:9px;padding:11px 14px;font-weight:750;font-size:11px;letter-spacing:.04em;min-height:42px}.btn.primary{background:linear-gradient(110deg,#218e93,#15596d);border-color:#56d5d0;color:white}.btn.gold{border-color:#b58b4e;color:#f2d9a7}.btn.ghost{background:transparent}.btn:disabled{opacity:.42;cursor:not-allowed}.btn-row{display:flex;gap:9px;flex-wrap:wrap;align-items:center;margin-top:13px}.status{min-height:20px;color:var(--teal);font-size:11px;margin:10px 0 0;white-space:pre-wrap}.status.error{color:#ff9b9b}.status.ok{color:#8ee1bb}.team-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:12px 0}.team-choice{border:2px solid #35586a;border-radius:12px;background:#091f2e;color:#eafafa;padding:16px;text-align:left;min-height:100px}.team-choice[data-team="A"]{--team:var(--blue)}.team-choice[data-team="B"]{--team:var(--amber)}.team-choice.selected{border-color:var(--team);background:color-mix(in srgb,var(--team) 13%,#091f2e);box-shadow:inset 0 0 0 1px var(--team)}.team-choice strong{display:block;font-size:15px;letter-spacing:.08em}.team-choice small{display:block;color:var(--muted);margin-top:5px}.team-choice .ship-icon{font-size:20px;display:block;margin-bottom:5px}.badge{display:inline-block;border:1px solid #406174;border-radius:40px;padding:3px 8px;font:9px ui-monospace,monospace;color:#a9c5cf}.code{font-size:clamp(31px,6vw,44px);letter-spacing:.2em;font-weight:900;color:var(--gold);line-height:1.15}.code-row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}.teams-status{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:15px 0}.team-stat{padding:13px;border:1px solid var(--line);border-radius:11px;background:#081d2b}.team-stat h3{font-size:10px;letter-spacing:.1em;margin:0 0 4px}.team-stat .number{font-size:27px;font-weight:850}.bar{height:6px;background:#1b3949;border-radius:8px;overflow:hidden;margin-top:7px}.bar i{display:block;height:100%;width:0;background:var(--teal);transition:width .15s}.manifest{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:7px;margin-top:9px}.manifest-item{border:1px solid #244557;background:#081d2b;border-radius:8px;padding:8px 10px;font-size:10px;display:flex;justify-content:space-between;gap:8px;align-items:center}.manifest-item small{color:#8eabb5}.avatar-swatch{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:5px}.room-meta{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:10px 0}.room-meta .badge{font-size:10px}.game-shell{width:min(1500px,96vw);margin:18px auto 35px;padding:12px;background:#041622;border:1px solid #256072;border-radius:15px;box-shadow:0 20px 70px #0008}.game-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:2px 2px 12px}.game-toolbar .badge{margin-right:auto}.game-stage{position:relative;width:100%;height:min(76vh,820px);min-height:380px;background:#020a11;border:1px solid #1c5367;border-radius:11px;overflow:hidden}.game-stage iframe{display:block;width:100%;height:100%;border:0;background:#03080f}.game-stage iframe.hidden{display:none}.game-caption{font:10px ui-monospace,monospace;color:#90b3bf;padding:8px 4px 0}.game-button.active{border-color:var(--teal);background:#115063}.game-status{font-size:10px;color:#9bc4ce;margin:0 3px 8px}.game-toolbar .btn{min-height:38px}.host-fly{border-color:#bc9556;color:#f5d79e}.game-shell.fullscreen{position:fixed;z-index:50;inset:0;width:100vw;height:100dvh;margin:0;border-radius:0;padding:10px;background:#020a11}.game-shell.fullscreen .game-stage{height:calc(100dvh - 95px);max-height:none}.world-help{font-size:10px;color:#90aeb8;margin:8px 0}.movement{display:grid;grid-template-columns:repeat(3,52px);gap:7px;justify-content:center;margin:13px auto}.movement button{min-height:45px;border:1px solid #426a7a;border-radius:10px;background:#102e40;color:white;font-size:16px}.movement .empty{visibility:hidden}.player-lobby{margin-top:14px}.notice{background:#091f2d;border-left:3px solid var(--teal);border-radius:7px;padding:10px 12px;color:#a6c4cd;font-size:10px;line-height:1.5;margin-top:12px}footer{text-align:center;color:#688b98;font:8px ui-monospace,monospace;letter-spacing:.1em;padding:0 14px 22px}.field-inline{display:flex;gap:8px;align-items:end;flex-wrap:wrap}.field-inline .field{flex:1;min-width:180px}.camera-controls{color:#93b0ba;font-size:10px;margin-top:8px}
 @media(max-width:700px){.role-grid{grid-template-columns:1fr}.role-card{min-height:110px}.grid{grid-template-columns:1fr}.topbar{padding:12px}.top-link{font-size:9px}main{margin-top:18px}.panel{border-radius:13px}.team-choice{padding:12px}.btn{min-height:44px}}
 @media(max-width:380px){.teams-status{grid-template-columns:1fr}.team-grid{gap:7px}}
 </style>
@@ -44,7 +44,7 @@
           <div class="team-stat"><h3>SHIP B · BRAVO</h3><div class="number" id="count-b">0/15</div><div class="bar"><i id="bar-b"></i></div></div>
         </div>
         <p id="host-room-status" class="status">Waiting for players…</p>
-        <div class="btn-row"><button class="btn primary" id="start-race" disabled>START RACE</button><button class="btn" id="reset-race">RESET ROOM</button></div>
+        <div class="btn-row"><button class="btn primary" id="start-race" disabled>START GAME</button><button class="btn" id="reset-race">RESET ROOM</button></div>
         <h3 style="font-size:10px;letter-spacing:.12em;margin:20px 0 8px">CREW MANIFEST</h3><div id="host-manifest" class="manifest"><span class="muted">No players yet.</span></div>
         <h3 style="font-size:10px;letter-spacing:.12em;margin:20px 0 8px">SHIP SPEED CONTROL</h3>
         <div class="grid"><label class="field">Ship<select id="host-ship"><option value="A">Ship A · Alpha</option><option value="B">Ship B · Bravo</option></select></label><label class="field">Speed · <output id="host-speed-value">0</output><input id="host-speed" type="range" min="0" max="100" value="0"></label></div>
@@ -72,8 +72,7 @@
     <div id="player-lobby" class="player-lobby hidden">
       <div class="section-head"><h2>YOU ARE ABOARD</h2><span id="player-team-badge" class="badge">SHIP —</span></div>
       <div class="room-meta"><span class="badge" id="player-room-code">ROOM —</span><span class="badge" id="player-crew-count">0 / 30 CREW</span><span class="badge" id="player-phase">LOBBY</span></div>
-      <canvas id="player-world" aria-label="Shared two-ship multiplayer world"></canvas>
-      <p class="world-help">Shared course preview. Crew positions and custom character profiles update as room state arrives.</p>
+      <p class="world-help">Both server-created ships are active in this room. Your assigned main deck opens automatically when the host starts the game.</p>
       <div class="movement" aria-label="Movement controls"><span class="empty"></span><button id="move-forward" aria-label="Move forward">▲</button><span class="empty"></span><button id="move-left" aria-label="Move left">◀</button><button id="move-back" aria-label="Move back">▼</button><button id="move-right" aria-label="Move right">▶</button></div>
       <div class="btn-row"><button class="btn primary" id="ready-button">I'M READY</button><button class="btn" id="leave-room">LEAVE ROOM</button></div>
       <p id="ready-status" class="status"></p>
@@ -86,19 +85,35 @@
     <div class="grid"><label class="field">Render WebSocket URL<input id="spectator-server" value="wss://titan-multiplayer.onrender.com"></label><label class="field">Room code<input id="spectator-code" maxlength="6" placeholder="Room code"></label></div>
     <div class="btn-row"><button class="btn primary" id="connect-spectator">CONNECT DISPLAY</button><button class="btn ghost" data-back>Back</button></div>
     <p id="spectator-status" class="status"></p>
-    <div id="spectator-view" class="hidden"><div class="room-meta"><span class="badge" id="spectator-phase">LOBBY</span><span class="badge" id="spectator-count">0 / 30 CREW</span></div><canvas id="spectator-world" aria-label="Shared race spectator view"></canvas><p class="camera-controls">CAMERA: use W A S D or arrow keys to fly around the course. The display is read-only.</p><div class="teams-status"><div class="team-stat"><h3>ALPHA · SHIP A</h3><div id="spectator-a">Waiting</div></div><div class="team-stat"><h3>BRAVO · SHIP B</h3><div id="spectator-b">Waiting</div></div></div><h2 id="spectator-winner"></h2></div>
+    <div id="spectator-view" class="hidden"><div class="room-meta"><span class="badge" id="spectator-phase">LOBBY</span><span class="badge" id="spectator-count">0 / 30 CREW</span></div><p class="camera-controls">The live projection map opens automatically when the host starts the game. Display is read-only.</p><div class="teams-status"><div class="team-stat"><h3>ALPHA · SHIP A</h3><div id="spectator-a">Waiting</div></div><div class="team-stat"><h3>BRAVO · SHIP B</h3><div id="spectator-b">Waiting</div></div></div><h2 id="spectator-winner"></h2></div>
+  </section>
+
+  <section id="game-session" class="game-shell hidden" aria-label="TITAN multiplayer game">
+    <div class="game-toolbar">
+      <span id="game-room-badge" class="badge">ROOM —</span>
+      <button class="btn game-button" id="view-deck">MY SHIP · MAIN DECK</button>
+      <button class="btn game-button" id="view-map">WORLD MAP</button>
+      <button class="btn host-fly hidden" id="fly-mode">FLY MODE: OFF</button>
+      <button class="btn" id="game-fullscreen">FULL SCREEN</button>
+      <button class="btn" id="game-reset">RESET ROOM</button>
+      <button class="btn ghost" id="game-leave">LEAVE</button>
+    </div>
+    <p class="game-status" id="game-status">Synchronising both server-created ships…</p>
+    <div class="game-stage">
+      <iframe id="game-map-frame" title="Authoritative projection.html multiplayer world" allow="fullscreen"></iframe>
+      <iframe id="game-deck-frame" title="Your assigned TITAN main deck" allow="fullscreen; gamepad"></iframe>
+    </div>
+    <div class="game-caption">SERVER-AUTHORITATIVE WORLD · TWO SEPARATE SHIPS · LIVE CREW POSITIONS</div>
   </section>
 </main>
 <footer>THE TITAN · PRIVATE MULTIPLAYER · HOST, PLAYERS AND DISPLAY SHARE ONE ROOM CODE</footer>
-<script src="three.min.js"></script>
-<script src="character-runtime.js"></script>
 <script>
 (()=>{
 'use strict';
 const $=id=>document.getElementById(id);
 const DEFAULT_SERVER='wss://titan-multiplayer.onrender.com';
 const CHARACTER_KEY='titan-character-v1';
-let socket=null,role=null,roomCode='',roomState=null,selectedTeam='',playerId='',deviceId='',ready=false,playerPos={x:0,z:0},sceneView=null,reconnectTimer=null,reconnectAttempts=0;
+let socket=null,role=null,roomCode='',roomState=null,selectedTeam='',playerId='',deviceId='',ready=false,playerPos={x:0,z:0},reconnectTimer=null,reconnectAttempts=0,gameView='deck',gameFrameLoaded={map:false,deck:false},hostFly=false,gameEntered=false;
 const serverSaved=localStorage.getItem('titan-mp-server')||DEFAULT_SERVER;
 ['host-server','join-server','spectator-server'].forEach(id=>$(id).value=serverSaved);
 function setStatus(id,message,type=''){const el=$(id);if(!el)return;el.textContent=message;el.className='status'+(type?' '+type:'');}
@@ -107,6 +122,7 @@ function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&l
 function normalizeServer(id){let raw=$(id).value.trim()||DEFAULT_SERVER;let u;try{u=new URL(raw);}catch(_){throw new Error('Enter a valid Render URL, for example wss://titan-multiplayer.onrender.com');}if(u.protocol==='https:')u.protocol='wss:';else if(u.protocol==='http:')u.protocol='ws:';if(!['ws:','wss:'].includes(u.protocol))throw new Error('Server URL must use https://, http://, wss:// or ws://.');u.hash='';localStorage.setItem('titan-mp-server',raw);return u.toString();}
 function characterExists(){try{return !!localStorage.getItem(CHARACTER_KEY);}catch(_){return false;}}
 function readCharacter(){try{return JSON.parse(localStorage.getItem(CHARACTER_KEY)||'{}');}catch(_){return {};}}
+function ensureHostCharacter(){if(characterExists())return;try{localStorage.setItem(CHARACTER_KEY,JSON.stringify({name:'Captain',skinColor:'#d9a47f',outfitColor:'#237f93',accentColor:'#e2bd78',hairColor:'#28333b',hairStyle:'short',accessory:'none',height:1,bodyBuild:1,animationSpeed:1}));}catch(_){}}
 function playerDeviceId(){try{let id=localStorage.getItem('titan-mp-device-id');if(!id){id=(crypto.randomUUID?crypto.randomUUID():('dev-'+Date.now()+'-'+Math.random().toString(16).slice(2)));localStorage.setItem('titan-mp-device-id',id);}return id;}catch(_){return 'dev-'+Math.random().toString(16).slice(2);}}
 function showJoinStatus(message,type=''){setStatus('join-status',message,type);}
 function closeSocket(){if(reconnectTimer){clearTimeout(reconnectTimer);reconnectTimer=null;}if(socket){try{socket.onclose=null;socket.close();}catch(_){}socket=null;}}
@@ -135,14 +151,14 @@ function handleMessage(m){
     return;
   }
   if(m.type==='created'){
-    reconnectAttempts=0;if(reconnectTimer){clearTimeout(reconnectTimer);reconnectTimer=null;}role='host';roomCode=m.code||m.state?.code||'';roomState=m.state||roomState;
+    reconnectAttempts=0;if(reconnectTimer){clearTimeout(reconnectTimer);reconnectTimer=null;}role='host';roomCode=m.code||m.state?.code||'';roomState=m.state||roomState;playerId=roomState?.hostPlayerId||roomState?.players?.find(p=>p.isHost)?.id||('host-'+roomCode);ensureHostCharacter();
     $('host-dashboard').classList.remove('hidden');$('room-code').textContent=roomCode||'------';
-    setStatus('host-status','Room created. Share this code with both crews.','ok');renderState(roomState);return;
+    setStatus('host-status','Room created. Loading the authoritative projection so its live obstacles and route can be registered…','ok');ensureGameFrame('map');renderState(roomState);return;
   }
   if(m.type==='host:claimed'){
-    reconnectAttempts=0;if(reconnectTimer){clearTimeout(reconnectTimer);reconnectTimer=null;}role='host';roomCode=m.code||m.state?.code||'';roomState=m.state||roomState;
+    reconnectAttempts=0;if(reconnectTimer){clearTimeout(reconnectTimer);reconnectTimer=null;}role='host';roomCode=m.code||m.state?.code||'';roomState=m.state||roomState;playerId=roomState?.hostPlayerId||roomState?.players?.find(p=>p.isHost)?.id||('host-'+roomCode);ensureHostCharacter();
     $('host-dashboard').classList.remove('hidden');$('room-code').textContent=roomCode;
-    setStatus('host-status','Host control reconnected to the existing room.','ok');renderState(roomState);return;
+    setStatus('host-status','Host control reconnected. Refreshing the authoritative projection geometry…','ok');ensureGameFrame('map');renderState(roomState);return;
   }
   if(m.type==='joined'){
     reconnectAttempts=0;if(reconnectTimer){clearTimeout(reconnectTimer);reconnectTimer=null;}role='player';playerId=m.playerId||playerId;roomCode=m.state?.code||roomCode;
@@ -151,12 +167,12 @@ function handleMessage(m){
     $('join-room').disabled=true;$('customize-character').textContent='CHARACTER SAVED';
     try{sessionStorage.removeItem('titan-mp-pending-join');}catch(_){}
     showJoinStatus('Joined successfully. You are on Ship '+(m.team||selectedTeam)+'.','ok');
-    if(m.state)renderState(m.state);initWorld('player-world');return;
+    if(m.state)renderState(m.state);return;
   }
   if(m.type==='watching'){
     reconnectAttempts=0;if(reconnectTimer){clearTimeout(reconnectTimer);reconnectTimer=null;}role='spectator';roomCode=m.code||m.state?.code||'';$('spectator-view').classList.remove('hidden');
     setStatus('spectator-status','Spectator display connected to room '+roomCode+'.','ok');
-    if(m.state)renderState(m.state);initWorld('spectator-world');return;
+    if(m.state)renderState(m.state);return;
   }
   if(m.type==='room:checked'){
     const seats=m.seats||{};
@@ -176,30 +192,37 @@ function handleMessage(m){
 }
 function playerManifest(players){return (players||[]).map(p=>{
   const color=p.character?.outfitColor||'#56d5d0';
-  return '<div class="manifest-item"><span><i class="avatar-swatch" style="background:'+esc(color)+'"></i>'+esc(p.name)+' <small>SHIP '+esc(p.team)+'</small></span><span class="badge">'+(p.connected?'ONLINE':'RECONNECTING')+' · '+(p.ready?'READY':'NOT READY')+'</span></div>';
+  const area=(p.area||'main-deck').replace('-', ' ').toUpperCase();
+  return '<div class="manifest-item"><span><i class="avatar-swatch" style="background:'+esc(color)+'"></i>'+esc(p.name)+' <small>SHIP '+esc(p.team)+' · '+esc(area)+'</small></span><span class="badge">'+(p.connected?'ONLINE':'RECONNECTING')+' · '+(p.ready?'READY':'NOT READY')+'</span></div>';
 }).join('')||'<span class="muted">No players have joined yet.</span>';}
+
 function renderState(s){
   if(!s)return;roomState=s;roomCode=s.code||roomCode;
-  const players=s.players||[],a=players.filter(p=>p.team==='A'),b=players.filter(p=>p.team==='B');
+  const players=s.players||[],crew=players.filter(p=>!p.isHost),a=crew.filter(p=>p.team==='A'),b=crew.filter(p=>p.team==='B');
   $('room-code').textContent=roomCode||'------';
   $('count-a').textContent=a.length+'/15';$('count-b').textContent=b.length+'/15';
   $('bar-a').style.width=(Math.min(15,a.length)/15*100)+'%';$('bar-b').style.width=(Math.min(15,b.length)/15*100)+'%';
   $('host-phase').textContent=String(s.status||'lobby').toUpperCase();
-  const readyCount=players.filter(p=>p.ready).length;
-  $('host-room-status').textContent='STATUS: '+String(s.status||'lobby').toUpperCase()+' · '+readyCount+'/'+players.length+' READY · '+a.length+' ALPHA · '+b.length+' BRAVO';
-  const canStart=s.status==='lobby'&&a.length>0&&b.length>0&&players.length>=2&&players.every(p=>p.ready&&p.connected);
+  const readyCount=crew.filter(p=>p.ready&&p.connected).length;
+  $('host-room-status').textContent='STATUS: '+String(s.status||'lobby').toUpperCase()+' · '+readyCount+'/'+crew.length+' CREW READY · '+(a.length+(players.some(p=>p.isHost&&p.team==='A')?1:0))+' ON SHIP A · '+b.length+' ON SHIP B';
+  const hasA=players.some(p=>p.team==='A'&&p.connected),hasB=players.some(p=>p.team==='B'&&p.connected);
+  const canStart=s.status==='lobby'&&!!s.map?.geometryReady&&hasA&&hasB&&crew.length>=1&&crew.every(p=>p.ready&&p.connected)&&players.some(p=>p.isHost&&p.connected);
   $('start-race').disabled=!canStart;
+  if(s.status==='lobby'&&!s.map?.geometryReady)$('host-room-status').textContent+=' · WAITING FOR MAP GEOMETRY';
   $('host-manifest').innerHTML=playerManifest(players);
-  $('player-crew-count').textContent=players.length+' / 30 CREW';$('player-phase').textContent=String(s.status||'lobby').toUpperCase();
+  $('player-crew-count').textContent=crew.length+' / 30 CREW';$('player-phase').textContent=String(s.status||'lobby').toUpperCase();
   $('player-manifest').innerHTML=playerManifest(players);
   const me=players.find(p=>p.id===playerId);
-  if(me){playerPos={x:Number(me.x)||0,z:Number(me.z)||0};ready=!!me.ready;$('player-team-badge').textContent='SHIP '+me.team;$('ready-button').textContent=ready?'CANCEL READY':'I\'M READY';$('ready-status').textContent=ready?'You are marked ready.':'Get ready with your crew.';}
-  $('spectator-phase').textContent=String(s.status||'lobby').toUpperCase();$('spectator-count').textContent=players.length+' / 30 CREW';
+  if(me){playerPos={x:Number(me.x)||0,z:Number(me.z)||0};ready=!!me.ready;$('player-team-badge').textContent='SHIP '+me.team;$('ready-button').textContent=ready?'CANCEL READY':'I\'M READY';$('ready-status').textContent=me.isHost?'Host avatar · Ship '+me.team:(ready?'You are marked ready.':'Get ready with your crew.');}
+  $('spectator-phase').textContent=String(s.status||'lobby').toUpperCase();$('spectator-count').textContent=crew.length+' / 30 CREW';
   $('spectator-a').textContent='Crew '+a.length+'/15 · Ready '+a.filter(p=>p.ready).length+' · Progress '+Math.round(s.ships?.A?.progress||0)+'%';
   $('spectator-b').textContent='Crew '+b.length+'/15 · Ready '+b.filter(p=>p.ready).length+' · Progress '+Math.round(s.ships?.B?.progress||0)+'%';
   $('spectator-winner').textContent=s.winner?'SHIP '+s.winner+' WINS!':'';
-  updateWorld(s);
+  if(s.status==='racing'||s.status==='finished') enterGameSession();
+  else if(s.status==='lobby'&&gameEntered){gameEntered=false;hostFly=false;$('game-session').classList.add('hidden');if(role==='host')activePanel('host');else activePanel('join');}
+  if(gameEntered) sendStateToGameFrames();
 }
+
 function selectTeam(team){selectedTeam=team;document.querySelectorAll('.team-choice').forEach(b=>{const on=b.dataset.team===team;b.classList.toggle('selected',on);b.setAttribute('aria-pressed',on?'true':'false');});$('team-status').textContent='Selected: Ship '+team+(team==='A'?' · Alpha':' · Bravo')+'.';$('team-status').style.color=team==='A'?'#49b9e9':'#e5ae58';refreshJoinButtons();}
 function refreshJoinButtons(){const ok=!!selectedTeam&&$('join-code').value.trim().length===6&&$('join-name').value.trim().length>0&&characterExists();$('join-room').disabled=!ok;const c=characterExists()?readCharacter():null;$('character-status').textContent=c?'Character ready: '+(c.name||'Explorer')+'. You can join this room.':'Create and save your character first. Your selected room code and ship will be remembered while you customise.';}
 function getJoinDetails(){return {server:$('join-server').value.trim()||DEFAULT_SERVER,code:$('join-code').value.trim().toUpperCase(),name:$('join-name').value.trim().slice(0,22),team:selectedTeam,deviceId:playerDeviceId()};}
@@ -210,49 +233,93 @@ async function joinRoom(){const d=getJoinDetails();if(!d.code||d.code.length!==6
 }
 async function checkRoom(){const code=$('join-code').value.trim().toUpperCase();if(code.length!==6)return showJoinStatus('Enter the six-character room code first.','error');try{await ensureConnected('join-server');send({type:'room:check',code});showJoinStatus('Checking room…');}catch(e){showJoinStatus(e.message,'error');}}
 function createCharacter(){if(!stashJoin())return;location.href='character-creator.html?return=multiplayer';}
-async function createRoom(){try{const key=$('host-key').value;if(!key)return setStatus('host-status','Enter your private host key from Render.','error');setStatus('host-status','Connecting securely to Render…');await ensureConnected('host-server');role='host';send({type:'host:create',hostKey:key});}catch(e){setStatus('host-status',e.message,'error');}}
+async function createRoom(){try{ensureHostCharacter();const key=$('host-key').value;if(!key)return setStatus('host-status','Enter your private host key from Render.','error');setStatus('host-status','Connecting securely to Render…');await ensureConnected('host-server');role='host';send({type:'host:create',hostKey:key,character:readCharacter()});}catch(e){setStatus('host-status',e.message,'error');}}
 async function claimHost(){const code=prompt('Enter the existing room code to reconnect:');if(!code)return;try{const key=$('host-key').value;if(!key)return setStatus('host-status','Enter your private host key from Render.','error');await ensureConnected('host-server');role='host';roomCode=code.trim().toUpperCase();send({type:'host:claim',code:roomCode,hostKey:key});}catch(e){setStatus('host-status',e.message,'error');}}
 async function connectSpectator(){const code=$('spectator-code').value.trim().toUpperCase();if(code.length!==6)return setStatus('spectator-status','Enter the room code from the host.','error');try{setStatus('spectator-status','Connecting to the live room…');await ensureConnected('spectator-server');role='spectator';send({type:'watch',code});}catch(e){setStatus('spectator-status',e.message,'error');}}
 function copyText(value,statusId,success){const fallback=()=>{const input=document.createElement('textarea');input.value=value;document.body.appendChild(input);input.select();try{document.execCommand('copy');}catch(_){}input.remove();setStatus(statusId,success,'ok');};if(navigator.clipboard?.writeText)navigator.clipboard.writeText(value).then(()=>setStatus(statusId,success,'ok')).catch(fallback);else fallback();}
 function leaveRoom(){send({type:'player:leave'});closeSocket();role=null;$('player-lobby').classList.add('hidden');$('join-room').disabled=false;showJoinStatus('You left the room.');}
 
-// Shared 3D view: both ship hulls and each connected player's saved custom character.
-const avatarObjects=new Map();let worldRenderer=null,worldScene=null,worldCamera=null,worldCanvasId='',worldShips={};
-function initWorld(canvasId){if(worldRenderer&&worldCanvasId===canvasId)return;disposeWorld();const canvas=$(canvasId);if(!canvas||!window.THREE)return;
-  try{
-    worldCanvasId=canvasId;worldScene=new THREE.Scene();worldScene.background=new THREE.Color(0x08283a);worldScene.fog=new THREE.Fog(0x08283a,45,130);
-    worldCamera=new THREE.PerspectiveCamera(52,1,.1,240);worldCamera.position.set(0,24,31);worldCamera.lookAt(0,1,-5);
-    worldRenderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:false,powerPreference:'high-performance'});worldRenderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.5));worldRenderer.setClearColor(0x08283a);
-    worldScene.add(new THREE.HemisphereLight(0xbfeeff,0x203b48,1.8));const sun=new THREE.DirectionalLight(0xffedcf,2);sun.position.set(-12,26,15);worldScene.add(sun);
-    const sea=new THREE.Mesh(new THREE.PlaneGeometry(180,240,32,32),new THREE.MeshStandardMaterial({color:0x12506a,roughness:.62,metalness:.08}));sea.rotation.x=-Math.PI/2;sea.position.y=-.15;sea.position.z=-45;worldScene.add(sea);
-    for(const team of ['A','B']){
-      const g=new THREE.Group();const hullMat=new THREE.MeshStandardMaterial({color:team==='A'?0x238b9e:0xb57d39,metalness:.4,roughness:.48});
-      const hull=new THREE.Mesh(new THREE.BoxGeometry(8.3,1.2,17),hullMat);hull.position.y=.55;g.add(hull);
-      const deck=new THREE.Mesh(new THREE.BoxGeometry(7.7,.12,15.9),new THREE.MeshStandardMaterial({color:0x263d48,metalness:.16,roughness:.8}));deck.position.y=1.19;g.add(deck);
-      const bridge=new THREE.Mesh(new THREE.BoxGeometry(3.2,2.1,3.1),new THREE.MeshStandardMaterial({color:0x9bb4b9,metalness:.48,roughness:.4}));bridge.position.set(0,2.25,-4.2);g.add(bridge);
-      const railMat=new THREE.MeshStandardMaterial({color:team==='A'?0x54c4d4:0xe2b466,metalness:.65,roughness:.35});
-      for(const x of [-3.7,3.7]){const rail=new THREE.Mesh(new THREE.BoxGeometry(.09,.5,15.6),railMat);rail.position.set(x,1.52,0);g.add(rail);}
-      g.position.set(team==='A'?-7:7,0,0);worldScene.add(g);worldShips[team]=g;
+// The shared game world is rendered by the original projection.html and main-deck.html.
+function gameFrameUrl(kind){
+  const team=role==='host'?'A':(roomState?.players?.find(p=>p.id===playerId)?.team||selectedTeam||'A');
+  if(kind==='map')return 'projection.html?multiplayer=1&room='+encodeURIComponent(roomCode);
+  return 'main-deck.html?multiplayer=1&team='+encodeURIComponent(team)+'&room='+encodeURIComponent(roomCode)+'&player='+encodeURIComponent(playerId);
+}
+function ensureGameFrame(kind){
+  const frame=$(kind==='map'?'game-map-frame':'game-deck-frame');
+  if(!frame.src || frame.src==='about:blank' || !gameFrameLoaded[kind]){
+    frame.src=gameFrameUrl(kind);gameFrameLoaded[kind]=true;
+    frame.onload=()=>sendStateToGameFrames();
+  }
+}
+function setGameView(view){
+  gameView=view;const mapOn=view==='map';
+  $('game-map-frame').classList.toggle('hidden',!mapOn);
+  $('game-deck-frame').classList.toggle('hidden',mapOn);
+  $('view-map').classList.toggle('active',mapOn);$('view-deck').classList.toggle('active',!mapOn);
+  if(mapOn){ensureGameFrame('map');$('game-map-frame').contentWindow?.focus();if(hostFly)sendFlyMode(true);}
+  else {ensureGameFrame('deck');$('game-deck-frame').contentWindow?.focus();sendFlyMode(false);}
+  $('game-status').textContent=mapOn?'Live projection.html tactical map · both ship transforms and crew are server-synchronised.':'Ship '+(role==='host'?'A':(selectedTeam||'—'))+' · Main Deck · ship-local hitboxes and collision boundaries active.';
+  sendStateToGameFrames();
+}
+function enterGameSession(){
+  if(!roomState||!['racing','finished'].includes(roomState.status))return;
+  const firstEntry=!gameEntered;
+  if(firstEntry){gameEntered=true;gameFrameLoaded={map:false,deck:false};$('game-session').classList.remove('hidden');$('home').classList.add('hidden');$('host').classList.add('hidden');$('join').classList.add('hidden');$('spectator').classList.add('hidden');$('fly-mode').classList.toggle('hidden',role!=='host');$('game-reset').classList.toggle('hidden',role!=='host');$('view-deck').classList.toggle('hidden',role==='spectator');$('game-leave').classList.toggle('hidden',role!=='player'&&role!=='spectator');setGameView(role==='spectator'?'map':'deck');}
+  $('game-room-badge').textContent='ROOM '+roomCode+' · '+String(roomState.status).toUpperCase();
+}
+function sendStateToGameFrames(){
+  if(!gameEntered||!roomState)return;
+  const packet={state:roomState,playerId:playerId,role:role};
+  ['game-map-frame','game-deck-frame'].forEach(id=>{const f=$(id);try{if(f.contentWindow)f.contentWindow.postMessage({source:'TITAN_MULTIPLAYER',type:'STATE',packet:packet},location.origin);}catch(_){}});
+  if(hostFly&&gameView==='map')sendFlyMode(true);
+}
+function sendFlyMode(enabled){hostFly=!!enabled;$('fly-mode').textContent='FLY MODE: '+(hostFly?'ON':'OFF');$('fly-mode').classList.toggle('active',hostFly);const f=$('game-map-frame');try{f.contentWindow?.postMessage({source:'TITAN_MULTIPLAYER',type:'FLY_MODE',enabled:hostFly},location.origin);if(hostFly)f.contentWindow?.focus();}catch(_){}}
+function exitGameSession(){gameEntered=false;hostFly=false;closeSocket();role=null;roomState=null;$('game-session').classList.add('hidden');activePanel('home');}
+window.addEventListener('message',event=>{
+  if(event.origin!==location.origin||!event.data||!String(event.data.source||'').startsWith('TITAN_'))return;
+  const d=event.data;
+  if(d.source==='TITAN_MAIN_DECK'){
+    if(d.type==='DECK_READY'){sendStateToGameFrames();return;}
+    if(d.type==='POSE'&&d.pose){playerPos={x:Number(d.pose.x)||0,z:Number(d.pose.z)||0};send({type:role==='host'?'host:move':'player:move',...d.pose});return;}
+    if(d.type==='AREA_CHANGE'){send({type:role==='host'?'host:move':'player:move',x:playerPos.x,z:playerPos.z,yaw:0,area:d.area});return;}
+    if(d.type==='SHIP_CONTROL'){const team=role==='host'?'A':selectedTeam;send(role==='host'?{type:'host:control',team,throttle:d.throttle,rudder:d.rudder}:{type:'ship:control',throttle:d.throttle,rudder:d.rudder});return;}
+    if(d.type==='INTERACTION'){
+      const team=role==='host'?'A':selectedTeam;
+      if(d.action==='doorOpen'||d.action==='hatchOpen')send(role==='host'?{type:'host:system',team,action:d.action,value:d.value}:{type:'ship:system',action:d.action,value:d.value});
+      else send(role==='host'?{type:'host:system',team,action:'interaction',target:d.target,value:d.value}:{type:'ship:interaction',target:d.target,value:d.value});
     }
-    const gate=new THREE.Group();const arch=new THREE.Mesh(new THREE.TorusGeometry(10,.35,8,60),new THREE.MeshStandardMaterial({color:0xe1bf7d,emissive:0x3e2607}));gate.add(arch);gate.position.set(0,6,-22);worldScene.add(gate);
-    const resize=()=>{if(!worldRenderer||!worldCanvasId)return;const w=Math.max(1,canvas.clientWidth),h=Math.max(1,canvas.clientHeight);worldRenderer.setSize(w,h,false);worldCamera.aspect=w/h;worldCamera.updateProjectionMatrix();};
-    if(window.ResizeObserver)new ResizeObserver(resize).observe(canvas);else window.addEventListener('resize',resize);resize();
-    const thisRenderer=worldRenderer;
-    const animate=()=>{if(worldRenderer!==thisRenderer)return;requestAnimationFrame(animate);const t=performance.now()/1000;for(const entry of avatarObjects.values()){if(window.TitanCharacterRuntime)TitanCharacterRuntime.animateModel(entry.model,t,entry.moving?1:0,entry.speed||1);}worldRenderer.render(worldScene,worldCamera);};
-    const rendererRef=thisRenderer;animate();
-  }catch(err){console.warn('TITAN shared world could not initialise',err);}
-}
-function disposeWorld(){if(worldRenderer){try{worldRenderer.dispose();}catch(_){}}for(const item of avatarObjects.values()){worldScene?.remove(item.model);item.model.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material){if(Array.isArray(o.material))o.material.forEach(m=>m.dispose());else o.material.dispose();}});}avatarObjects.clear();worldRenderer=null;worldScene=null;worldCamera=null;worldCanvasId='';worldShips={};}
-function updateWorld(s){if(!worldScene||!worldRenderer||!s)return;for(const team of ['A','B']){const sh=s.ships?.[team];if(sh&&worldShips[team]){worldShips[team].position.x=Number(sh.x)||(team==='A'?-7:7);worldShips[team].position.z=-(Number(sh.progress)||0)*.18;worldShips[team].rotation.y=Number(sh.yaw)||0;}}
-  const alive=new Set();for(const p of (s.players||[])){alive.add(p.id);let entry=avatarObjects.get(p.id);if(!entry){const cfg=p.character||{name:p.name};const model=window.TitanCharacterRuntime?TitanCharacterRuntime.createModel(THREE,cfg,{scale:.62}):new THREE.Group();worldScene.add(model);entry={model,moving:false,speed:cfg.animationSpeed||1};avatarObjects.set(p.id,entry);}entry.model.visible=!!p.connected;entry.moving=Date.now()<(p.movingUntil||0);entry.speed=p.character?.animationSpeed||1;const base=p.team==='A'?-7:7;const shipZ=-(Number(s.ships?.[p.team]?.progress)||0)*.18;entry.model.position.set(base+(Number(p.x)||0),1.28,shipZ+(Number(p.z)||0));entry.model.rotation.y=Number(p.yaw)||0;}
-  for(const [id,entry] of avatarObjects){if(!alive.has(id)){worldScene.remove(entry.model);entry.model.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material){if(Array.isArray(o.material))o.material.forEach(m=>m.dispose());else o.material.dispose();}});avatarObjects.delete(id);}}
-}
+  }
+  if(d.source==='TITAN_SHIP_BUS'&&d.type==='COMMAND'){
+    const action=String(d.payload?.action||'').toLowerCase();
+    const current=roomState?.ships?.[role==='host'?'A':selectedTeam]||{};
+    let throttle=Number(current.throttle)||0, rudder=Number(current.rudder)||0;
+    if(action==='setthrottle')throttle=Number(d.payload.value)||0;
+    if(action==='setrudder')rudder=Number(d.payload.value)||0;
+    if(action==='allstop'){throttle=0;rudder=0;}
+    const team=role==='host'?'A':selectedTeam;
+    if(['setthrottle','setrudder','allstop'].includes(action)){
+      send(role==='host'?{type:'host:control',team,throttle,rudder}:{type:'ship:control',throttle,rudder});return;
+    }
+    let systemAction=null, systemValue=d.payload?.value;
+    if(action==='setelectrics'&&String(d.payload?.key)==='main'){systemAction='powerOnline';}
+    else if(action==='setcooling'&&['swPump','lubPump'].includes(String(d.payload?.key))){systemAction='coolingOnline';}
+    else if(action==='setreactor'&&String(d.payload?.key)==='generator'){systemAction='reactorOnline';}
+    if(systemAction){send(role==='host'?{type:'host:system',team,action:systemAction,value:systemValue}:{type:'ship:system',action:systemAction,value:systemValue});return;}
+  }
+  if(d.source==='TITAN_ENGINE_ROOM'&&d.type==='TELEMETRY'){
+    send({type:role==='host'?'host:telemetry':'ship:telemetry',telemetry:d.telemetry});return;
+  }
+  if(d.source==='TITAN_PROJECTION'&&d.type==='MAP_READY')sendStateToGameFrames();
+  if(d.source==='TITAN_PROJECTION'&&d.type==='MAP_GEOMETRY'&&role==='host'&&d.geometry){send({type:'host:map-geometry',geometry:d.geometry});}
+});
 
 $('open-host').onclick=()=>activePanel('host');$('open-join').onclick=()=>activePanel('join');$('open-spectator').onclick=()=>activePanel('spectator');document.querySelectorAll('[data-back]').forEach(b=>b.onclick=()=>activePanel('home'));
 $('create-room').onclick=createRoom;$('reconnect-host').onclick=claimHost;
 $('copy-code').onclick=()=>copyText(roomCode,'host-status','Room code copied.');
 $('copy-invite').onclick=()=>copyText(location.origin+location.pathname+'?mode=join&code='+encodeURIComponent(roomCode),'host-status','Invite link copied.');
 $('start-race').onclick=()=>send({type:'host:start'});$('reset-race').onclick=()=>send({type:'host:reset'});
+$('view-deck').onclick=()=>setGameView('deck');$('view-map').onclick=()=>setGameView('map');$('fly-mode').onclick=()=>{if(role!=='host')return;if(!hostFly){setGameView('map');sendFlyMode(true);}else{sendFlyMode(false);setGameView('deck');}};$('game-fullscreen').onclick=()=>{const shell=$('game-session');shell.classList.toggle('fullscreen');if(shell.classList.contains('fullscreen')){const req=shell.requestFullscreen||shell.webkitRequestFullscreen;if(req)req.call(shell);}else if(document.fullscreenElement&&document.exitFullscreen)document.exitFullscreen();};$('game-reset').onclick=()=>send({type:'host:reset'});$('game-leave').onclick=()=>{if(role==='player')send({type:'player:leave'});exitGameSession();};
 $('host-speed').oninput=()=> $('host-speed-value').textContent=$('host-speed').value;
 $('apply-speed').onclick=()=>{const team=$('host-ship').value;const ship=roomState?.ships?.[team]||{};send({type:'host:ship',team,speed:Number($('host-speed').value),x:ship.x,yaw:ship.yaw,z:ship.z});};
 $('finish-a').onclick=()=>send({type:'host:finish',team:'A'});$('finish-b').onclick=()=>send({type:'host:finish',team:'B'});
@@ -264,7 +331,6 @@ $('leave-room').onclick=leaveRoom;$('connect-spectator').onclick=connectSpectato
 function moveBy(dx,dz){if(!role||role!=='player')return;playerPos.x=Math.max(-3.1,Math.min(3.1,playerPos.x+dx));playerPos.z=Math.max(-5.5,Math.min(5.5,playerPos.z+dz));send({type:'player:move',x:playerPos.x,z:playerPos.z,yaw:Math.atan2(dx,-dz)});}
 $('move-forward').onclick=()=>moveBy(0,-.7);$('move-back').onclick=()=>moveBy(0,.7);$('move-left').onclick=()=>moveBy(-.7,0);$('move-right').onclick=()=>moveBy(.7,0);
 window.addEventListener('keydown',e=>{if(role!=='player'||$('player-lobby').classList.contains('hidden'))return;if(['ArrowUp','w','W'].includes(e.key))moveBy(0,-.5);if(['ArrowDown','s','S'].includes(e.key))moveBy(0,.5);if(['ArrowLeft','a','A'].includes(e.key))moveBy(-.5,0);if(['ArrowRight','d','D'].includes(e.key))moveBy(.5,0);});
-window.addEventListener('keydown',e=>{if(role!=='spectator'||!worldCamera||$('spectator').classList.contains('hidden'))return;const step=1.2;if(e.key==='w'||e.key==='ArrowUp')worldCamera.position.z-=step;if(e.key==='s'||e.key==='ArrowDown')worldCamera.position.z+=step;if(e.key==='a'||e.key==='ArrowLeft')worldCamera.position.x-=step;if(e.key==='d'||e.key==='ArrowRight')worldCamera.position.x+=step;worldCamera.lookAt(0,1,-5);});
 
 // Invite links can prefill the room code, but never silently create a room or bypass team choice.
 const params=new URLSearchParams(location.search);if(params.get('mode')==='join'){$('join-code').value=(params.get('code')||'').toUpperCase().replace(/[^A-F0-9]/g,'').slice(0,6);activePanel('join');}

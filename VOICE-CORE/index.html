@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VoiceCore — Offline Voice Assistant Demo</title>
+  <link rel="stylesheet" href="css/voice.css" />
+  <style>
+    :root {
+      --bg: #0d1117;
+      --panel: #161b22;
+      --border: #30363d;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --accent: #58a6ff;
+      --ok: #3fb950;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+    header {
+      padding: 1.5rem 1.25rem 1rem;
+      border-bottom: 1px solid var(--border);
+      background: var(--panel);
+    }
+    header h1 {
+      font-size: 1.35rem;
+      letter-spacing: 0.06em;
+      color: var(--accent);
+    }
+    header p { color: var(--muted); font-size: 0.9rem; margin-top: 0.35rem; max-width: 52rem; }
+    main { padding: 1.25rem; max-width: 860px; }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1rem 1.15rem;
+      margin-bottom: 1rem;
+    }
+    .card h2 {
+      font-size: 0.95rem;
+      letter-spacing: 0.04em;
+      color: var(--accent);
+      margin-bottom: 0.55rem;
+    }
+    .card p, .card li { color: var(--muted); font-size: 0.88rem; }
+    .card ul { padding-left: 1.2rem; margin: 0.4rem 0; }
+    .card code {
+      background: #0d1117;
+      padding: 0.1rem 0.35rem;
+      border-radius: 4px;
+      font-size: 0.82rem;
+      color: #79c0ff;
+    }
+    .demo-status {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 0.5rem;
+      margin-top: 0.75rem;
+    }
+    .stat {
+      background: #0d1117;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.5rem 0.6rem;
+      text-align: center;
+    }
+    .stat .label { font-size: 0.65rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+    .stat .value { font-size: 1.05rem; font-weight: 600; margin-top: 0.15rem; }
+    .stat .value.on { color: var(--ok); }
+    .stat .value.off { color: var(--muted); }
+    pre {
+      background: #0d1117;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.75rem;
+      overflow-x: auto;
+      font-size: 0.78rem;
+      color: #c9d1d9;
+      margin-top: 0.5rem;
+    }
+    .note {
+      border-left: 3px solid var(--accent);
+      padding: 0.5rem 0.75rem;
+      margin-top: 0.75rem;
+      background: rgba(88,166,255,0.06);
+      font-size: 0.84rem;
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>VOICE CORE</h1>
+    <p>
+      Fully offline-capable voice control layer for HTML applications.
+      Uses the browser’s Web Speech API (on-device when available). No API keys, no cloud AI.
+      Register your own commands and the assistant executes them.
+    </p>
+  </header>
+
+  <main>
+    <div class="card">
+      <h2>Demo plant status</h2>
+      <p>These values are controlled by voice (or by typing in the VoiceCore panel).</p>
+      <div class="demo-status" id="demo-status">
+        <div class="stat"><div class="label">Main Breaker</div><div class="value off" id="st-main">OFF</div></div>
+        <div class="stat"><div class="label">Generator</div><div class="value off" id="st-gen">OFF</div></div>
+        <div class="stat"><div class="label">Cooling Pumps</div><div class="value off" id="st-cool">OFF</div></div>
+        <div class="stat"><div class="label">Clutch</div><div class="value off" id="st-clutch">OFF</div></div>
+        <div class="stat"><div class="label">Throttle</div><div class="value" id="st-throttle">30%</div></div>
+        <div class="stat"><div class="label">Target RPM</div><div class="value" id="st-rpm">400</div></div>
+      </div>
+      <div class="note">
+        Try saying: <strong>“start engines”</strong>, <strong>“turn on cooling”</strong>,
+        <strong>“set throttle to fifty”</strong>, <strong>“open navigation”</strong>,
+        <strong>“status report”</strong>, or <strong>“shut down everything”</strong>.
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>How to integrate</h2>
+      <p>Include the scripts and register your functions:</p>
+<pre>// After VoiceCore scripts are loaded
+await VoiceCore.init();
+
+VoiceCore.register({
+  name: "activate_engines",
+  phrases: ["start engines", "turn on engines", "activate propulsion"],
+  action: () => { activateEngines(); },
+  response: "Engines activated."
+});
+
+VoiceCore.start(); // begin listening</pre>
+      <p style="margin-top:0.6rem">See <code>README.md</code> and the Titan integration example for a full production setup.</p>
+    </div>
+
+    <div class="card">
+      <h2>Offline notes</h2>
+      <ul>
+        <li>Web Speech API is used first. Many Chromium browsers support <code>processLocally</code> for true on-device recognition after the language pack is present.</li>
+        <li>No audio is sent to external services when on-device mode is active.</li>
+        <li>Speech synthesis (replies) also runs locally via the browser.</li>
+        <li>If you see <strong>“language not supported”</strong>: the browser lacks that speech locale. VoiceCore auto-falls back through <code>en-US → en-GB → en</code> and disables on-device mode if needed. You can always type commands in the panel.</li>
+        <li>Chrome/Edge on desktop usually work best. Firefox and some mobile browsers have limited language packs or require network for recognition.</li>
+        <li>For stricter offline environments you can later swap the recognition backend for Vosk / Vosklet (see README).</li>
+        <li>Always provide a typed fallback — the panel includes a manual input.</li>
+      </ul>
+    </div>
+  </main>
+
+  <!-- VoiceCore modules (order matters) -->
+  <script src="js/settings.js"></script>
+  <script src="js/command-registry.js"></script>
+  <script src="js/command-interpreter.js"></script>
+  <script src="js/voice-response.js"></script>
+  <script src="js/execution-engine.js"></script>
+  <script src="js/microphone.js"></script>
+  <script src="js/voice-trainer.js"></script>
+<script src="js/voice-engine.js"></script>
+
+  <script>
+    // ---------- Demo plant state ----------
+    const Plant = {
+      main: false,
+      generator: false,
+      cooling: false,
+      clutch: false,
+      throttle: 30,
+      rpm: 400
+    };
+
+    function refreshUI() {
+      const set = (id, on, labelOn, labelOff) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.textContent = on ? (labelOn || "ON") : (labelOff || "OFF");
+        el.classList.toggle("on", !!on);
+        el.classList.toggle("off", !on);
+      };
+      set("st-main", Plant.main);
+      set("st-gen", Plant.generator);
+      set("st-cool", Plant.cooling);
+      set("st-clutch", Plant.clutch);
+      document.getElementById("st-throttle").textContent = Plant.throttle + "%";
+      document.getElementById("st-rpm").textContent = Plant.rpm;
+    }
+
+    // ---------- Register demo commands ----------
+    function registerDemoCommands() {
+      const R = VoiceCore.register.bind(VoiceCore);
+
+      R({
+        name: "start_engines",
+        phrases: [
+          "start engines", "turn on engines", "activate propulsion",
+          "engines on", "power up engines", "start the engines"
+        ],
+        action: () => {
+          Plant.main = true;
+          Plant.generator = true;
+          refreshUI();
+        },
+        response: "Engines activated."
+      });
+
+      R({
+        name: "stop_engines",
+        phrases: [
+          "stop engines", "shut down engines", "turn off engines",
+          "engines off", "deactivate propulsion"
+        ],
+        action: () => {
+          Plant.main = false;
+          Plant.generator = false;
+          Plant.clutch = false;
+          refreshUI();
+        },
+        response: "Engines shut down.",
+        confirm: true
+      });
+
+      R({
+        name: "cooling_on",
+        phrases: [
+          "turn on cooling", "start cooling", "enable cooling",
+          "cooling on", "start pumps", "activate cooling"
+        ],
+        action: () => { Plant.cooling = true; refreshUI(); },
+        response: "Cooling pumps online."
+      });
+
+      R({
+        name: "cooling_off",
+        phrases: ["turn off cooling", "stop cooling", "cooling off", "stop pumps"],
+        action: () => { Plant.cooling = false; refreshUI(); },
+        response: "Cooling pumps stopped."
+      });
+
+      R({
+        name: "clutch_in",
+        phrases: ["engage clutch", "clutch in", "couple the shaft", "clutch on"],
+        action: () => { Plant.clutch = true; refreshUI(); },
+        response: "Clutch engaged."
+      });
+
+      R({
+        name: "clutch_out",
+        phrases: ["disengage clutch", "clutch out", "clutch off", "open clutch"],
+        action: () => { Plant.clutch = false; refreshUI(); },
+        response: "Clutch disengaged."
+      });
+
+      R({
+        name: "status",
+        phrases: [
+          "status report", "system status", "plant status",
+          "what is the status", "report status", "give me status"
+        ],
+        action: () => {},
+        response: () => {
+          const parts = [];
+          parts.push(Plant.main ? "Main breaker closed" : "Main breaker open");
+          parts.push(Plant.generator ? "generator online" : "generator offline");
+          parts.push(Plant.cooling ? "cooling active" : "cooling off");
+          parts.push("throttle " + Plant.throttle + " percent");
+          parts.push("target R P M " + Plant.rpm);
+          return parts.join(". ") + ".";
+        }
+      });
+
+      R({
+        name: "throttle_up",
+        phrases: ["increase throttle", "throttle up", "more power", "raise throttle"],
+        action: () => {
+          Plant.throttle = Math.min(100, Plant.throttle + 10);
+          refreshUI();
+        },
+        response: () => "Throttle now " + Plant.throttle + " percent."
+      });
+
+      R({
+        name: "throttle_down",
+        phrases: ["decrease throttle", "throttle down", "less power", "reduce throttle"],
+        action: () => {
+          Plant.throttle = Math.max(0, Plant.throttle - 10);
+          refreshUI();
+        },
+        response: () => "Throttle now " + Plant.throttle + " percent."
+      });
+
+      R({
+        name: "set_throttle",
+        phrases: [
+          "set throttle to fifty", "throttle fifty", "set throttle fifty percent",
+          "set throttle to 50", "throttle to 50", "set throttle to thirty",
+          "set throttle to seventy", "set throttle to one hundred", "full throttle",
+          "throttle zero", "set throttle to zero"
+        ],
+        action: () => {
+          // Simple heuristic from last spoken text
+          const t = (VoiceCore.lastFinal || "").toLowerCase();
+          if (/full|hundred|100/.test(t)) Plant.throttle = 100;
+          else if (/seventy|70/.test(t)) Plant.throttle = 70;
+          else if (/fifty|50/.test(t)) Plant.throttle = 50;
+          else if (/thirty|30/.test(t)) Plant.throttle = 30;
+          else if (/zero|0\b/.test(t)) Plant.throttle = 0;
+          else Plant.throttle = 50;
+          refreshUI();
+        },
+        response: () => "Throttle set to " + Plant.throttle + " percent."
+      });
+
+      R({
+        name: "shutdown_all",
+        phrases: [
+          "shut down everything", "emergency stop", "kill all systems",
+          "full shutdown", "shutdown all"
+        ],
+        action: () => {
+          Plant.main = false;
+          Plant.generator = false;
+          Plant.cooling = false;
+          Plant.clutch = false;
+          Plant.throttle = 0;
+          refreshUI();
+        },
+        response: "All systems shut down.",
+        confirm: true
+      });
+
+      R({
+        name: "open_navigation",
+        phrases: ["open navigation", "show the map", "show navigation", "navigation panel"],
+        action: () => { console.log("[Demo] Navigation would open here"); },
+        response: "Navigation opened."
+      });
+    }
+
+    // ---------- Boot ----------
+    (async function () {
+      refreshUI();
+      await VoiceCore.init({ autoUI: true });
+      registerDemoCommands();
+      VoiceCore.speak("Voice Core ready. Press the microphone button or type a command.");
+    })();
+  </script>
+
+</body>
+</html>

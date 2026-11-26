@@ -1,53 +1,281 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>THE TITAN — Multiplayer Command</title><style>
-:root{color-scheme:dark;--bg:#061522;--panel:#0c2434;--line:#24495b;--teal:#56d5d0;--muted:#9bb4be;--gold:#d9bb79}*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 70% 0,#12384a,var(--bg) 60%);color:#effafa;font:14px system-ui;min-height:100vh}header{padding:18px max(16px,4vw);border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}header b{letter-spacing:.2em;color:var(--teal)}main{width:min(1100px,94vw);margin:26px auto}.tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}.tabs button,button{border:1px solid #386072;background:#102c3e;color:#eafafa;border-radius:9px;padding:11px 15px;font-weight:700;cursor:pointer}.tabs button.active,.primary{background:linear-gradient(110deg,#218e93,#15596d);border-color:#56d5d0}.panel{background:#0b2232;border:1px solid var(--line);border-radius:15px;padding:20px;margin-bottom:14px;box-shadow:0 16px 40px #0003}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}.field{display:grid;gap:6px;margin:12px 0;color:var(--muted)}input,select{width:100%;padding:12px;border-radius:8px;border:1px solid #345466;background:#061925;color:white}h1{font-size:clamp(25px,5vw,42px);margin:5px 0 12px}h2{font-size:16px;letter-spacing:.08em}.muted{color:var(--muted)}.hidden{display:none!important}.team{padding:14px;border:1px solid var(--line);border-radius:10px}.count{font-size:30px;font-weight:800}.bar{height:7px;background:#203b4a;border-radius:9px;overflow:hidden}.bar i{display:block;height:100%;background:var(--teal)}#world{width:100%;height:360px;background:linear-gradient(#163a4b,#071923);border-radius:12px;display:block}button:disabled{opacity:.4;cursor:not-allowed}.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.status{color:var(--teal);min-height:22px;white-space:pre-wrap}.code{font-size:36px;letter-spacing:.2em;color:var(--gold);font-weight:900}.player{padding:9px;border-bottom:1px solid #203c4c;display:flex;justify-content:space-between;gap:8px}.pill{font-size:11px;border:1px solid #416070;border-radius:30px;padding:3px 8px;color:var(--muted)}footer{color:#7695a2;text-align:center;padding:22px;font-size:11px}@media(max-width:600px){#world{height:260px}.panel{padding:15px}}
-</style></head><body><header><b>THE TITAN</b><span class="muted">MULTIPLAYER OPERATIONS</span></header><main><h1>Two crews. One ocean. One winner.</h1><p class="muted">Private-host multiplayer · Custom course · 15 crew per ship</p>
-<div class="tabs"><button class="active" data-tab="host">Host command</button><button data-tab="player">Join as player</button><button data-tab="display">Spectator display</button></div>
-<section id="host" class="panel"><h2>CREATE / CONTROL ROOM</h2><div class="grid"><label class="field">Multiplayer server URL<input id="server" placeholder="wss://your-titan-server.example"></label><label class="field">Private host key<input id="hostkey" type="password" placeholder="Set TITAN_HOST_KEY on server"></label></div><div class="row"><button class="primary" id="create">Create race room</button><button id="claim">Reconnect to room</button></div><p class="status" id="hoststatus"></p><div id="roombox" class="hidden"><div class="muted">ROOM CODE</div><div class="code" id="roomcode">------</div><div class="grid"><div class="team"><h2>SHIP A · ALPHA</h2><div class="count" id="acount">0/15</div><div class="bar"><i id="abar" style="width:0%"></i></div></div><div class="team"><h2>SHIP B · BRAVO</h2><div class="count" id="bcount">0/15</div><div class="bar"><i id="bbar" style="width:0%"></i></div></div></div><p id="roomstate" class="status">Waiting for crews…</p><div class="row"><button class="primary" id="start" disabled>Start race</button><button id="reset">Reset match</button><button id="finishA">Declare A winner</button><button id="finishB">Declare B winner</button></div><h2>CREW MANIFEST</h2><div id="manifest"></div><h2>HOST SHIP CONTROL</h2><div class="grid"><label class="field">Ship<select id="shipteam"><option value="A">Ship A</option><option value="B">Ship B</option></select></label><label class="field">Speed<input id="shipspeed" type="range" min="0" max="100" value="0"></label></div><button id="setspeed">Apply ship speed</button></div></section>
-<section id="player" class="panel hidden"><h2>JOIN YOUR CREW</h2><label class="field">Multiplayer server URL<input id="pserver" placeholder="wss://your-titan-server.example"></label><div class="grid"><label class="field">Room code<input id="pcode" maxlength="6" placeholder="ABC123"></label><label class="field">Your name<input id="pname" maxlength="22" placeholder="Crew member"></label></div><div class="row"><button id="makechar">Create / customise character</button><label class="field" style="min-width:150px">Choose ship<select id="pteam"><option value="A">Ship A · Alpha</option><option value="B">Ship B · Bravo</option></select></label></div><button class="primary" id="join">Join room</button><div id="playerroom" class="hidden"><p class="status" id="playerstatus"></p><button class="primary" id="ready">I'm ready</button><p class="muted">Move with the on-screen controls. Your crew and ship state are synchronised live.</p><div class="row"><button id="left">◀</button><button id="forward">▲ Move</button><button id="right">▶</button><button id="back">▼</button></div></div><p class="status" id="pstatus"></p></section>
-<section id="display" class="panel hidden"><h2>LIVE RACE DISPLAY</h2><label class="field">Multiplayer server URL<input id="dserver" placeholder="wss://your-titan-server.example"></label><label class="field">Room code<input id="dcode" maxlength="6" placeholder="ABC123"></label><button class="primary" id="watch">Connect display</button><p id="dstatus" class="status"></p><canvas id="world"></canvas><p class="muted">Host camera: use WASD / arrow keys to fly around the shared course. Spectator camera is read-only.</p><div class="grid"><div class="team"><h2>ALPHA · SHIP A</h2><div id="dA">Waiting</div></div><div class="team"><h2>BRAVO · SHIP B</h2><div id="dB">Waiting</div></div></div><h2 id="winner"></h2></section></main><footer>THE TITAN · PRIVATE MULTIPLAYER · HOSTED SERVER REQUIRED</footer>
-<script src="three.min.js"></script><script>
-(()=>{'use strict';const $=id=>document.getElementById(id);let ws=null,roomCode='',role='',state=null,ready=false,move={x:0,z:0},pos={x:0,z:0};const savedServer=localStorage.getItem('titan-mp-server')||'';['server','pserver','dserver'].forEach(x=>$(x).value=savedServer);
-function url(id){let v=$(id).value.trim();localStorage.setItem('titan-mp-server',v);return v.replace(/^http/,'ws').replace(/\/$/,'')}
-function connect(u){
- if(ws&&ws.readyState===1)ws.close();
- return new Promise((resolve,reject)=>{
-  try{
-   ws=new WebSocket(u);
-   ws.onopen=()=>resolve(ws);
-   ws.onerror=()=>reject(Error('Cannot connect. Check the server URL and deployment.'));
-   ws.onmessage=e=>{
-    let m;try{m=JSON.parse(e.data)}catch{return}
-    if(m.type==='error'){status(m.message);return}
-    if(m.type==='state'){
-     state=m.state;roomCode=m.state.code||roomCode;
-     if(role==='host'||!$('host').classList.contains('hidden')){$('roomcode').textContent=roomCode;$('roombox').classList.remove('hidden')}
-     render();
-    }
-    if(m.type==='created'){role='host';roomCode=m.code;$('roomcode').textContent=roomCode;$('roombox').classList.remove('hidden');status('Room created. Share the code with up to 30 players.')}
-    if(m.type==='host:claimed'){role='host';$('roomcode').textContent=roomCode;$('roombox').classList.remove('hidden');status('Host control reconnected.')}
-    if(m.type==='joined'){role='player';$('playerroom').classList.remove('hidden');$('playerstatus').textContent='Joined Ship '+m.team+'. Customise your character before spawn if you have not already.'}
-    if(m.type==='watching'){role='spectator';status('Display connected.')}
-    if(m.type==='kicked')status('You were removed from the room.');
-   };
-  }catch(e){reject(e)}
- });
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#061522">
+<title>THE TITAN — Multiplayer</title>
+<style>
+:root{color-scheme:dark;--bg:#061522;--panel:#0c2434;--line:#24495b;--teal:#56d5d0;--muted:#9bb4be;--gold:#d9bb79;--blue:#49b9e9;--amber:#e5ae58;--red:#ef7777;--green:#69d5ad}
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;background:radial-gradient(ellipse at 75% 0,#12384a,var(--bg) 58%);color:#effafa;font:14px/1.45 Inter,system-ui,-apple-system,"Segoe UI",sans-serif}body{min-height:100dvh}button,input{font:inherit}button{cursor:pointer;touch-action:manipulation}a{color:inherit}.topbar{padding:14px max(16px,4vw);border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;background:#04131fe8;position:sticky;top:0;z-index:5;backdrop-filter:blur(12px)}.brand{display:flex;gap:10px;align-items:center;text-decoration:none}.mark{width:36px;height:36px;border-radius:10px;background:linear-gradient(145deg,#258a91,#0c3045);display:grid;place-items:center;border:1px solid #58d3cb80;font-size:19px}.brand b{letter-spacing:.18em;font-size:12px}.brand small{display:block;color:#85aeb8;font:8px ui-monospace,monospace;letter-spacing:.14em;margin-top:3px}.top-link{font-size:11px;color:#9bb9c3;text-decoration:none}main{width:min(1120px,94vw);margin:28px auto 54px}.eyebrow{color:var(--teal);font:9px ui-monospace,monospace;letter-spacing:.19em}.hero h1{font-size:clamp(29px,5vw,48px);line-height:1.02;margin:8px 0}.muted{color:var(--muted)}.hero p{max-width:670px;margin:0 0 22px;color:var(--muted);line-height:1.65}.panel{background:linear-gradient(155deg,rgba(12,36,52,.98),rgba(5,20,32,.98));border:1px solid var(--line);border-radius:16px;padding:clamp(15px,3vw,24px);box-shadow:0 16px 45px #0003;margin:14px 0}.hidden{display:none!important}.section-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px}.section-head h2{font-size:13px;letter-spacing:.12em;margin:0}.step{color:#83a9b5;font:8px ui-monospace,monospace;letter-spacing:.12em}.role-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.role-card{border:1px solid #35586a;background:linear-gradient(150deg,#102e40,#081d2c);color:#eafafa;border-radius:13px;min-height:155px;padding:19px;text-align:left;display:flex;flex-direction:column;align-items:flex-start;gap:8px;transition:.18s}.role-card:hover{border-color:var(--teal);transform:translateY(-2px)}.role-icon{font-size:24px}.role-card strong{font-size:13px;letter-spacing:.08em}.role-card span:last-child{font-size:11px;color:var(--muted);line-height:1.5}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.field{display:grid;gap:6px;margin:10px 0;color:#c1d7df;font-size:11px}.field input{width:100%;padding:12px;border:1px solid #34576a;border-radius:9px;background:#061925;color:#f5fbfc;min-height:44px;outline:none}.field input:focus{border-color:var(--teal);box-shadow:0 0 0 3px #56d5d015}.field input::placeholder{color:#607f8c}.btn{border:1px solid #3b6477;background:#102e40;color:#eafafa;border-radius:9px;padding:11px 14px;font-weight:750;font-size:11px;letter-spacing:.04em;min-height:42px}.btn.primary{background:linear-gradient(110deg,#218e93,#15596d);border-color:#56d5d0;color:white}.btn.gold{border-color:#b58b4e;color:#f2d9a7}.btn.ghost{background:transparent}.btn:disabled{opacity:.42;cursor:not-allowed}.btn-row{display:flex;gap:9px;flex-wrap:wrap;align-items:center;margin-top:13px}.status{min-height:20px;color:var(--teal);font-size:11px;margin:10px 0 0;white-space:pre-wrap}.status.error{color:#ff9b9b}.status.ok{color:#8ee1bb}.team-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:12px 0}.team-choice{border:2px solid #35586a;border-radius:12px;background:#091f2e;color:#eafafa;padding:16px;text-align:left;min-height:100px}.team-choice[data-team="A"]{--team:var(--blue)}.team-choice[data-team="B"]{--team:var(--amber)}.team-choice.selected{border-color:var(--team);background:color-mix(in srgb,var(--team) 13%,#091f2e);box-shadow:inset 0 0 0 1px var(--team)}.team-choice strong{display:block;font-size:15px;letter-spacing:.08em}.team-choice small{display:block;color:var(--muted);margin-top:5px}.team-choice .ship-icon{font-size:20px;display:block;margin-bottom:5px}.badge{display:inline-block;border:1px solid #406174;border-radius:40px;padding:3px 8px;font:9px ui-monospace,monospace;color:#a9c5cf}.code{font-size:clamp(31px,6vw,44px);letter-spacing:.2em;font-weight:900;color:var(--gold);line-height:1.15}.code-row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}.teams-status{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:15px 0}.team-stat{padding:13px;border:1px solid var(--line);border-radius:11px;background:#081d2b}.team-stat h3{font-size:10px;letter-spacing:.1em;margin:0 0 4px}.team-stat .number{font-size:27px;font-weight:850}.bar{height:6px;background:#1b3949;border-radius:8px;overflow:hidden;margin-top:7px}.bar i{display:block;height:100%;width:0;background:var(--teal);transition:width .15s}.manifest{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:7px;margin-top:9px}.manifest-item{border:1px solid #244557;background:#081d2b;border-radius:8px;padding:8px 10px;font-size:10px;display:flex;justify-content:space-between;gap:8px;align-items:center}.manifest-item small{color:#8eabb5}.avatar-swatch{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:5px}.room-meta{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:10px 0}.room-meta .badge{font-size:10px}#player-world,#spectator-world{width:100%;height:clamp(250px,45vw,390px);display:block;background:linear-gradient(#1c566a,#071923);border:1px solid #2d596b;border-radius:12px;touch-action:pan-y}.world-help{font-size:10px;color:#90aeb8;margin:8px 0}.movement{display:grid;grid-template-columns:repeat(3,52px);gap:7px;justify-content:center;margin:13px auto}.movement button{min-height:45px;border:1px solid #426a7a;border-radius:10px;background:#102e40;color:white;font-size:16px}.movement .empty{visibility:hidden}.player-lobby{margin-top:14px}.notice{background:#091f2d;border-left:3px solid var(--teal);border-radius:7px;padding:10px 12px;color:#a6c4cd;font-size:10px;line-height:1.5;margin-top:12px}footer{text-align:center;color:#688b98;font:8px ui-monospace,monospace;letter-spacing:.1em;padding:0 14px 22px}.field-inline{display:flex;gap:8px;align-items:end;flex-wrap:wrap}.field-inline .field{flex:1;min-width:180px}.camera-controls{color:#93b0ba;font-size:10px;margin-top:8px}
+@media(max-width:700px){.role-grid{grid-template-columns:1fr}.role-card{min-height:110px}.grid{grid-template-columns:1fr}.topbar{padding:12px}.top-link{font-size:9px}main{margin-top:18px}.panel{border-radius:13px}.team-choice{padding:12px}.btn{min-height:44px}}
+@media(max-width:380px){.teams-status{grid-template-columns:1fr}.team-grid{gap:7px}}
+</style>
+</head>
+<body>
+<header class="topbar"><a class="brand" href="main-menu.html"><span class="mark">✦</span><span><b>THE TITAN</b><small>MULTIPLAYER OPERATIONS</small></span></a><a class="top-link" href="main-menu.html">← Main menu</a></header>
+<main>
+  <section class="hero"><div class="eyebrow">PRIVATE EVENT SERVER // SHARED 3D COURSE</div><h1>Two crews. One shared world.</h1><p>Host a private race, join one of the two ships, or connect the public spectator display. Players choose their ship before character creation and join the same room code.</p></section>
+
+  <section id="home" class="panel">
+    <div class="section-head"><h2>SELECT YOUR ROLE</h2><span class="step">01 / MULTIPLAYER ENTRY</span></div>
+    <div class="role-grid">
+      <button class="role-card" id="open-host"><span class="role-icon">♛</span><strong>HOST A RACE</strong><span>Create the room, share its code, manage both teams and start the race.</span></button>
+      <button class="role-card" id="open-join"><span class="role-icon">⚓</span><strong>JOIN A CREW</strong><span>Enter the host's room code, select Ship A or B, customise and join.</span></button>
+      <button class="role-card" id="open-spectator"><span class="role-icon">▣</span><strong>SPECTATOR DISPLAY</strong><span>Connect a TV or projector to watch both ships and the live crew.</span></button>
+    </div>
+    <div class="notice">Players must use the host's exact room code. Opening the website or creating a character does not automatically create or join a room.</div>
+  </section>
+
+  <section id="host" class="panel hidden">
+    <div class="section-head"><h2>HOST CONTROL</h2><span class="step">HOST DEVICE · 1 ACTIVE SESSION</span></div>
+    <div class="grid">
+      <label class="field">Render WebSocket URL<input id="host-server" value="wss://titan-multiplayer.onrender.com" autocomplete="url"></label>
+      <label class="field">Private host key<input id="host-key" type="password" autocomplete="off" placeholder="Your TITAN_HOST_KEY from Render"></label>
+    </div>
+    <div class="btn-row"><button class="btn primary" id="create-room">CREATE NEW ROOM</button><button class="btn" id="reconnect-host">RECONNECT TO EXISTING ROOM</button><button class="btn ghost" data-back>Back</button></div>
+    <p id="host-status" class="status" role="status"></p>
+    <div id="host-dashboard" class="hidden">
+      <div class="panel" style="margin-top:15px;background:#071c2a">
+        <div class="section-head"><h2>ROOM CODE</h2><span class="badge" id="host-phase">LOBBY</span></div>
+        <div class="code-row"><div class="code" id="room-code">------</div><button class="btn" id="copy-code">COPY CODE</button><button class="btn" id="copy-invite">COPY INVITE LINK</button></div>
+        <div class="teams-status">
+          <div class="team-stat"><h3>SHIP A · ALPHA</h3><div class="number" id="count-a">0/15</div><div class="bar"><i id="bar-a"></i></div></div>
+          <div class="team-stat"><h3>SHIP B · BRAVO</h3><div class="number" id="count-b">0/15</div><div class="bar"><i id="bar-b"></i></div></div>
+        </div>
+        <p id="host-room-status" class="status">Waiting for players…</p>
+        <div class="btn-row"><button class="btn primary" id="start-race" disabled>START RACE</button><button class="btn" id="reset-race">RESET ROOM</button></div>
+        <h3 style="font-size:10px;letter-spacing:.12em;margin:20px 0 8px">CREW MANIFEST</h3><div id="host-manifest" class="manifest"><span class="muted">No players yet.</span></div>
+        <h3 style="font-size:10px;letter-spacing:.12em;margin:20px 0 8px">SHIP SPEED CONTROL</h3>
+        <div class="grid"><label class="field">Ship<select id="host-ship"><option value="A">Ship A · Alpha</option><option value="B">Ship B · Bravo</option></select></label><label class="field">Speed · <output id="host-speed-value">0</output><input id="host-speed" type="range" min="0" max="100" value="0"></label></div>
+        <div class="btn-row"><button class="btn" id="apply-speed">APPLY SPEED</button><button class="btn" id="finish-a">DECLARE SHIP A WINNER</button><button class="btn" id="finish-b">DECLARE SHIP B WINNER</button></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="join" class="panel hidden">
+    <div class="section-head"><h2>JOIN YOUR CREW</h2><span class="step">ROOM CODE → TEAM → CHARACTER → JOIN</span></div>
+    <label class="field">Render WebSocket URL<input id="join-server" value="wss://titan-multiplayer.onrender.com" autocomplete="url"></label>
+    <div class="grid">
+      <label class="field">Room code from host<input id="join-code" maxlength="6" autocapitalize="characters" placeholder="e.g. A1B2C3"></label>
+      <label class="field">Your crew name<input id="join-name" maxlength="22" placeholder="Enter your player name"></label>
+    </div>
+    <h3 style="font-size:11px;letter-spacing:.1em;margin:17px 0 6px">CHOOSE YOUR SHIP — REQUIRED</h3>
+    <div class="team-grid">
+      <button type="button" class="team-choice" data-team="A" aria-pressed="false"><span class="ship-icon">⚓</span><strong>SHIP A · ALPHA</strong><small>Blue crew · Maximum 15 players</small></button>
+      <button type="button" class="team-choice" data-team="B" aria-pressed="false"><span class="ship-icon">⚓</span><strong>SHIP B · BRAVO</strong><small>Gold crew · Maximum 15 players</small></button>
+    </div>
+    <p id="team-status" class="muted" style="font-size:10px">No ship selected yet. Choose Ship A or Ship B.</p>
+    <div id="character-status" class="notice">Your character is saved on this device. Create one here before joining if you haven't already.</div>
+    <div class="btn-row"><button class="btn" id="check-room">CHECK ROOM / SEATS</button><button class="btn gold" id="customize-character">CREATE / CUSTOMISE CHARACTER</button><button class="btn primary" id="join-room" disabled>JOIN ROOM</button><button class="btn ghost" data-back>Back</button></div>
+    <p id="join-status" class="status" role="status"></p>
+    <div id="player-lobby" class="player-lobby hidden">
+      <div class="section-head"><h2>YOU ARE ABOARD</h2><span id="player-team-badge" class="badge">SHIP —</span></div>
+      <div class="room-meta"><span class="badge" id="player-room-code">ROOM —</span><span class="badge" id="player-crew-count">0 / 30 CREW</span><span class="badge" id="player-phase">LOBBY</span></div>
+      <canvas id="player-world" aria-label="Shared two-ship multiplayer world"></canvas>
+      <p class="world-help">Shared course preview. Crew positions and custom character profiles update as room state arrives.</p>
+      <div class="movement" aria-label="Movement controls"><span class="empty"></span><button id="move-forward" aria-label="Move forward">▲</button><span class="empty"></span><button id="move-left" aria-label="Move left">◀</button><button id="move-back" aria-label="Move back">▼</button><button id="move-right" aria-label="Move right">▶</button></div>
+      <div class="btn-row"><button class="btn primary" id="ready-button">I'M READY</button><button class="btn" id="leave-room">LEAVE ROOM</button></div>
+      <p id="ready-status" class="status"></p>
+      <h3 style="font-size:10px;letter-spacing:.12em;margin:18px 0 8px">PLAYERS IN THIS ROOM</h3><div id="player-manifest" class="manifest"></div>
+    </div>
+  </section>
+
+  <section id="spectator" class="panel hidden">
+    <div class="section-head"><h2>SPECTATOR DISPLAY</h2><span class="step">PROJECTOR / TV</span></div>
+    <div class="grid"><label class="field">Render WebSocket URL<input id="spectator-server" value="wss://titan-multiplayer.onrender.com"></label><label class="field">Room code<input id="spectator-code" maxlength="6" placeholder="Room code"></label></div>
+    <div class="btn-row"><button class="btn primary" id="connect-spectator">CONNECT DISPLAY</button><button class="btn ghost" data-back>Back</button></div>
+    <p id="spectator-status" class="status"></p>
+    <div id="spectator-view" class="hidden"><div class="room-meta"><span class="badge" id="spectator-phase">LOBBY</span><span class="badge" id="spectator-count">0 / 30 CREW</span></div><canvas id="spectator-world" aria-label="Shared race spectator view"></canvas><p class="camera-controls">CAMERA: use W A S D or arrow keys to fly around the course. The display is read-only.</p><div class="teams-status"><div class="team-stat"><h3>ALPHA · SHIP A</h3><div id="spectator-a">Waiting</div></div><div class="team-stat"><h3>BRAVO · SHIP B</h3><div id="spectator-b">Waiting</div></div></div><h2 id="spectator-winner"></h2></div>
+  </section>
+</main>
+<footer>THE TITAN · PRIVATE MULTIPLAYER · HOST, PLAYERS AND DISPLAY SHARE ONE ROOM CODE</footer>
+<script src="three.min.js"></script>
+<script src="character-runtime.js"></script>
+<script>
+(()=>{
+'use strict';
+const $=id=>document.getElementById(id);
+const DEFAULT_SERVER='wss://titan-multiplayer.onrender.com';
+const CHARACTER_KEY='titan-character-v1';
+let socket=null,role=null,roomCode='',roomState=null,selectedTeam='',playerId='',deviceId='',ready=false,playerPos={x:0,z:0},sceneView=null,reconnectTimer=null,reconnectAttempts=0;
+const serverSaved=localStorage.getItem('titan-mp-server')||DEFAULT_SERVER;
+['host-server','join-server','spectator-server'].forEach(id=>$(id).value=serverSaved);
+function setStatus(id,message,type=''){const el=$(id);if(!el)return;el.textContent=message;el.className='status'+(type?' '+type:'');}
+function activePanel(id){['home','host','join','spectator'].forEach(x=>$(x).classList.toggle('hidden',x!==id));}
+function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function normalizeServer(id){let raw=$(id).value.trim()||DEFAULT_SERVER;let u;try{u=new URL(raw);}catch(_){throw new Error('Enter a valid Render URL, for example wss://titan-multiplayer.onrender.com');}if(u.protocol==='https:')u.protocol='wss:';else if(u.protocol==='http:')u.protocol='ws:';if(!['ws:','wss:'].includes(u.protocol))throw new Error('Server URL must use https://, http://, wss:// or ws://.');u.hash='';localStorage.setItem('titan-mp-server',raw);return u.toString();}
+function characterExists(){try{return !!localStorage.getItem(CHARACTER_KEY);}catch(_){return false;}}
+function readCharacter(){try{return JSON.parse(localStorage.getItem(CHARACTER_KEY)||'{}');}catch(_){return {};}}
+function playerDeviceId(){try{let id=localStorage.getItem('titan-mp-device-id');if(!id){id=(crypto.randomUUID?crypto.randomUUID():('dev-'+Date.now()+'-'+Math.random().toString(16).slice(2)));localStorage.setItem('titan-mp-device-id',id);}return id;}catch(_){return 'dev-'+Math.random().toString(16).slice(2);}}
+function showJoinStatus(message,type=''){setStatus('join-status',message,type);}
+function closeSocket(){if(reconnectTimer){clearTimeout(reconnectTimer);reconnectTimer=null;}if(socket){try{socket.onclose=null;socket.close();}catch(_){}socket=null;}}
+function scheduleReconnect(){if(reconnectTimer||!role)return;if(reconnectAttempts>=5){const msg='Connection could not be restored. Check your internet and use the reconnect/join control.';if(role==='host')setStatus('host-status',msg,'error');else if(role==='player')setStatus('ready-status',msg,'error');else setStatus('spectator-status',msg,'error');return;}const delay=Math.min(1000*Math.pow(2,reconnectAttempts),12000);reconnectAttempts++;const oldRole=role;if(oldRole==='player')setStatus('ready-status','Connection lost. Reconnecting… attempt '+reconnectAttempts+'/5');else if(oldRole==='host')setStatus('host-status','Connection lost. Reconnecting host control… attempt '+reconnectAttempts+'/5');else setStatus('spectator-status','Connection lost. Reconnecting display… attempt '+reconnectAttempts+'/5');reconnectTimer=setTimeout(async()=>{reconnectTimer=null;try{if(oldRole==='player'){await connect(normalizeServer('join-server'));const d=getJoinDetails();send({type:'join',code:roomCode||d.code,team:d.team,name:d.name,deviceId:playerDeviceId(),character:readCharacter()});}else if(oldRole==='host'){await connect(normalizeServer('host-server'));send({type:'host:claim',code:roomCode,hostKey:$('host-key').value});}else if(oldRole==='spectator'){await connect(normalizeServer('spectator-server'));send({type:'watch',code:roomCode||$('spectator-code').value.trim().toUpperCase()});}}catch(err){if(!reconnectTimer)scheduleReconnect();}},delay);}
+function connect(url){
+  if(socket&&socket.readyState===WebSocket.OPEN)return Promise.resolve(socket);
+  closeSocket();
+  return new Promise((resolve,reject)=>{
+    let settled=false;let s;
+    try{s=new WebSocket(url);}catch(err){reject(err);return;}
+    socket=s;const timeout=setTimeout(()=>{if(!settled){settled=true;try{s.close();}catch(_){}reject(new Error('Connection timed out. Check the Render service and URL.'));}},12000);
+    s.onopen=()=>{if(settled)return;settled=true;clearTimeout(timeout);resolve(s);};
+    s.onerror=()=>{if(!settled){settled=true;clearTimeout(timeout);reject(new Error('Could not connect to Render. Check that the service is Live and the URL is correct.'));}};
+    s.onclose=()=>{if(!settled){settled=true;clearTimeout(timeout);reject(new Error('Connection closed before it was ready.'));}if(socket===s)socket=null;if(role)scheduleReconnect();}
+    s.onmessage=e=>{let m;try{m=JSON.parse(e.data);}catch(_){return;}handleMessage(m);};
+  });
 }
-function send(o){if(ws&&ws.readyState===1)ws.send(JSON.stringify(o));else status('Not connected.')}
-function status(t){$('hoststatus').textContent=t;$('pstatus').textContent=t;$('dstatus').textContent=t}
-document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-tab]').forEach(x=>x.classList.toggle('active',x===b));['host','player','display'].forEach(x=>$(x).classList.toggle('hidden',x!==b.dataset.tab))});
-$('create').onclick=async()=>{try{await connect(url('server'));send({type:'host:create',hostKey:$('hostkey').value})}catch(e){status(e.message)}};
-$('claim').onclick=async()=>{try{await connect(url('server'));roomCode=prompt('Enter room code')||'';send({type:'host:claim',hostKey:$('hostkey').value,code:roomCode})}catch(e){status(e.message)}};
-$('join').onclick=async()=>{try{await connect(url('pserver'));let device=localStorage.getItem('titan-player-device')||crypto.randomUUID();localStorage.setItem('titan-player-device',device);send({type:'join',code:$('pcode').value.toUpperCase(),team:$('pteam').value,name:$('pname').value,deviceId:device})}catch(e){status(e.message)}};
-$('makechar').onclick=()=>location.href='character-creator.html?return=multiplayer.html';
-$('ready').onclick=()=>{ready=!ready;send({type:'player:ready',ready});$('ready').textContent=ready?'Cancel ready':'I\'m ready'};
-$('start').onclick=()=>send({type:'host:start'});$('reset').onclick=()=>send({type:'host:reset'});$('finishA').onclick=()=>send({type:'host:finish',team:'A'});$('finishB').onclick=()=>send({type:'host:finish',team:'B'});
-$('setspeed').onclick=()=>{let t=$('shipteam').value;let sh=state?.ships?.[t]||{};send({type:'host:ship',team:t,x:sh.x||0,z:sh.z||0,yaw:sh.yaw||0,speed:+$('shipspeed').value})};
-$('watch').onclick=async()=>{try{await connect(url('dserver'));send({type:'watch',code:$('dcode').value.toUpperCase()});status('Display connected.')}catch(e){status(e.message)}};
-function render(){if(!state)return;let a=state.players.filter(p=>p.team==='A'),b=state.players.filter(p=>p.team==='B');$('acount').textContent=a.length+'/15';$('bcount').textContent=b.length+'/15';$('abar').style.width=a.length/15*100+'%';$('bbar').style.width=b.length/15*100+'%';$('roomstate').textContent='STATUS: '+state.status.toUpperCase()+' · '+a.filter(p=>p.ready).length+'/'+a.length+' A READY · '+b.filter(p=>p.ready).length+'/'+b.length+' B READY';$('start').disabled=state.status!=='lobby'||state.players.length<2||state.players.some(p=>!p.ready);$('manifest').innerHTML=state.players.map(p=>'<div class="player"><span>'+esc(p.name)+' <span class="pill">SHIP '+p.team+'</span></span><span>'+(p.ready?'READY':'NOT READY')+'</span></div>').join('')||'<p class="muted">No players yet.</p>';$('dA').textContent='Speed '+state.ships.A.speed+' · Progress '+Math.round(state.ships.A.progress)+'% · '+a.length+' crew';$('dB').textContent='Speed '+state.ships.B.speed+' · Progress '+Math.round(state.ships.B.progress)+'% · '+b.length+' crew';$('winner').textContent=state.winner?'SHIP '+state.winner+' WINS!':'';drawWorld(state)}
-function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-function moveBy(dx,dz){pos.x+=dx;pos.z+=dz;send({type:'player:move',x:pos.x,z:pos.z,yaw:Math.atan2(dx,dz)})}
-[['left',-1,0],['right',1,0],['forward',0,-1],['back',0,1]].forEach(([id,x,z])=>$(id).onclick=()=>moveBy(x,z));
-let renderer,scene,camera,ships=[],playerDots=[];function initWorld(){let c=$('world');if(!c||!window.THREE)return;try{scene=new THREE.Scene();scene.background=new THREE.Color(0x092637);scene.fog=new THREE.Fog(0x092637,45,140);camera=new THREE.PerspectiveCamera(48,1,.1,200);camera.position.set(0,24,38);camera.lookAt(0,0,-10);renderer=new THREE.WebGLRenderer({canvas:c,antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));scene.add(new THREE.HemisphereLight(0xbdefff,0x173344,2));let sun=new THREE.DirectionalLight(0xffffff,2);sun.position.set(-10,25,15);scene.add(sun);let water=new THREE.Mesh(new THREE.PlaneGeometry(180,220,50,50),new THREE.MeshStandardMaterial({color:0x12506a,roughness:.55,metalness:.12,wireframe:false}));water.rotation.x=-Math.PI/2;water.position.z=-40;scene.add(water);for(let i=0;i<2;i++){let g=new THREE.Group();let hull=new THREE.Mesh(new THREE.BoxGeometry(4,1.3,13),new THREE.MeshStandardMaterial({color:i?0xb47c37:0x2b9da5,metalness:.5,roughness:.4}));g.add(hull);let bridge=new THREE.Mesh(new THREE.BoxGeometry(2.5,2,3),new THREE.MeshStandardMaterial({color:0xc8d9dc,metalness:.5}));bridge.position.y=1.5;g.add(bridge);g.position.set(i?5:-5,1,-4);scene.add(g);ships.push(g)}let gate=new THREE.Mesh(new THREE.TorusGeometry(13,.5,8,64),new THREE.MeshStandardMaterial({color:0xe0bd70,emissive:0x5d3a10}));gate.position.set(0,6,-85);scene.add(gate);for(let i=0;i<35;i++){let rock=new THREE.Mesh(new THREE.DodecahedronGeometry(1+Math.random()*3,0),new THREE.MeshStandardMaterial({color:0x304a50,roughness:1}));rock.position.set((Math.random()-.5)*90,0,-15-Math.random()*100);scene.add(rock)}function resize(){let w=c.clientWidth,h=c.clientHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix()}new ResizeObserver(resize).observe(c);resize();(function loop(){requestAnimationFrame(loop);renderer.render(scene,camera)})()}catch(e){console.warn(e)}}function drawWorld(s){if(!renderer)return;['A','B'].forEach((t,i)=>{let sh=s.ships[t];ships[i].position.set(sh.x|| (i?5:-5),1,(sh.z||0)-4);ships[i].rotation.y=sh.yaw||0});while(playerDots.length<s.players.length){let dot=new THREE.Mesh(new THREE.CapsuleGeometry(.35,.8,3,6),new THREE.MeshStandardMaterial({color:0xe8eee9}));scene.add(dot);playerDots.push(dot)}playerDots.forEach((d,i)=>{let pl=s.players[i];d.visible=!!pl;if(pl)d.position.set((pl.team==='A'?-5:5)+(pl.x||0)*.18,1.3,(pl.z||0)*.18-4)})}
-initWorld();window.addEventListener('keydown',e=>{if(!camera||$('display').classList.contains('hidden'))return;let v=.9;if(e.key==='w'||e.key==='ArrowUp')camera.position.z-=v;if(e.key==='s'||e.key==='ArrowDown')camera.position.z+=v;if(e.key==='a'||e.key==='ArrowLeft')camera.position.x-=v;if(e.key==='d'||e.key==='ArrowRight')camera.position.x+=v;});window.addEventListener('beforeunload',()=>{if(ws)ws.close()});
+function send(message){if(!socket||socket.readyState!==WebSocket.OPEN)return false;socket.send(JSON.stringify(message));return true;}
+async function ensureConnected(fieldId){const url=normalizeServer(fieldId);if(socket&&socket.readyState===WebSocket.OPEN)return socket;return connect(url);}
+function handleMessage(m){
+  if(m.type==='error'){
+    const message=m.message||'The server rejected this request.';
+    if(role==='host'||!$('host').classList.contains('hidden'))setStatus('host-status',message,'error');
+    else if(role==='player'||!$('join').classList.contains('hidden'))showJoinStatus(message,'error');
+    else setStatus('spectator-status',message,'error');
+    return;
+  }
+  if(m.type==='created'){
+    reconnectAttempts=0;if(reconnectTimer){clearTimeout(reconnectTimer);reconnectTimer=null;}role='host';roomCode=m.code||m.state?.code||'';roomState=m.state||roomState;
+    $('host-dashboard').classList.remove('hidden');$('room-code').textContent=roomCode||'------';
+    setStatus('host-status','Room created. Share this code with both crews.','ok');renderState(roomState);return;
+  }
+  if(m.type==='host:claimed'){
+    reconnectAttempts=0;if(reconnectTimer){clearTimeout(reconnectTimer);reconnectTimer=null;}role='host';roomCode=m.code||m.state?.code||'';roomState=m.state||roomState;
+    $('host-dashboard').classList.remove('hidden');$('room-code').textContent=roomCode;
+    setStatus('host-status','Host control reconnected to the existing room.','ok');renderState(roomState);return;
+  }
+  if(m.type==='joined'){
+    reconnectAttempts=0;if(reconnectTimer){clearTimeout(reconnectTimer);reconnectTimer=null;}role='player';playerId=m.playerId||playerId;roomCode=m.state?.code||roomCode;
+    $('player-lobby').classList.remove('hidden');$('player-room-code').textContent='ROOM '+roomCode;
+    $('player-team-badge').textContent='SHIP '+(m.team||selectedTeam);
+    $('join-room').disabled=true;$('customize-character').textContent='CHARACTER SAVED';
+    try{sessionStorage.removeItem('titan-mp-pending-join');}catch(_){}
+    showJoinStatus('Joined successfully. You are on Ship '+(m.team||selectedTeam)+'.','ok');
+    if(m.state)renderState(m.state);initWorld('player-world');return;
+  }
+  if(m.type==='watching'){
+    reconnectAttempts=0;if(reconnectTimer){clearTimeout(reconnectTimer);reconnectTimer=null;}role='spectator';roomCode=m.code||m.state?.code||'';$('spectator-view').classList.remove('hidden');
+    setStatus('spectator-status','Spectator display connected to room '+roomCode+'.','ok');
+    if(m.state)renderState(m.state);initWorld('spectator-world');return;
+  }
+  if(m.type==='room:checked'){
+    const seats=m.seats||{};
+    $('team-status').textContent='Room found · Ship A: '+(seats.A??'?')+' seats left · Ship B: '+(seats.B??'?')+' seats left · '+(m.canJoin?'Accepting players':'Race already started');
+    $('team-status').style.color=m.canJoin?'#8ee1bb':'#ff9b9b';
+    return;
+  }
+  if(m.type==='kicked'){
+    role=null;roomState=null;closeSocket();$('player-lobby').classList.add('hidden');$('join-room').disabled=false;showJoinStatus(m.message||'The host removed you from this room.','error');return;
+  }
+  if(m.type==='left'){
+    role=null;roomState=null;$('player-lobby').classList.add('hidden');$('join-room').disabled=false;showJoinStatus('You left the room.');return;
+  }
+  if(m.type==='state'){
+    roomState=m.state;roomCode=roomState?.code||roomCode;renderState(roomState);
+  }
+}
+function playerManifest(players){return (players||[]).map(p=>{
+  const color=p.character?.outfitColor||'#56d5d0';
+  return '<div class="manifest-item"><span><i class="avatar-swatch" style="background:'+esc(color)+'"></i>'+esc(p.name)+' <small>SHIP '+esc(p.team)+'</small></span><span class="badge">'+(p.connected?'ONLINE':'RECONNECTING')+' · '+(p.ready?'READY':'NOT READY')+'</span></div>';
+}).join('')||'<span class="muted">No players have joined yet.</span>';}
+function renderState(s){
+  if(!s)return;roomState=s;roomCode=s.code||roomCode;
+  const players=s.players||[],a=players.filter(p=>p.team==='A'),b=players.filter(p=>p.team==='B');
+  $('room-code').textContent=roomCode||'------';
+  $('count-a').textContent=a.length+'/15';$('count-b').textContent=b.length+'/15';
+  $('bar-a').style.width=(Math.min(15,a.length)/15*100)+'%';$('bar-b').style.width=(Math.min(15,b.length)/15*100)+'%';
+  $('host-phase').textContent=String(s.status||'lobby').toUpperCase();
+  const readyCount=players.filter(p=>p.ready).length;
+  $('host-room-status').textContent='STATUS: '+String(s.status||'lobby').toUpperCase()+' · '+readyCount+'/'+players.length+' READY · '+a.length+' ALPHA · '+b.length+' BRAVO';
+  const canStart=s.status==='lobby'&&a.length>0&&b.length>0&&players.length>=2&&players.every(p=>p.ready&&p.connected);
+  $('start-race').disabled=!canStart;
+  $('host-manifest').innerHTML=playerManifest(players);
+  $('player-crew-count').textContent=players.length+' / 30 CREW';$('player-phase').textContent=String(s.status||'lobby').toUpperCase();
+  $('player-manifest').innerHTML=playerManifest(players);
+  const me=players.find(p=>p.id===playerId);
+  if(me){playerPos={x:Number(me.x)||0,z:Number(me.z)||0};ready=!!me.ready;$('player-team-badge').textContent='SHIP '+me.team;$('ready-button').textContent=ready?'CANCEL READY':'I\'M READY';$('ready-status').textContent=ready?'You are marked ready.':'Get ready with your crew.';}
+  $('spectator-phase').textContent=String(s.status||'lobby').toUpperCase();$('spectator-count').textContent=players.length+' / 30 CREW';
+  $('spectator-a').textContent='Crew '+a.length+'/15 · Ready '+a.filter(p=>p.ready).length+' · Progress '+Math.round(s.ships?.A?.progress||0)+'%';
+  $('spectator-b').textContent='Crew '+b.length+'/15 · Ready '+b.filter(p=>p.ready).length+' · Progress '+Math.round(s.ships?.B?.progress||0)+'%';
+  $('spectator-winner').textContent=s.winner?'SHIP '+s.winner+' WINS!':'';
+  updateWorld(s);
+}
+function selectTeam(team){selectedTeam=team;document.querySelectorAll('.team-choice').forEach(b=>{const on=b.dataset.team===team;b.classList.toggle('selected',on);b.setAttribute('aria-pressed',on?'true':'false');});$('team-status').textContent='Selected: Ship '+team+(team==='A'?' · Alpha':' · Bravo')+'.';$('team-status').style.color=team==='A'?'#49b9e9':'#e5ae58';refreshJoinButtons();}
+function refreshJoinButtons(){const ok=!!selectedTeam&&$('join-code').value.trim().length===6&&$('join-name').value.trim().length>0&&characterExists();$('join-room').disabled=!ok;const c=characterExists()?readCharacter():null;$('character-status').textContent=c?'Character ready: '+(c.name||'Explorer')+'. You can join this room.':'Create and save your character first. Your selected room code and ship will be remembered while you customise.';}
+function getJoinDetails(){return {server:$('join-server').value.trim()||DEFAULT_SERVER,code:$('join-code').value.trim().toUpperCase(),name:$('join-name').value.trim().slice(0,22),team:selectedTeam,deviceId:playerDeviceId()};}
+function stashJoin(){const d=getJoinDetails();if(d.code.length!==6||!d.name||!d.team){showJoinStatus('Enter the six-character room code, your name and choose a ship before creating your character.','error');return false;}try{sessionStorage.setItem('titan-mp-pending-join',JSON.stringify(d));}catch(_){showJoinStatus('This browser could not save your temporary join details.','error');return false;}return true;}
+async function joinRoom(){const d=getJoinDetails();if(!d.code||d.code.length!==6)return showJoinStatus('Enter the six-character room code from your host.','error');if(!d.team)return showJoinStatus('Choose Ship A or Ship B first.','error');if(!d.name)return showJoinStatus('Enter your player name.','error');if(!characterExists())return showJoinStatus('Create and save your character before joining.','error');
+  try{showJoinStatus('Connecting to the host room…');await ensureConnected('join-server');role='player';deviceId=d.deviceId;send({type:'join',code:d.code,team:d.team,name:d.name,deviceId:d.deviceId,character:readCharacter()});}
+  catch(e){showJoinStatus(e.message,'error');}
+}
+async function checkRoom(){const code=$('join-code').value.trim().toUpperCase();if(code.length!==6)return showJoinStatus('Enter the six-character room code first.','error');try{await ensureConnected('join-server');send({type:'room:check',code});showJoinStatus('Checking room…');}catch(e){showJoinStatus(e.message,'error');}}
+function createCharacter(){if(!stashJoin())return;location.href='character-creator.html?return=multiplayer';}
+async function createRoom(){try{const key=$('host-key').value;if(!key)return setStatus('host-status','Enter your private host key from Render.','error');setStatus('host-status','Connecting securely to Render…');await ensureConnected('host-server');role='host';send({type:'host:create',hostKey:key});}catch(e){setStatus('host-status',e.message,'error');}}
+async function claimHost(){const code=prompt('Enter the existing room code to reconnect:');if(!code)return;try{const key=$('host-key').value;if(!key)return setStatus('host-status','Enter your private host key from Render.','error');await ensureConnected('host-server');role='host';roomCode=code.trim().toUpperCase();send({type:'host:claim',code:roomCode,hostKey:key});}catch(e){setStatus('host-status',e.message,'error');}}
+async function connectSpectator(){const code=$('spectator-code').value.trim().toUpperCase();if(code.length!==6)return setStatus('spectator-status','Enter the room code from the host.','error');try{setStatus('spectator-status','Connecting to the live room…');await ensureConnected('spectator-server');role='spectator';send({type:'watch',code});}catch(e){setStatus('spectator-status',e.message,'error');}}
+function copyText(value,statusId,success){const fallback=()=>{const input=document.createElement('textarea');input.value=value;document.body.appendChild(input);input.select();try{document.execCommand('copy');}catch(_){}input.remove();setStatus(statusId,success,'ok');};if(navigator.clipboard?.writeText)navigator.clipboard.writeText(value).then(()=>setStatus(statusId,success,'ok')).catch(fallback);else fallback();}
+function leaveRoom(){send({type:'player:leave'});closeSocket();role=null;$('player-lobby').classList.add('hidden');$('join-room').disabled=false;showJoinStatus('You left the room.');}
+
+// Shared 3D view: both ship hulls and each connected player's saved custom character.
+const avatarObjects=new Map();let worldRenderer=null,worldScene=null,worldCamera=null,worldCanvasId='',worldShips={};
+function initWorld(canvasId){if(worldRenderer&&worldCanvasId===canvasId)return;disposeWorld();const canvas=$(canvasId);if(!canvas||!window.THREE)return;
+  try{
+    worldCanvasId=canvasId;worldScene=new THREE.Scene();worldScene.background=new THREE.Color(0x08283a);worldScene.fog=new THREE.Fog(0x08283a,45,130);
+    worldCamera=new THREE.PerspectiveCamera(52,1,.1,240);worldCamera.position.set(0,24,31);worldCamera.lookAt(0,1,-5);
+    worldRenderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:false,powerPreference:'high-performance'});worldRenderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.5));worldRenderer.setClearColor(0x08283a);
+    worldScene.add(new THREE.HemisphereLight(0xbfeeff,0x203b48,1.8));const sun=new THREE.DirectionalLight(0xffedcf,2);sun.position.set(-12,26,15);worldScene.add(sun);
+    const sea=new THREE.Mesh(new THREE.PlaneGeometry(180,240,32,32),new THREE.MeshStandardMaterial({color:0x12506a,roughness:.62,metalness:.08}));sea.rotation.x=-Math.PI/2;sea.position.y=-.15;sea.position.z=-45;worldScene.add(sea);
+    for(const team of ['A','B']){
+      const g=new THREE.Group();const hullMat=new THREE.MeshStandardMaterial({color:team==='A'?0x238b9e:0xb57d39,metalness:.4,roughness:.48});
+      const hull=new THREE.Mesh(new THREE.BoxGeometry(8.3,1.2,17),hullMat);hull.position.y=.55;g.add(hull);
+      const deck=new THREE.Mesh(new THREE.BoxGeometry(7.7,.12,15.9),new THREE.MeshStandardMaterial({color:0x263d48,metalness:.16,roughness:.8}));deck.position.y=1.19;g.add(deck);
+      const bridge=new THREE.Mesh(new THREE.BoxGeometry(3.2,2.1,3.1),new THREE.MeshStandardMaterial({color:0x9bb4b9,metalness:.48,roughness:.4}));bridge.position.set(0,2.25,-4.2);g.add(bridge);
+      const railMat=new THREE.MeshStandardMaterial({color:team==='A'?0x54c4d4:0xe2b466,metalness:.65,roughness:.35});
+      for(const x of [-3.7,3.7]){const rail=new THREE.Mesh(new THREE.BoxGeometry(.09,.5,15.6),railMat);rail.position.set(x,1.52,0);g.add(rail);}
+      g.position.set(team==='A'?-7:7,0,0);worldScene.add(g);worldShips[team]=g;
+    }
+    const gate=new THREE.Group();const arch=new THREE.Mesh(new THREE.TorusGeometry(10,.35,8,60),new THREE.MeshStandardMaterial({color:0xe1bf7d,emissive:0x3e2607}));gate.add(arch);gate.position.set(0,6,-22);worldScene.add(gate);
+    const resize=()=>{if(!worldRenderer||!worldCanvasId)return;const w=Math.max(1,canvas.clientWidth),h=Math.max(1,canvas.clientHeight);worldRenderer.setSize(w,h,false);worldCamera.aspect=w/h;worldCamera.updateProjectionMatrix();};
+    if(window.ResizeObserver)new ResizeObserver(resize).observe(canvas);else window.addEventListener('resize',resize);resize();
+    const thisRenderer=worldRenderer;
+    const animate=()=>{if(worldRenderer!==thisRenderer)return;requestAnimationFrame(animate);const t=performance.now()/1000;for(const entry of avatarObjects.values()){if(window.TitanCharacterRuntime)TitanCharacterRuntime.animateModel(entry.model,t,entry.moving?1:0,entry.speed||1);}worldRenderer.render(worldScene,worldCamera);};
+    const rendererRef=thisRenderer;animate();
+  }catch(err){console.warn('TITAN shared world could not initialise',err);}
+}
+function disposeWorld(){if(worldRenderer){try{worldRenderer.dispose();}catch(_){}}for(const item of avatarObjects.values()){worldScene?.remove(item.model);item.model.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material){if(Array.isArray(o.material))o.material.forEach(m=>m.dispose());else o.material.dispose();}});}avatarObjects.clear();worldRenderer=null;worldScene=null;worldCamera=null;worldCanvasId='';worldShips={};}
+function updateWorld(s){if(!worldScene||!worldRenderer||!s)return;for(const team of ['A','B']){const sh=s.ships?.[team];if(sh&&worldShips[team]){worldShips[team].position.x=Number(sh.x)||(team==='A'?-7:7);worldShips[team].position.z=-(Number(sh.progress)||0)*.18;worldShips[team].rotation.y=Number(sh.yaw)||0;}}
+  const alive=new Set();for(const p of (s.players||[])){alive.add(p.id);let entry=avatarObjects.get(p.id);if(!entry){const cfg=p.character||{name:p.name};const model=window.TitanCharacterRuntime?TitanCharacterRuntime.createModel(THREE,cfg,{scale:.62}):new THREE.Group();worldScene.add(model);entry={model,moving:false,speed:cfg.animationSpeed||1};avatarObjects.set(p.id,entry);}entry.model.visible=!!p.connected;entry.moving=Date.now()<(p.movingUntil||0);entry.speed=p.character?.animationSpeed||1;const base=p.team==='A'?-7:7;const shipZ=-(Number(s.ships?.[p.team]?.progress)||0)*.18;entry.model.position.set(base+(Number(p.x)||0),1.28,shipZ+(Number(p.z)||0));entry.model.rotation.y=Number(p.yaw)||0;}
+  for(const [id,entry] of avatarObjects){if(!alive.has(id)){worldScene.remove(entry.model);entry.model.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material){if(Array.isArray(o.material))o.material.forEach(m=>m.dispose());else o.material.dispose();}});avatarObjects.delete(id);}}
+}
+
+$('open-host').onclick=()=>activePanel('host');$('open-join').onclick=()=>activePanel('join');$('open-spectator').onclick=()=>activePanel('spectator');document.querySelectorAll('[data-back]').forEach(b=>b.onclick=()=>activePanel('home'));
+$('create-room').onclick=createRoom;$('reconnect-host').onclick=claimHost;
+$('copy-code').onclick=()=>copyText(roomCode,'host-status','Room code copied.');
+$('copy-invite').onclick=()=>copyText(location.origin+location.pathname+'?mode=join&code='+encodeURIComponent(roomCode),'host-status','Invite link copied.');
+$('start-race').onclick=()=>send({type:'host:start'});$('reset-race').onclick=()=>send({type:'host:reset'});
+$('host-speed').oninput=()=> $('host-speed-value').textContent=$('host-speed').value;
+$('apply-speed').onclick=()=>{const team=$('host-ship').value;const ship=roomState?.ships?.[team]||{};send({type:'host:ship',team,speed:Number($('host-speed').value),x:ship.x,yaw:ship.yaw,z:ship.z});};
+$('finish-a').onclick=()=>send({type:'host:finish',team:'A'});$('finish-b').onclick=()=>send({type:'host:finish',team:'B'});
+document.querySelectorAll('.team-choice').forEach(b=>b.onclick=()=>selectTeam(b.dataset.team));
+['join-code','join-name'].forEach(id=>$(id).addEventListener('input',()=>{if(id==='join-code')$(id).value=$(id).value.toUpperCase().replace(/[^A-F0-9]/g,'').slice(0,6);refreshJoinButtons();}));
+$('customize-character').onclick=createCharacter;$('join-room').onclick=joinRoom;$('check-room').onclick=checkRoom;
+$('ready-button').onclick=()=>{ready=!ready;send({type:'player:ready',ready});$('ready-button').textContent=ready?'CANCEL READY':'I\'M READY';};
+$('leave-room').onclick=leaveRoom;$('connect-spectator').onclick=connectSpectator;
+function moveBy(dx,dz){if(!role||role!=='player')return;playerPos.x=Math.max(-3.1,Math.min(3.1,playerPos.x+dx));playerPos.z=Math.max(-5.5,Math.min(5.5,playerPos.z+dz));send({type:'player:move',x:playerPos.x,z:playerPos.z,yaw:Math.atan2(dx,-dz)});}
+$('move-forward').onclick=()=>moveBy(0,-.7);$('move-back').onclick=()=>moveBy(0,.7);$('move-left').onclick=()=>moveBy(-.7,0);$('move-right').onclick=()=>moveBy(.7,0);
+window.addEventListener('keydown',e=>{if(role!=='player'||$('player-lobby').classList.contains('hidden'))return;if(['ArrowUp','w','W'].includes(e.key))moveBy(0,-.5);if(['ArrowDown','s','S'].includes(e.key))moveBy(0,.5);if(['ArrowLeft','a','A'].includes(e.key))moveBy(-.5,0);if(['ArrowRight','d','D'].includes(e.key))moveBy(.5,0);});
+window.addEventListener('keydown',e=>{if(role!=='spectator'||!worldCamera||$('spectator').classList.contains('hidden'))return;const step=1.2;if(e.key==='w'||e.key==='ArrowUp')worldCamera.position.z-=step;if(e.key==='s'||e.key==='ArrowDown')worldCamera.position.z+=step;if(e.key==='a'||e.key==='ArrowLeft')worldCamera.position.x-=step;if(e.key==='d'||e.key==='ArrowRight')worldCamera.position.x+=step;worldCamera.lookAt(0,1,-5);});
+
+// Invite links can prefill the room code, but never silently create a room or bypass team choice.
+const params=new URLSearchParams(location.search);if(params.get('mode')==='join'){$('join-code').value=(params.get('code')||'').toUpperCase().replace(/[^A-F0-9]/g,'').slice(0,6);activePanel('join');}
+// Character creator returns here with the join details still in this tab's session storage.
+if(params.get('resumeSetup')==='1'){try{const pending=JSON.parse(sessionStorage.getItem('titan-mp-pending-join')||'null');if(pending){$('join-server').value=pending.server||DEFAULT_SERVER;$('join-code').value=(pending.code||'').toUpperCase();$('join-name').value=pending.name||'';selectTeam(pending.team||'');activePanel('join');refreshJoinButtons();history.replaceState({},'',location.pathname);}}catch(err){console.warn('Could not restore TITAN crew setup',err);}}
+if(params.get('resumeJoin')==='1'){
+  try{const pending=JSON.parse(sessionStorage.getItem('titan-mp-pending-join')||'null');if(pending){$('join-server').value=pending.server||DEFAULT_SERVER;$('join-code').value=(pending.code||'').toUpperCase();$('join-name').value=pending.name||'';selectTeam(pending.team||'');activePanel('join');refreshJoinButtons();history.replaceState({},'',location.pathname);setTimeout(()=>joinRoom(),350);}}
+  catch(err){console.warn('Could not resume TITAN join flow',err);}
+}
+refreshJoinButtons();
 })();
-</script></body></html>
+</script>
+</body>
+</html>

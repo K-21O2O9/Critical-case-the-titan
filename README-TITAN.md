@@ -28,3 +28,8 @@
 ## Notes
 
 Keep all files and folders together. The project uses the local `three.min.js` build and does not require a remote model download. The character is rendered procedurally, so no external model asset is required. Browser local storage is scoped to the same browser profile and origin; use the same local server address to retain the saved character between pages.
+
+
+## Multiplayer race
+
+Open `multiplayer.html` or choose **MULTIPLAYER RACE** from the main menu. The first screen asks whether you are hosting, joining a crew, or displaying the spectator view. Players must enter the host's room code, select Ship A or Ship B, create/save their character if needed, and then join. See `MULTIPLAYER-SETUP.md` for Netlify/Render deployment and testing instructions.

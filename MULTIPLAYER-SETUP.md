@@ -1,46 +1,82 @@
-# THE TITAN — Private-host multiplayer integration
+# THE TITAN — Multiplayer v2 setup
 
-## What was added
-- `multiplayer.html`: host, player and spectator entry point; room-code lobby; 15-player team caps; ready checks; host controls; shared course preview.
-- `multiplayer-server/`: Node.js WebSocket server with in-memory rooms, host-key authentication, player/team state, reconnection grace period, ready checks, ship state and race lifecycle.
-- A Multiplayer Command shortcut on the existing main menu.
-- Existing ship, deck, character creator, voice and system pages are retained.
+## What is fixed in this build
 
-## Run locally
+- The main menu now has a dedicated **MULTIPLAYER RACE** entry. The normal character workshop remains available for single-player use.
+- Multiplayer opens on a role-selection screen: Host a Race, Join a Crew, or Spectator Display. It no longer opens the host screen by default.
+- Players must enter the room code, enter a name, and explicitly select Ship A or Ship B before they can proceed.
+- The character-creation route remembers the selected room, name, team, and server in the current browser tab. Saving the character returns to the crew lobby and automatically attempts the join.
+- Players with an existing saved character can join directly.
+- Host and spectator sessions do not consume one of the 30 player places. Each ship has a hard limit of 15.
+- The server returns clear room-not-found, team-full, already-connected, host-key and start-readiness errors.
+- Starting requires at least one connected, ready player on each ship and every player must be connected and ready.
+- Player positions and character profiles are included in room state. The multiplayer shared-world preview renders both ships and the players' custom character models; movement is broadcast to the other connected clients.
+- Host rejoin is supported with the room code and host key. A player can reconnect using the same browser/device identity during the reconnection grace period.
+
+## Deploy the website to Netlify
+
+1. Upload the **contents** of this project to the GitHub repository (not only the ZIP file).
+2. In Netlify, import that GitHub repository.
+3. Set Base directory to blank, Build command to blank, and Publish directory to `.` (project root).
+4. Deploy. The public multiplayer page is `/multiplayer.html`.
+5. After updating these files in GitHub, Netlify should create a new production deployment. Confirm its deploy status is Published before testing.
+
+## Deploy/update the Render multiplayer server
+
+The Render Web Service must use the `multiplayer-server` folder as its Root Directory:
+
+- Root Directory: `multiplayer-server`
+- Runtime: Node
+- Build command: `npm install`
+- Start command: `npm start`
+- Health check path: `/healthz` (or `/`)
+- Environment variable: `TITAN_HOST_KEY` = your private host key (keep it in Render only)
+
+The service uses the `PORT` supplied by Render. Do not hard-code a public port.
+
+To update an existing Render service, commit/push the changed `multiplayer-server/server.js` and `multiplayer-server/package.json` to the same connected GitHub repository, then allow Render to deploy the latest commit. Keep your existing `TITAN_HOST_KEY` value; do not paste it into GitHub or Netlify. After deployment, open the Render URL with `/healthz`; the response should include `protocol: "titan-room-v2"`.
+
+The browser automatically defaults to `wss://titan-multiplayer.onrender.com`. It can be changed in the host/player/spectator URL field if your Render hostname is different. HTTPS Netlify pages must use `wss://`, not `ws://`.
+
+## Correct event flow
+
+1. Open `https://YOUR-NETLIFY-SITE.netlify.app/multiplayer.html` on the host device.
+2. Select **Host a Race**, enter your Render WebSocket URL and the private host key, then create one room.
+3. Share the six-character room code or copied invite link. Do not ask players to create rooms.
+4. Each player opens the same `/multiplayer.html`, selects **Join a Crew**, enters that same room code and their name, and selects exactly one ship.
+5. A player without a saved character chooses **Create / Customise Character**. On save, the page returns to the crew setup and submits the join. A player with a saved character can press **Join Room** directly.
+6. The host sees team counts and the crew manifest. Players press **I'm Ready**.
+7. Start becomes available only when there is at least one connected and ready player on both teams and all joined players are ready.
+8. The projector opens **Spectator Display** and connects with the same room code. It does not use a player slot.
+
+## Local test
+
 Requirements: Node.js 20+.
 
-1. Open a terminal in `multiplayer-server/`.
-2. Run `npm install`.
-3. Set a private host key:
-   - macOS/Linux: `export TITAN_HOST_KEY="your-long-random-secret"`
-   - PowerShell: `$env:TITAN_HOST_KEY="your-long-random-secret"`
-4. Run `npm start`.
-5. Serve the ZIP root over HTTP (do not open pages with `file://`):
-   `python -m http.server 8080`
-6. Open `http://localhost:8080/multiplayer.html`.
-7. Host enters `ws://localhost:2567` and the same host key, then creates a room.
-8. Players open the same website from their phones, enter the reachable WebSocket server URL, room code, name and team.
+Terminal 1:
 
-## Deploy
-- Deploy the ZIP root as a static site on Netlify. Publish directory is the project root; no build command is required.
-- Deploy `multiplayer-server/` as a separate Node service on a WebSocket-capable host such as Render or Railway.
-- Configure `TITAN_HOST_KEY` as a server environment secret. Never put this secret in the website or commit it.
-- Use the server's public `wss://` URL in host, player and display screens.
-- The included `render.yaml` is a deployment starting point. Review the host's current pricing, sleep policy, bandwidth and connection limits before the event.
+```bash
+cd multiplayer-server
+npm install
+# Linux/macOS
+export TITAN_HOST_KEY="replace-with-a-long-random-secret"
+# PowerShell alternative:
+# $env:TITAN_HOST_KEY="replace-with-a-long-random-secret"
+npm start
+```
 
-## Important current limitations — test before an event
-This is an initial multiplayer foundation, not yet a finished 30-player production game:
-- Rooms and player state are in server memory; restarting the server loses active rooms. No persistent database is configured.
-- Player movement is synchronised as coordinates, but existing main-deck 3D gameplay and engine controls have NOT yet been wired into the authoritative multiplayer state.
-- The spectator preview is a lightweight generated course with two ships; it is not yet the final custom map nor a full replica of the main-deck environment.
-- Host camera can move around the spectator preview, but ship steering is currently limited to speed adjustment and winner/reset controls. Add server-side ship physics and full helm controls in the next integration pass.
-- Player avatars are not yet rendered with the full character-creator model on every client.
-- The spectator display connects read-only and does not consume a player slot.
-- HTTPS sites require `wss://`; browsers will block insecure `ws://` connections from a Netlify HTTPS page.
-- Use a production persistent server and load-test 30 concurrent phone clients on the actual event network before relying on it.
+Terminal 2, from the project root:
 
-## Network at the venue
-All devices must have internet access to the deployed server, or be on a LAN where the server is reachable. The room code is not a substitute for server connectivity. Have a backup hotspot/router and test Wi-Fi coverage in the venue.
+```bash
+python -m http.server 8080
+```
 
-## Security
-Use a long random `TITAN_HOST_KEY`, keep it server-side, and do not share it with players. This starter server does not yet include rate limiting, moderation tooling, persistent identity, TLS termination configuration or robust anti-cheat validation; deploy behind a reputable HTTPS/WSS platform and add those before a public event.
+Open `http://localhost:8080/multiplayer.html`. Host uses `ws://localhost:2567`. Use the exact same room code on two other browser sessions. To test across phones on the same Wi-Fi, use the computer's LAN IP address in the website URL and the server WebSocket URL, and ensure the local firewall permits the ports.
+
+## Important limitations and event readiness
+
+This build fixes the room entry, team choice, character return flow, player state, and shared multiplayer 3D lobby view. It does **not yet network every pre-existing Main Deck, Engine Room, reactor, cooling, voice or ship-equipment control** from the original single-player simulation. Those systems still need a dedicated integration pass before they affect race physics.
+
+Rooms are stored in server memory. A Render restart/deploy will clear live rooms and disconnect active matches. Do not deploy during an event. Keep this service at **one instance**: scaling this in-memory build to multiple instances would put clients in separate room stores. Multi-instance scaling requires shared room state (for example, a Redis-backed room driver) first. This is not a guarantee of flawless 30-device operation: first test on two phones, then 5–10, then do a full 30-client test on the actual event network. Measure Render CPU/memory, WebSocket stability, latency, and Netlify/mobile browser performance. Have a backup internet connection.
+
+Do not publish the host key. Do not share it with players. The player-side source code does not contain the host key.

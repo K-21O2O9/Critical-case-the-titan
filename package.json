@@ -1,0 +1,1 @@
+{"name":"titan-private-race-host","version":"1.0.0","private":true,"description":"Private room server for THE TITAN shared-ocean team race","scripts":{"start":"node server.js"},"dependencies":{"ws":"^8.18.0"}}

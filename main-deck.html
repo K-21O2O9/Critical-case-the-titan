@@ -1,0 +1,4273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#071725">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>THE TITAN — Main Deck</title>
+<style>
+:root {
+  --bg: #071725;
+  --panel: #102A3B;
+  --border: #1e4054;
+  --text: #eef6f8;
+  --muted: #8aa4b3;
+  --accent: #36BFC0;
+  --brass: #C5A66A;
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-l: env(safe-area-inset-left, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
+  --font: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+  --mono: ui-monospace, "SF Mono", Consolas, monospace;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  height: 100%; width: 100%;
+  height: 100dvh; width: 100dvw;
+  overflow: hidden; background: var(--bg); color: var(--text);
+  font-family: var(--font);
+  -webkit-tap-highlight-color: transparent;
+  touch-action: none;
+  overscroll-behavior: none;
+}
+.hidden { display: none !important; }
+
+#loading-screen {
+  display: none !important;
+}
+.loading-content {
+  max-width: min(420px, 94vw); width: 100%;
+  padding: 1.75rem 1.6rem 1.5rem;
+  border: 1px solid rgba(30,64,84,0.95); border-radius: 16px;
+  background: linear-gradient(165deg, rgba(16,42,59,0.97), rgba(7,23,37,0.99));
+  box-shadow: 0 24px 60px rgba(0,0,0,0.55), 0 0 40px rgba(54,191,192,0.1);
+}
+.loading-kicker { font-size: 0.65rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); margin-bottom: 0.4rem; }
+.loading-content h1 {
+  font-size: clamp(1.55rem, 5vw, 2.1rem); letter-spacing: 0.14em; margin-bottom: 0.35rem;
+  background: linear-gradient(92deg, #fff, #c5f0f0 42%, #36BFC0);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.subtitle { color: var(--muted); font-size: 0.88rem; margin-bottom: 1.25rem; line-height: 1.4; }
+#btn-start {
+  width: 100%; padding: 1rem 1.2rem; font-size: 1rem; font-weight: 650; letter-spacing: 0.05em;
+  background: linear-gradient(135deg, #2aa8a9, #1a6a6c); color: #fff;
+  border: 1px solid rgba(90,212,213,0.45); border-radius: 10px; cursor: pointer;
+  box-shadow: 0 10px 28px rgba(54,191,192,0.3);
+  min-height: 48px; touch-action: manipulation;
+}
+#btn-start:hover { filter: brightness(1.08); }
+
+#game {
+  position: fixed; inset: 0;
+  width: 100%; height: 100%;
+  width: 100dvw; height: 100dvh;
+  display: flex; flex-direction: column;
+  background: var(--bg);
+}
+#top-bar {
+  flex: 0 0 auto;
+  display: flex; align-items: center; gap: 12px;
+  padding: max(8px, var(--safe-t)) max(14px, var(--safe-r)) 8px max(14px, var(--safe-l));
+  min-height: calc(44px + var(--safe-t));
+  background: linear-gradient(90deg, rgba(7,23,37,.98), rgba(16,42,59,.97));
+  border-bottom: 1px solid var(--border); z-index: 30;
+}
+.ship-name { flex: 1; font-weight: 700; letter-spacing: 0.09em; font-size: clamp(0.72rem, 2.5vw, 0.88rem); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ship-subtitle { color: var(--muted); font-size: 0.65rem; margin-left: 8px; font-weight: 500; }
+#sim-clock { font: 0.75rem var(--mono); color: #d5e5ea; flex-shrink: 0; }
+
+#workspace { flex: 1 1 auto; position: relative; min-height: 0; min-width: 0; overflow: hidden; }
+#canvas-host {
+  position: absolute; inset: 0;
+  background: #5a7a88;
+  touch-action: none;
+}
+#canvas-host canvas.deck-renderer {
+  position: absolute; inset: 0; z-index: 1;
+  display: block; width: 100% !important; height: 100% !important;
+  outline: none; touch-action: none;
+}
+
+/* CSS3D layer for flat holographic projection table */
+#css3d-layer {
+  position: absolute; inset: 0; z-index: 5;
+  pointer-events: none; overflow: hidden;
+  perspective-origin: 50% 50%;
+  will-change: transform;
+}
+#css3d-layer > div { pointer-events: none; }
+#proj-iframe {
+  width: 1024px; height: 640px;
+  border: 2px solid rgba(0, 229, 255, 0.65);
+  background: #03080f;
+  border-radius: 4px;
+  box-shadow: 0 0 24px rgba(0, 229, 255, 0.28);
+  pointer-events: none;
+}
+#css3d-layer.interactive-table {
+  z-index: 45;
+  clip-path: none !important;
+  -webkit-clip-path: none !important;
+}
+#css3d-layer.interactive-table,
+#css3d-layer.interactive-table > div,
+#css3d-layer.interactive-table #proj-iframe {
+  pointer-events: auto !important;
+}
+
+.ui-btn {
+  position: absolute; z-index: 50;
+  min-height: 40px; min-width: 40px;
+  padding: 8px 12px;
+  border: 1px solid rgba(88,166,255,.35); border-radius: 8px;
+  background: rgba(7,23,37,.92); color: #d7e8eb;
+  font-size: 0.7rem; font-weight: 600; letter-spacing: 0.04em;
+  cursor: pointer;
+  touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+}
+.ui-btn:hover, .ui-btn:active { border-color: var(--accent); color: #fff; }
+#btn-fullscreen { top: max(10px, var(--safe-t)); left: max(10px, var(--safe-l)); }
+#quality-btn { top: max(10px, var(--safe-t)); right: max(10px, var(--safe-r)); }
+#btn-settings { top: max(10px, var(--safe-t)); right: max(110px, calc(var(--safe-r) + 100px)); }
+#btn-exit-table {
+  display: none;
+  top: max(10px, var(--safe-t)); left: 50%; transform: translateX(-50%);
+  border-color: var(--accent); background: rgba(7,23,37,.96); color: #eefdfa;
+}
+#btn-exit-table.show { display: block; }
+
+/* Helm panel */
+#helm-panel {
+  display: none;
+  position: absolute; z-index: 35;
+  right: max(12px, var(--safe-r));
+  top: max(56px, calc(var(--safe-t) + 48px));
+  width: min(240px, 38vw);
+  max-height: calc(100% - 120px);
+  overflow: auto;
+  padding: 12px 14px;
+  background: linear-gradient(180deg, rgba(16,42,59,.96), rgba(7,23,37,.98));
+  border: 1px solid var(--border); border-radius: 12px;
+  box-shadow: 0 12px 36px rgba(0,0,0,.45);
+}
+#helm-panel.open { display: block; }
+#helm-panel .helm-head { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px; }
+#helm-panel h3 {
+  font-size: 0.7rem; letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--accent); margin: 0;
+}
+#helm-close {
+  width:28px; height:28px; flex:0 0 auto; border:1px solid var(--border);
+  border-radius:7px; background:rgba(7,23,37,.8); color:var(--muted);
+  font-size:1.1rem; cursor:pointer; touch-action:manipulation;
+}
+.helm-row { margin-bottom: 10px; }
+.helm-row label { display: block; font-size: 0.65rem; color: var(--muted); margin-bottom: 4px; letter-spacing: 0.06em; }
+.helm-row input[type="range"] { width: 100%; accent-color: var(--accent); height: 1.5rem; }
+.helm-val { font: 0.8rem var(--mono); color: #d7eeee; margin-top: 3px; }
+.helm-btns { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-top: 8px; }
+.helm-btns button {
+  padding: 8px 4px; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.04em;
+  border: 1px solid var(--border); border-radius: 6px; background: rgba(7,23,37,.85);
+  color: var(--text); cursor: pointer; min-height: 36px; touch-action: manipulation;
+}
+.helm-btns button:hover, .helm-btns button.active { border-color: var(--accent); background: rgba(54,191,192,.18); color: #fff; }
+#helm-status { font-size: 0.65rem; color: var(--muted); margin-top: 8px; font-family: var(--mono); }
+
+/* Sensor Ops internal menu (sonar / lidar / radar / hull) */
+#sensor-panel {
+  display: none;
+  position: absolute; z-index: 36;
+  left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: min(520px, 94vw);
+  max-height: min(88vh, 640px);
+  overflow: hidden;
+  padding: 0;
+  background: linear-gradient(165deg, rgba(8,28,42,.98), rgba(4,16,28,.99));
+  border: 1px solid rgba(54,191,192,.55);
+  border-radius: 14px;
+  box-shadow: 0 20px 60px rgba(0,0,0,.65), 0 0 0 1px rgba(0,0,0,.4);
+  font-family: var(--mono, monospace);
+}
+#sensor-panel.open { display: flex; flex-direction: column; }
+#sensor-panel .sp-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 12px 14px 10px;
+  border-bottom: 1px solid rgba(54,191,192,.28);
+  background: rgba(6,22,34,.9);
+}
+#sensor-panel .sp-head h3 {
+  margin: 0; font-size: 0.72rem; letter-spacing: 0.14em; text-transform: uppercase;
+  color: #36bfc0;
+}
+#sensor-close {
+  width: 30px; height: 30px; flex: 0 0 auto; border: 1px solid var(--border);
+  border-radius: 8px; background: rgba(7,23,37,.85); color: var(--muted);
+  font-size: 1.15rem; cursor: pointer; touch-action: manipulation;
+}
+#sensor-panel .sp-tabs {
+  display: flex; gap: 0; border-bottom: 1px solid rgba(26,73,92,.7);
+  background: rgba(4,18,28,.85);
+}
+#sensor-panel .sp-tab {
+  flex: 1; padding: 10px 6px; font-size: 0.62rem; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; border: none; border-bottom: 2px solid transparent;
+  background: transparent; color: var(--muted); cursor: pointer; touch-action: manipulation;
+}
+#sensor-panel .sp-tab.active {
+  color: #7affd4; border-bottom-color: #36bfc0; background: rgba(54,191,192,.08);
+}
+#sensor-panel .sp-body {
+  flex: 1; overflow: auto; padding: 12px 14px 14px;
+  min-height: 280px;
+}
+#sensor-panel .sp-section { display: none; }
+#sensor-panel .sp-section.active { display: block; }
+#sensor-panel .sp-row { margin-bottom: 12px; }
+#sensor-panel .sp-row label {
+  display: block; font-size: 0.62rem; color: var(--muted); margin-bottom: 5px; letter-spacing: 0.06em;
+}
+#sensor-panel .sp-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+#sensor-panel .sp-btns.three { grid-template-columns: 1fr 1fr 1fr; }
+#sensor-panel .sp-btns button, #sensor-panel .sp-action {
+  padding: 10px 8px; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.04em;
+  border: 1px solid rgba(54,191,192,.4); border-radius: 8px;
+  background: rgba(10,36,52,.9); color: #d7eeee; cursor: pointer;
+  min-height: 40px; touch-action: manipulation;
+}
+#sensor-panel .sp-btns button:hover, #sensor-panel .sp-action:hover,
+#sensor-panel .sp-btns button.active {
+  border-color: #36bfc0; background: rgba(54,191,192,.22); color: #fff;
+}
+#sensor-panel .sp-status {
+  font-size: 0.68rem; color: #9ec7d4; margin-top: 8px; line-height: 1.45;
+  min-height: 2.4em;
+}
+#sensor-panel .sp-list {
+  list-style: none; margin: 0; padding: 0; max-height: 260px; overflow: auto;
+}
+#sensor-panel .sp-list li {
+  display: grid; grid-template-columns: 1fr auto; gap: 6px 10px;
+  padding: 9px 10px; margin-bottom: 6px;
+  border: 1px solid rgba(26,73,92,.75); border-radius: 8px;
+  background: rgba(6,22,34,.75); cursor: pointer;
+  font-size: 0.68rem; color: #cfe8ea;
+}
+#sensor-panel .sp-list li:hover, #sensor-panel .sp-list li.selected {
+  border-color: #c5a66a; background: rgba(197,166,106,.12);
+}
+#sensor-panel .sp-list .sp-id { color: #36bfc0; font-weight: 700; letter-spacing: 0.04em; }
+#sensor-panel .sp-list .sp-meta { color: #9ec7d4; font-size: 0.62rem; }
+#sensor-panel .sp-list .sp-type {
+  justify-self: end; align-self: start;
+  padding: 2px 7px; border-radius: 4px; font-size: 0.58rem; letter-spacing: 0.05em;
+  background: rgba(54,191,192,.15); color: #7affd4;
+}
+#sensor-panel #sensor-3d-canvas {
+  width: 100%; height: 280px; display: block;
+  background: #031018; border: 1px solid rgba(26,73,92,.8); border-radius: 8px;
+  touch-action: none;
+}
+#sensor-panel .sp-hint {
+  font-size: 0.6rem; color: var(--muted); margin-top: 8px; line-height: 1.4;
+}
+@media (max-width: 520px) {
+  #sensor-panel { width: 96vw; max-height: 90vh; }
+  #sensor-panel #sensor-3d-canvas { height: 220px; }
+}
+
+#door-prompt { display: none !important; }
+
+#system-toast {
+  display: none; position: absolute; z-index: 32;
+  top: max(58px, calc(var(--safe-t) + 50px));
+  left: 50%; transform: translateX(-50%);
+  max-width: min(92vw, 480px);
+  padding: 9px 16px;
+  background: rgba(7, 23, 37, 0.94);
+  border: 1px solid rgba(197, 166, 106, 0.65);
+  border-radius: 9px;
+  color: #f4eedc;
+  font: 0.74rem var(--mono);
+  letter-spacing: 0.04em;
+  text-align: center;
+  pointer-events: none;
+  box-shadow: 0 10px 28px rgba(0,0,0,0.45);
+}
+#system-toast.show { display: block; }
+
+/* Deck Access Hatch Ladder Destination Modal */
+#hatch-modal {
+  position: fixed; inset: 0; z-index: 2147483000;
+  display: flex; align-items: center; justify-content: center;
+  padding: max(1rem, var(--safe-t)) max(1rem, var(--safe-r)) max(1rem, var(--safe-b)) max(1rem, var(--safe-l));
+  background: rgba(4, 14, 24, 0.76);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+/* Ensure modal is never clipped by immersive/fullscreen game container */
+#game:fullscreen #hatch-modal,
+#game:-webkit-full-screen #hatch-modal,
+#game.immersive #hatch-modal {
+  position: fixed; inset: 0; z-index: 2147483000;
+}
+#hatch-modal[hidden] { display: none !important; }
+.hatch-card {
+  width: min(390px, 94vw);
+  padding: 1.35rem 1.35rem 1.25rem;
+  background: linear-gradient(165deg, #102a3b, #071725);
+  border: 1px solid rgba(54, 191, 192, 0.55);
+  border-radius: 14px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.65), 0 0 32px rgba(54, 191, 192, 0.14);
+}
+.hatch-kicker {
+  font: 0.64rem var(--mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--brass);
+  margin-bottom: 0.35rem;
+}
+.hatch-card h2 {
+  font-size: 1.05rem;
+  letter-spacing: 0.08em;
+  color: #eef9f9;
+  margin-bottom: 0.35rem;
+}
+.hatch-desc {
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-bottom: 1rem;
+  line-height: 1.4;
+}
+.hatch-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.hatch-btn {
+  width: 100%;
+  min-height: 48px;
+  padding: 0.78rem 1rem;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background: rgba(7, 23, 37, 0.92);
+  color: var(--text);
+  font-size: 0.88rem;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  touch-action: manipulation;
+}
+.hatch-btn:hover, .hatch-btn:active {
+  border-color: var(--accent);
+  background: rgba(54, 191, 192, 0.16);
+  color: #fff;
+}
+.hatch-btn.primary {
+  border-color: rgba(54, 191, 192, 0.55);
+  background: linear-gradient(135deg, rgba(42, 168, 169, 0.28), rgba(16, 42, 59, 0.95));
+}
+.hatch-btn span.tag {
+  font: 0.66rem var(--mono);
+  color: var(--accent);
+  letter-spacing: 0.08em;
+}
+.hatch-row-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.55rem;
+  margin-top: 0.2rem;
+}
+.hatch-btn.secondary {
+  justify-content: center;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+/* Multi-touch joystick */
+#joystick-zone {
+  display: none; position: absolute; z-index: 40;
+  left: max(16px, var(--safe-l));
+  bottom: max(18px, var(--safe-b));
+  width: 140px; height: 140px;
+  touch-action: none;
+}
+#joystick-zone.visible { display: block; }
+#joystick-base {
+  width: 140px; height: 140px; border-radius: 50%;
+  background: rgba(7,23,37,.68); border: 2px solid rgba(54,191,192,.45);
+  position: relative;
+}
+#joystick-knob {
+  width: 56px; height: 56px; border-radius: 50%;
+  position: absolute; left: 42px; top: 42px;
+  background: rgba(54,191,192,.78); border: 1px solid rgba(255,255,255,.35);
+  will-change: transform; transform: translate3d(0,0,0);
+  box-shadow: 0 4px 16px rgba(0,0,0,.35);
+  pointer-events: none;
+}
+#look-zone {
+  display: none; position: absolute; z-index: 14;
+  right: 0; top: 0; bottom: 0; width: 58%;
+  touch-action: none;
+}
+#look-zone.visible { display: block; }
+#mobile-controls {
+  display: none; position: absolute; z-index: 40;
+  right: max(18px, var(--safe-r));
+  bottom: max(22px, var(--safe-b));
+}
+#mobile-controls.visible { display: flex; }
+#btn-interact {
+  width: 72px; height: 72px; border-radius: 50%;
+  border: 2px solid rgba(54,191,192,.7); background: rgba(7,23,37,.88);
+  color: #dffdf9; font-weight: 800; letter-spacing: 0.08em; font-size: 0.8rem;
+  box-shadow: 0 6px 20px rgba(0,0,0,.4); cursor: pointer;
+  touch-action: manipulation;
+}
+
+.settings-panel {
+  position: fixed; inset: 0; z-index: 2147483001;
+  display: flex; align-items: center; justify-content: center;
+  padding: max(0.75rem, var(--safe-t)) max(0.75rem, var(--safe-r)) max(0.75rem, var(--safe-b)) max(0.75rem, var(--safe-l));
+  background: rgba(0,0,0,0.72);
+}
+.settings-panel[hidden] { display: none !important; }
+.settings-card {
+  width: min(420px, 96vw); max-height: min(88dvh, 680px); overflow: auto;
+  background: linear-gradient(165deg, #102a3b, #071725);
+  border: 1px solid var(--border); border-radius: 14px;
+  box-shadow: 0 24px 80px rgba(0,0,0,0.55);
+}
+.settings-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 1rem 1.15rem; border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; background: #102a3b; z-index: 1;
+}
+.settings-head h2 { font-size: 1rem; letter-spacing: 0.08em; color: var(--accent); }
+.settings-close {
+  width: 2.2rem; height: 2.2rem; border-radius: 8px; border: 1px solid var(--border);
+  background: transparent; color: var(--muted); cursor: pointer; font-size: 1.3rem;
+}
+.settings-body { padding: 1rem 1.15rem 1.3rem; }
+.settings-section { margin-bottom: 1.1rem; }
+.settings-section h3 { font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin-bottom: 0.55rem; }
+.settings-toggle { display: flex; align-items: center; gap: 0.55rem; padding: 0.45rem 0; font-size: 0.9rem; cursor: pointer; min-height: 44px; }
+.settings-toggle input { accent-color: var(--accent); width: 1.1rem; height: 1.1rem; }
+
+
+
+/* Engine panel removed from user UI — live stats render on bridge room screens */
+#engine-panel { display: none !important; }
+#btn-engine-panel { display: none !important; }
+
+/* Engine Room live telemetry panel (bridge side) */
+#engine-panel {
+  display: none;
+  position: absolute; z-index: 36;
+  left: max(12px, var(--safe-l));
+  top: max(56px, calc(var(--safe-t) + 48px));
+  width: min(280px, 46vw);
+  max-height: calc(100% - 120px);
+  overflow: auto;
+  padding: 12px 14px;
+  background: linear-gradient(180deg, rgba(16,42,59,.97), rgba(7,23,37,.99));
+  border: 1px solid var(--border); border-radius: 12px;
+  box-shadow: 0 12px 36px rgba(0,0,0,.45);
+  font-size: 0.72rem;
+}
+#engine-panel.open { display: block; }
+#engine-panel .eng-head {
+  display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px;
+}
+#engine-panel h3 {
+  font-size: 0.68rem; letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--accent); margin: 0;
+}
+#engine-close {
+  width:28px; height:28px; flex:0 0 auto; border:1px solid var(--border);
+  border-radius:7px; background:rgba(7,23,37,.8); color:var(--muted);
+  font-size:1.1rem; cursor:pointer; touch-action:manipulation;
+}
+.eng-link {
+  font: 0.62rem var(--mono); margin-bottom: 8px;
+  color: var(--muted);
+}
+.eng-link.ok { color: #5ddea0; }
+.eng-link.bad { color: #e8a05c; }
+.eng-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px;
+  margin-bottom: 8px;
+}
+.eng-stat label {
+  display:block; font-size: 0.58rem; color: var(--muted); letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.eng-stat .v {
+  font: 0.82rem var(--mono); color: #d7eeee; margin-top: 1px;
+}
+.eng-section-title {
+  font-size: 0.58rem; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--brass); margin: 8px 0 4px;
+}
+.eng-flags {
+  display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px;
+}
+.eng-flag {
+  font: 0.58rem var(--mono); padding: 3px 6px; border-radius: 4px;
+  border: 1px solid var(--border); color: var(--muted); background: rgba(7,23,37,.6);
+}
+.eng-flag.on {
+  border-color: rgba(54,191,192,.55); color: #b8f5f0;
+  background: rgba(54,191,192,.15);
+}
+#btn-engine-panel {
+  top: max(10px, var(--safe-t)); right: max(210px, calc(var(--safe-r) + 200px));
+}
+@media (max-width: 720px) {
+  #engine-panel { width: min(220px, 52vw); padding: 10px; }
+  #btn-engine-panel { right: max(180px, calc(var(--safe-r) + 170px)); font-size: 0.62rem; padding: 7px 9px; }
+}
+@media (max-width: 420px) {
+  #btn-engine-panel { display: none; } /* open via helm USE on small screens */
+}
+
+/* Fullscreen / immersive */
+#game.immersive #top-bar { display: none !important; }
+#game.immersive #workspace { height: 100%; }
+#game:fullscreen, #game:-webkit-full-screen { width: 100%; height: 100%; }
+#game:fullscreen #workspace, #game:-webkit-full-screen #workspace { height: 100%; }
+
+@media (max-width: 720px) {
+  .ship-subtitle { display: none; }
+  #helm-panel {
+    width: min(200px, 46vw);
+    padding: 10px;
+    top: max(52px, calc(var(--safe-t) + 44px));
+  }
+  #btn-settings { right: max(96px, calc(var(--safe-r) + 88px)); font-size: 0.62rem; padding: 7px 9px; }
+  #door-prompt { bottom: max(160px, calc(var(--safe-b) + 150px)); font-size: 0.72rem; }
+}
+@media (max-width: 420px) {
+  #helm-panel { width: min(170px, 48vw); }
+  #joystick-zone { width: 120px; height: 120px; }
+  #joystick-base { width: 120px; height: 120px; }
+  #joystick-knob { width: 48px; height: 48px; left: 36px; top: 36px; }
+}
+@media (max-height: 480px) and (orientation: landscape) {
+  #top-bar { min-height: 36px; padding-top: max(4px, var(--safe-t)); padding-bottom: 4px; }
+  #helm-panel { top: max(40px, calc(var(--safe-t) + 36px)); max-height: calc(100% - 70px); }
+  #joystick-zone { bottom: max(8px, var(--safe-b)); }
+  #mobile-controls { bottom: max(10px, var(--safe-b)); }
+  #btn-interact { width: 58px; height: 58px; }
+}
+@media (pointer: coarse) {
+  #joystick-zone.visible { display: block; }
+  #look-zone.visible { display: block; }
+  #mobile-controls.visible { display: flex; }
+}
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}
+</style>
+</head>
+<body>
+<div id="loading-screen">
+  <div class="loading-content">
+    <p class="loading-kicker">DECK OPERATIONS · ATLANTIC WATCH</p>
+    <h1>THE TITAN</h1>
+    <p class="subtitle">Main Deck walk mode · Multi-touch controls · Bridge systems online</p>
+    <button type="button" id="btn-start">Enter Main Deck</button>
+  </div>
+</div>
+
+<div id="game">
+  <header id="top-bar">
+    <div class="ship-name">THE TITAN <span class="ship-subtitle">/ MAIN DECK</span></div>
+    <div id="sim-clock">00:00:00</div>
+  </header>
+  <div id="workspace">
+    <div id="canvas-host">
+      <div id="css3d-layer" aria-hidden="true"></div>
+      <button type="button" class="ui-btn" id="btn-fullscreen" title="Fullscreen">⛶</button>
+      <button type="button" class="ui-btn" id="btn-exit-table" title="Step back from Chart Table">Exit Table</button>
+      <button type="button" class="ui-btn" id="btn-settings" title="Settings">Settings</button>
+      <button type="button" class="ui-btn" id="quality-btn">Quality: MED</button>
+
+      <div id="helm-panel" aria-label="Helm station controls">
+        <div class="helm-head"><h3>Helm · Propulsion</h3><button type="button" id="helm-close" aria-label="Close helm controls">×</button></div>
+        <div class="helm-row">
+          <label>Throttle</label>
+          <input type="range" id="helm-throttle" min="0" max="100" value="0">
+          <div class="helm-val"><span id="val-throttle">0</span>% · <span id="val-speed">0.0</span> kn</div>
+        </div>
+        <div class="helm-row">
+          <label>Rudder</label>
+          <input type="range" id="helm-rudder" min="-35" max="35" value="0">
+          <div class="helm-val"><span id="val-rudder">0</span>°</div>
+        </div>
+        <div class="helm-btns">
+          <button type="button" id="helm-port">PORT</button>
+          <button type="button" id="helm-amid" class="active">AMID</button>
+          <button type="button" id="helm-stbd">STBD</button>
+        </div>
+        <div class="helm-btns" style="margin-top:6px">
+          <button type="button" id="helm-stop" style="grid-column:1/-1">ALL STOP</button>
+        </div>
+        <div id="helm-status">ENGINES STANDBY</div>
+      </div>
+
+      
+      <div id="engine-panel" aria-label="Engine room live telemetry">
+        <div class="eng-head"><h3>Engine Room · Live</h3><button type="button" id="engine-close" aria-label="Close">×</button></div>
+        <div id="eng-link-status" class="eng-link bad">LINK · WAITING FOR ENGINE ROOM</div>
+        <div class="eng-grid">
+          <div class="eng-stat"><label>Speed</label><div class="v"><span id="eng-speed">—</span> kn</div></div>
+          <div class="eng-stat"><label>Heading</label><div class="v"><span id="eng-hdg">—</span>°</div></div>
+          <div class="eng-stat"><label>Throttle</label><div class="v"><span id="eng-thr">—</span>%</div></div>
+          <div class="eng-stat"><label>RPM</label><div class="v"><span id="eng-rpm">—</span></div></div>
+          <div class="eng-stat"><label>Power</label><div class="v"><span id="eng-pwr">—</span> kW</div></div>
+          <div class="eng-stat"><label>Temp</label><div class="v"><span id="eng-temp">—</span> °C</div></div>
+          <div class="eng-stat"><label>Fuel</label><div class="v"><span id="eng-fuel">—</span>%</div></div>
+          <div class="eng-stat"><label>Load</label><div class="v"><span id="eng-load">—</span> kW</div></div>
+        </div>
+        <div class="eng-section-title">Plant status</div>
+        <div class="eng-flags" id="eng-flags">
+          <span class="eng-flag" data-k="main">MAIN</span>
+          <span class="eng-flag" data-k="motor1">M1</span>
+          <span class="eng-flag" data-k="motor2">M2</span>
+          <span class="eng-flag" data-k="gen">GEN</span>
+          <span class="eng-flag" data-k="clutch">CLUTCH</span>
+          <span class="eng-flag" data-k="lub">LUB</span>
+          <span class="eng-flag" data-k="sw">SW</span>
+        </div>
+        <div class="eng-section-title">Heat · Electrics / Reactor / Reg / Motors</div>
+        <div class="eng-grid">
+          <div class="eng-stat"><label>Elec heat</label><div class="v"><span id="eng-heat-e">0</span></div></div>
+          <div class="eng-stat"><label>Reactor heat</label><div class="v"><span id="eng-heat-r">0</span></div></div>
+          <div class="eng-stat"><label>Reg heat</label><div class="v"><span id="eng-heat-g">0</span></div></div>
+          <div class="eng-stat"><label>Motor heat</label><div class="v"><span id="eng-heat-m">0</span></div></div>
+        </div>
+        <p style="font-size:0.62rem;color:var(--muted);margin-top:8px;line-height:1.35">
+          Helm throttle &amp; rudder orders are sent live to Engine Room. Open <code>engine-room.html</code> in another tab for full plant control.
+        </p>
+      </div>
+
+<div id="door-prompt">USE · Bridge door</div>
+      <div id="system-toast" role="status" aria-live="polite"></div>
+
+      <!-- Sensor Ops internal menu (opened by interacting with sonar / lidar / radar / hull) -->
+      <div id="sensor-panel" aria-label="Sensor station operations" role="dialog" aria-modal="true">
+        <div class="sp-head">
+          <h3 id="sensor-title">SENSOR OPS</h3>
+          <button type="button" id="sensor-close" aria-label="Close sensor menu">×</button>
+        </div>
+        <div class="sp-tabs" role="tablist">
+          <button type="button" class="sp-tab active" data-tab="scan" role="tab">Scan</button>
+          <button type="button" class="sp-tab" data-tab="identify" role="tab">Identify</button>
+          <button type="button" class="sp-tab" data-tab="view3d" role="tab">3D View</button>
+        </div>
+        <div class="sp-body">
+          <div class="sp-section active" id="sp-scan" data-section="scan">
+            <div class="sp-row">
+              <label>Active mode</label>
+              <div id="sp-mode-label" style="font-size:0.85rem;color:#7affd4;font-weight:700;">MULTIBEAM SONAR</div>
+            </div>
+            <div class="sp-row">
+              <label>Range / Focus</label>
+              <input type="range" id="sp-range" min="50" max="1000" step="25" value="500" style="width:100%;accent-color:#36bfc0;">
+              <div class="sp-status" id="sp-range-val">500 m</div>
+            </div>
+            <div class="sp-row">
+              <label>Scan actions</label>
+              <div class="sp-btns three">
+                <button type="button" id="sp-ping">PING / PULSE</button>
+                <button type="button" id="sp-focus">FOCUS BEAM</button>
+                <button type="button" id="sp-autoscan">AUTO SCAN</button>
+              </div>
+            </div>
+            <div class="sp-row">
+              <label>Efficiency</label>
+              <div class="sp-btns">
+                <button type="button" id="sp-wide">WIDE SWEEP</button>
+                <button type="button" id="sp-narrow">NARROW TRACK</button>
+              </div>
+            </div>
+            <div class="sp-status" id="sp-scan-status">Ready · select an action or open Identify / 3D View</div>
+            <p class="sp-hint">Focused and narrow modes improve classification of nearby contacts. Auto scan re-pings every 4 s while open.</p>
+          </div>
+          <div class="sp-section" id="sp-identify" data-section="identify">
+            <div class="sp-row">
+              <label>Detected contacts &amp; obstacles</label>
+              <ul class="sp-list" id="sp-contact-list"></ul>
+            </div>
+            <div class="sp-status" id="sp-id-status">Select a contact to lock classification</div>
+            <div class="sp-btns" style="margin-top:10px">
+              <button type="button" id="sp-classify">CLASSIFY SELECTED</button>
+              <button type="button" id="sp-refresh">REFRESH LIST</button>
+            </div>
+          </div>
+          <div class="sp-section" id="sp-view3d" data-section="view3d">
+            <canvas id="sensor-3d-canvas" width="480" height="280" aria-label="3D obstacle view"></canvas>
+            <p class="sp-hint">Perspective view of ship (center) and contacts. Drag to orbit · scroll or pinch to zoom. Orange = sonar, cyan = lidar / surface, gold = classified.</p>
+            <div class="sp-btns" style="margin-top:10px">
+              <button type="button" id="sp-3d-reset">RESET VIEW</button>
+              <button type="button" id="sp-3d-follow">FOLLOW CONTACT</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="joystick-zone">
+        <div id="joystick-base"><div id="joystick-knob"></div></div>
+      </div>
+      <div id="look-zone"></div>
+      <div id="mobile-controls"><button type="button" id="btn-interact">USE</button></div>
+    </div>
+  </div>
+<!-- Deck Access Ladder Modal -->
+<div id="hatch-modal" hidden>
+  <div class="hatch-card" role="dialog" aria-modal="true" aria-labelledby="hatch-title">
+    <p class="hatch-kicker">DECK ACCESS SHAFT · FRAME 14</p>
+    <h2 id="hatch-title">Companionway Ladder</h2>
+    <p class="hatch-desc">Select lower deck compartment to descend via vertical steel ladder:</p>
+    <div class="hatch-actions">
+      <button type="button" class="hatch-btn primary" id="btn-go-storage">
+        <span>Storage Compartment</span>
+        <span class="tag">DECK B · FWD</span>
+      </button>
+      <button type="button" class="hatch-btn primary" id="btn-go-engine">
+        <span>Engine Room</span>
+        <span class="tag">DECK C · AFT</span>
+      </button>
+      <div class="hatch-row-split">
+        <button type="button" class="hatch-btn secondary" id="btn-hatch-close-lid">Close Hatch</button>
+        <button type="button" class="hatch-btn secondary" id="btn-hatch-back">Back</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="settings-panel" class="settings-panel" hidden>
+  <div class="settings-card">
+    <div class="settings-head">
+      <h2>Settings</h2>
+      <button type="button" class="settings-close" id="settings-close" aria-label="Close">×</button>
+    </div>
+    <div class="settings-body">
+      <section class="settings-section">
+        <h3>Touch controls</h3>
+        <label class="settings-toggle"><input type="checkbox" id="set-joystick" checked> Show joystick</label>
+        <label class="settings-toggle"><input type="checkbox" id="set-use-btn" checked> Show USE button</label>
+        <label class="settings-toggle"><input type="checkbox" id="set-look-zone" checked> Look zone (right half)</label>
+      </section>
+      <section class="settings-section">
+        <h3>Graphics</h3>
+        <label class="settings-toggle"><input type="checkbox" id="set-shadows" checked> Shadows</label>
+        <p style="font-size:0.8rem;color:var(--muted);margin-top:0.4rem;line-height:1.4">Quality cycles LOW → MED → HIGH. Multi-touch: move with left stick and look with the right side of the screen at the same time.</p>
+      </section>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<script src="three.min.js"></script>
+<script src="character-runtime.js"></script>
+<script src="titan-ship-bus.js"></script>
+<script>
+(function () {
+  'use strict';
+  const $ = (id) => document.getElementById(id);
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+
+  /* Resolve sibling local file in the exact same directory regardless of folder path or protocol.
+     Works for http(s), file://, and relative opens as long as the target HTML sits next to this page. */
+  function resolveSameDirFile(filename) {
+    const name = String(filename || '').replace(/^\.?\//, '');
+    try {
+      if (window.location.protocol === 'about:' || window.location.protocol === 'blob:') {
+        return name;
+      }
+      // Preferred: URL relative to the current document (same folder)
+      return new URL(name, window.location.href).href;
+    } catch (e) {
+      try {
+        const cleanHref = (window.location.href || '').split('#')[0].split('?')[0];
+        const slashIdx = cleanHref.lastIndexOf('/');
+        const baseDir = slashIdx >= 0 ? cleanHref.substring(0, slashIdx + 1) : '';
+        return baseDir + name;
+      } catch (e2) {
+        return name;
+      }
+    }
+  }
+
+  /** Navigate to a same-folder HTML page (hatch ladder destinations). */
+  function goToSameDirPage(filename, label) {
+    const target = resolveSameDirFile(filename);
+    try {
+      if (typeof showToast === 'function') {
+        showToast((label || filename) + ' · loading…');
+      }
+    } catch (_) {}
+    // Prefer assign so history is preserved; fall back to href write
+    try {
+      window.location.assign(target);
+    } catch (_) {
+      window.location.href = target;
+    }
+  }
+  window.resolveSameDirFile = resolveSameDirFile;
+  window.goToSameDirPage = goToSameDirPage;
+
+  /* Ship is 20% larger overall (1.20x) with clean port & starboard corridors */
+  const SHIP_SCALE = 1.20;
+  const PLAYER_EYE_LOCAL_Y = 4.72; /* 4.72 * 1.20 = 5.664m world (1.824m above 3.84m deck) */
+
+  /* ── Engine State ── */
+  const state = {
+    entered: false,
+    ready: false,
+    quality: 'MED',
+    playerLocal: { x: 0.85, y: PLAYER_EYE_LOCAL_Y, z: -14.35 },
+    yaw: 0,
+    pitch: -0.02,
+    doorOpen: false,
+    doorProgress: 0,
+    hatchOpen: false,
+    hatchProgress: 0,
+    hatchPromptOpen: false,
+    nearDoor: false,
+    nearHelm: false,
+    nearTable: false,
+    nearHatch: false,
+    nearestTarget: null,
+    helmOpen: false,
+    tableFocused: false,
+    savedPose: null,
+    shipSpeed: 0,
+    shipHeading: 0,
+    throttle: 0,
+    rudder: 0,
+    time: 0,
+    /* Interactive simulation & scanner telemetry state */
+    radarRangeNm: 12,
+    lidarPulse: 0,
+    sonarPing: 0,
+    hullScanPulse: 0,
+    aisChannel: 16,
+    /* Live sensor model — obstacles/contacts can be added at runtime */
+    sonarMaxRangeM: 500,
+    sonarKeelClearanceM: 184.6,
+    sonarLastReturns: [],
+    radarContacts: [],
+    sonarObstacles: [],
+    surfaceObstacles: [],
+    sensorPanelOpen: false,
+    sensorMode: 'sonar',          // radar | lidar | sonar | hull
+    sensorScanMode: 'wide',       // wide | narrow
+    sensorFocus: false,
+    sensorAutoScan: false,
+    sensorSelectedId: null,
+    sensorOrbitYaw: 0.6,
+    sensorOrbitPitch: 0.35,
+    sensorOrbitDist: 1.0,
+    craneDeployed: false,
+    craneAngle: 0.22,
+    windlassRunning: false,
+    capstanRunning: false,
+    deckFloodlightsOn: true,
+    bellSwing: 0,
+    screens: [],
+    _lastScrT: 0
+  };
+
+  const keys = Object.create(null);
+
+  /* ── Titan Ship Bus: real-time link to Engine Room ── */
+  const shipBus = (typeof createTitanShipBus === 'function')
+    ? createTitanShipBus('bridge')
+    : null;
+  let engineLinked = false;
+  let lastEngTelemetry = null;
+
+  function setEnginePanelOpen(open) {
+    const el = $('engine-panel');
+    if (!el) return;
+    el.classList.toggle('open', !!open);
+  }
+
+  function updateEnginePanelUI(t) {
+    if (!t) return;
+    const set = (id, v) => { const e = $(id); if (e) e.textContent = v; };
+    set('eng-speed', (t.shipSpeedKn != null ? t.shipSpeedKn : 0).toFixed(1));
+    set('eng-hdg', String(Math.round(t.headingDeg != null ? t.headingDeg : 0)).padStart(3, '0'));
+    set('eng-thr', Math.round(t.throttle != null ? t.throttle : 0));
+    set('eng-rpm', Math.round(t.rpm != null ? t.rpm : 0));
+    set('eng-pwr', (t.powerKw != null ? t.powerKw : (t.elecPowerKw || 0)).toFixed(0));
+    set('eng-temp', (t.temperatureC != null ? t.temperatureC : 0).toFixed(0));
+    set('eng-fuel', (t.fuelPercent != null ? t.fuelPercent : 0).toFixed(0));
+    set('eng-load', (t.loadDemandKw != null ? t.loadDemandKw : 0).toFixed(0));
+    set('eng-heat-e', Math.round((t.machineHeat && t.machineHeat.electrics) || 0));
+    set('eng-heat-r', Math.round((t.machineHeat && t.machineHeat.reactor) || 0));
+    set('eng-heat-g', Math.round((t.machineHeat && t.machineHeat.regulator) || 0));
+    set('eng-heat-m', Math.round((t.machineHeat && t.machineHeat.motors) || 0));
+    const flags = {
+      main: t.electrics && t.electrics.main,
+      motor1: t.electrics && t.electrics.motor1,
+      motor2: t.electrics && t.electrics.motor2,
+      gen: t.reactor && t.reactor.generator,
+      clutch: t.motors && t.motors.clutch,
+      lub: t.cooling && t.cooling.lubPump,
+      sw: t.cooling && t.cooling.swPump
+    };
+    document.querySelectorAll('#eng-flags .eng-flag').forEach((el) => {
+      const k = el.getAttribute('data-k');
+      el.classList.toggle('on', !!flags[k]);
+    });
+    const link = $('eng-link-status');
+    if (link) {
+      if (t.connected) {
+        link.className = 'eng-link ok';
+        link.textContent = 'LINK · ENGINE ROOM ONLINE · ' + (t.condition || 'normal').toUpperCase();
+      } else {
+        link.className = 'eng-link bad';
+        link.textContent = 'LINK · WAITING FOR ENGINE ROOM';
+      }
+    }
+  }
+
+  function onEngineTelemetry(t) {
+    lastEngTelemetry = t;
+    engineLinked = !!(t && t.connected);
+    updateEnginePanelUI(t);
+    if (engineLinked && t) {
+      // Mirror authoritative propulsion from engine room
+      state.shipSpeed = t.shipSpeedKn != null ? t.shipSpeedKn : state.shipSpeed;
+      if (t.headingDeg != null) state.shipHeading = t.headingDeg;
+      // Keep local throttle display aligned when engine owns it
+      if (typeof t.throttle === 'number' && Math.abs(t.throttle - state.throttle) > 0.5) {
+        // Only soft-sync if user is not actively dragging (heuristic: no recent input)
+        // Always show engine value in eng panel; helm slider can stay as order.
+      }
+      if ($('val-speed')) $('val-speed').textContent = state.shipSpeed.toFixed(1);
+    }
+  }
+
+
+  /* ── Runtime obstacle / contact API (for upcoming content) ──
+     TitanSensors.addObstacle({ id, rangeM, bearingDeg, depthM, type })
+     TitanSensors.addRadarContact({ id, rangeNm, bearingDeg, label })
+     TitanSensors.clear()
+  */
+  const TitanSensors = {
+    addObstacle(o) {
+      if (!o) return null;
+      const id = o.id || ('OBS-' + (state.sonarObstacles.length + 1));
+      const entry = {
+        id: id,
+        rangeM: Number(o.rangeM != null ? o.rangeM : (o.range != null ? o.range : 120)),
+        bearingDeg: Number(o.bearingDeg != null ? o.bearingDeg : (o.bearing != null ? o.bearing : 0)),
+        depthM: Number(o.depthM != null ? o.depthM : (o.depth != null ? o.depth : 40)),
+        strength: Number(o.strength != null ? o.strength : 0.85),
+        type: o.type || 'obstacle',
+        label: o.label || id
+      };
+      const idx = state.sonarObstacles.findIndex((x) => x.id === id);
+      if (idx >= 0) state.sonarObstacles[idx] = entry;
+      else state.sonarObstacles.push(entry);
+      // Mirror weak ARPA echo when range is large enough to matter at radar scale
+      if (entry.rangeM > 80) {
+        TitanSensors.addRadarContact({
+          id: 'R-' + id,
+          rangeNm: Math.max(0.2, entry.rangeM / 1852),
+          bearingDeg: entry.bearingDeg,
+          label: entry.label
+        });
+      }
+      return entry;
+    },
+    addRadarContact(c) {
+      if (!c) return null;
+      const id = c.id || ('TGT-' + (state.radarContacts.length + 1));
+      const entry = {
+        id: id,
+        rangeNm: Number(c.rangeNm != null ? c.rangeNm : 2),
+        bearingDeg: Number(c.bearingDeg != null ? c.bearingDeg : 0),
+        label: c.label || id
+      };
+      const idx = state.radarContacts.findIndex((x) => x.id === id);
+      if (idx >= 0) state.radarContacts[idx] = entry;
+      else state.radarContacts.push(entry);
+      return entry;
+    },
+    remove(id) {
+      state.sonarObstacles = state.sonarObstacles.filter((x) => x.id !== id);
+      state.radarContacts = state.radarContacts.filter((x) => x.id !== id && x.id !== ('R-' + id));
+    },
+    clear() {
+      state.sonarObstacles = [];
+      state.radarContacts = [];
+      state.sonarLastReturns = [];
+    },
+    list() {
+      return {
+        sonar: state.sonarObstacles.slice(),
+        radar: state.radarContacts.slice(),
+        lastSonar: state.sonarLastReturns.slice()
+      };
+    },
+    /** Run a multibeam ping; returns contacts within max range */
+    ping() {
+      const maxR = state.sonarMaxRangeM || 500;
+      const returns = state.sonarObstacles
+        .filter((o) => o.rangeM <= maxR)
+        .map((o) => Object.assign({}, o, {
+          detected: true,
+          echo: Math.max(0.15, Math.min(1, o.strength * (1 - o.rangeM / maxR)))
+        }))
+        .sort((a, b) => a.rangeM - b.rangeM);
+      state.sonarLastReturns = returns;
+      state.sonarPing = 1.0;
+      return returns;
+    }
+  };
+  window.TitanSensors = TitanSensors;
+
+  // Demo seabed features so sonar is not empty until user content is added
+  TitanSensors.addObstacle({ id: 'SEABED-RISE', rangeM: 210, bearingDeg: 18, depthM: 42, type: 'seabed', label: 'Seabed rise' });
+  TitanSensors.addObstacle({ id: 'WRECK-A', rangeM: 145, bearingDeg: 312, depthM: 28, type: 'wreck', label: 'Wreck contact' });
+  TitanSensors.addRadarContact({ id: 'TGT-01', rangeNm: 4.2, bearingDeg: 41, label: 'Vessel CPA' });
+  TitanSensors.addRadarContact({ id: 'TGT-02', rangeNm: 6.8, bearingDeg: 135, label: 'Contact' });
+  TitanSensors.addRadarContact({ id: 'TGT-03', rangeNm: 5.1, bearingDeg: 224, label: 'Contact' });
+  TitanSensors.addRadarContact({ id: 'TGT-04', rangeNm: 7.9, bearingDeg: 312, label: 'Contact' });
+  // Extra demo contacts for richer Identify / 3D view
+  TitanSensors.addObstacle({ id: 'REEF-B', rangeM: 320, bearingDeg: 95, depthM: 18, type: 'reef', label: 'Coral shelf' });
+  TitanSensors.addObstacle({ id: 'CONTAINER', rangeM: 88, bearingDeg: 205, depthM: 12, type: 'debris', label: 'Floating debris' });
+
+  /* ── Sensor Ops internal menu controller ── */
+  const SensorOps = {
+    _autoTimer: null,
+    _raf: null,
+    _drag: false,
+    _lastX: 0,
+    _lastY: 0,
+
+    modeTitles: {
+      radar: 'X-BAND ARPA RADAR',
+      lidar: '3D SURFACE LIDAR',
+      sonar: 'MULTIBEAM SONAR',
+      hull: 'ULTRASONIC HULL SCAN'
+    },
+
+    open(mode) {
+      state.sensorMode = mode || 'sonar';
+      state.sensorPanelOpen = true;
+      if (document.pointerLockElement) {
+        (document.exitPointerLock || document.webkitExitPointerLock || (() => {})).call(document);
+      }
+      const el = $('sensor-panel');
+      if (!el) return;
+      el.classList.add('open');
+      $('sensor-title').textContent = 'SENSOR OPS · ' + (this.modeTitles[state.sensorMode] || state.sensorMode.toUpperCase());
+      $('sp-mode-label').textContent = this.modeTitles[state.sensorMode] || state.sensorMode;
+      const rangeEl = $('sp-range');
+      if (state.sensorMode === 'radar') {
+        rangeEl.min = 3; rangeEl.max = 24; rangeEl.step = 1;
+        rangeEl.value = state.radarRangeNm;
+        $('sp-range-val').textContent = state.radarRangeNm + ' NM';
+      } else {
+        rangeEl.min = 50; rangeEl.max = 1000; rangeEl.step = 25;
+        rangeEl.value = state.sonarMaxRangeM || 500;
+        $('sp-range-val').textContent = (state.sonarMaxRangeM || 500) + ' m';
+      }
+      this.switchTab('scan');
+      this.refreshList();
+      this.updateScanStatus('Station online · ready for efficient scan');
+      if (state.sensorMode === 'sonar' || state.sensorMode === 'lidar') {
+        this.doPing(false);
+      }
+      this.start3dLoop();
+      showToast((this.modeTitles[state.sensorMode] || 'SENSOR') + ' · OPS MENU OPEN');
+    },
+
+    close() {
+      state.sensorPanelOpen = false;
+      state.sensorAutoScan = false;
+      if (this._autoTimer) { clearInterval(this._autoTimer); this._autoTimer = null; }
+      const el = $('sensor-panel');
+      if (el) el.classList.remove('open');
+      this.stop3dLoop();
+      const autoBtn = $('sp-autoscan');
+      if (autoBtn) autoBtn.classList.remove('active');
+    },
+
+    switchTab(name) {
+      document.querySelectorAll('#sensor-panel .sp-tab').forEach((t) => {
+        t.classList.toggle('active', t.dataset.tab === name);
+      });
+      document.querySelectorAll('#sensor-panel .sp-section').forEach((s) => {
+        s.classList.toggle('active', s.dataset.section === name);
+      });
+      if (name === 'identify') this.refreshList();
+      if (name === 'view3d') this.draw3d();
+    },
+
+    updateScanStatus(msg) {
+      const el = $('sp-scan-status');
+      if (el) el.textContent = msg;
+    },
+
+    doPing(showToastMsg) {
+      const mode = state.sensorMode;
+      if (mode === 'radar') {
+        SoundFX.play('radar');
+        const n = (state.radarContacts || []).filter((c) => c.rangeNm <= state.radarRangeNm).length;
+        this.updateScanStatus('ARPA sweep complete · ' + n + ' track(s) inside ' + state.radarRangeNm + ' NM');
+        if (showToastMsg !== false) showToast('ARPA · ' + n + ' tracks');
+      } else if (mode === 'lidar') {
+        state.lidarPulse = 1.0;
+        SoundFX.play('radar');
+        const n = (state.surfaceObstacles || []).length || (state.sonarObstacles || []).filter((o) => (o.depthM || 99) < 5).length;
+        this.updateScanStatus('LiDAR pulse · surface layer scanned · ' + n + ' near-surface return(s)');
+        if (showToastMsg !== false) showToast('LiDAR · surface scan complete');
+      } else if (mode === 'sonar') {
+        const hits = TitanSensors.ping();
+        SoundFX.play('sonar');
+        const focusBonus = state.sensorFocus ? ' · focused beam' : '';
+        const modeTxt = state.sensorScanMode === 'narrow' ? 'narrow track' : 'wide sweep';
+        if (hits.length) {
+          const n = hits[0];
+          this.updateScanStatus('Ping · ' + hits.length + ' contact(s) · nearest ' + Math.round(n.rangeM) + ' m · ' + (n.label || n.id) + ' · ' + modeTxt + focusBonus);
+        } else {
+          this.updateScanStatus('Ping · no contacts within ' + (state.sonarMaxRangeM || 500) + ' m · ' + modeTxt);
+        }
+        if (showToastMsg !== false) {
+          if (hits.length) showToast('SONAR · ' + hits.length + ' contact(s)');
+          else showToast('SONAR · clear');
+        }
+      } else if (mode === 'hull') {
+        state.hullScanPulse = 1.0;
+        SoundFX.play('click');
+        this.updateScanStatus('Hull ultrasonic pass · 10 strain nodes + 6 ballast tanks · nominal');
+        if (showToastMsg !== false) showToast('HULL SCAN · nominal');
+      }
+      this.refreshList();
+      this.draw3d();
+    },
+
+    setFocus(on) {
+      state.sensorFocus = !!on;
+      const btn = $('sp-focus');
+      if (btn) btn.classList.toggle('active', state.sensorFocus);
+      this.updateScanStatus(state.sensorFocus
+        ? 'Focused beam active · better classification within 120 m'
+        : 'Focus off · full sector coverage');
+    },
+
+    setScanMode(mode) {
+      state.sensorScanMode = mode === 'narrow' ? 'narrow' : 'wide';
+      $('sp-wide') && $('sp-wide').classList.toggle('active', state.sensorScanMode === 'wide');
+      $('sp-narrow') && $('sp-narrow').classList.toggle('active', state.sensorScanMode === 'narrow');
+      this.updateScanStatus(state.sensorScanMode === 'narrow'
+        ? 'Narrow track · high resolution on selected bearing'
+        : 'Wide sweep · maximum coverage');
+    },
+
+    toggleAuto() {
+      state.sensorAutoScan = !state.sensorAutoScan;
+      const btn = $('sp-autoscan');
+      if (btn) btn.classList.toggle('active', state.sensorAutoScan);
+      if (this._autoTimer) { clearInterval(this._autoTimer); this._autoTimer = null; }
+      if (state.sensorAutoScan) {
+        this._autoTimer = setInterval(() => {
+          if (!state.sensorPanelOpen) { this.toggleAuto(); return; }
+          this.doPing(false);
+        }, 4000);
+        this.updateScanStatus('AUTO SCAN ON · re-ping every 4 s');
+      } else {
+        this.updateScanStatus('AUTO SCAN OFF');
+      }
+    },
+
+    getContacts() {
+      if (state.sensorMode === 'radar') {
+        return (state.radarContacts || []).map((c) => ({
+          id: c.id,
+          label: c.label || c.id,
+          type: 'surface',
+          rangeM: (c.rangeNm || 0) * 1852,
+          rangeDisp: (c.rangeNm || 0).toFixed(1) + ' NM',
+          bearingDeg: c.bearingDeg,
+          depthM: 0,
+          classified: !!c.classified
+        }));
+      }
+      // sonar / lidar / hull share obstacle pool; lidar prefers shallow
+      let list = (state.sonarLastReturns && state.sonarLastReturns.length)
+        ? state.sonarLastReturns.slice()
+        : (state.sonarObstacles || []).slice();
+      if (state.sensorMode === 'lidar') {
+        list = list.filter((o) => (o.depthM == null || o.depthM < 8));
+      }
+      if (state.sensorFocus) {
+        list = list.filter((o) => o.rangeM <= 180);
+      }
+      if (state.sensorScanMode === 'narrow' && state.sensorSelectedId) {
+        const sel = list.find((o) => o.id === state.sensorSelectedId);
+        if (sel) {
+          list = list.filter((o) => Math.abs(((o.bearingDeg - sel.bearingDeg + 540) % 360) - 180) < 35);
+        }
+      }
+      return list.map((o) => ({
+        id: o.id,
+        label: o.label || o.id,
+        type: o.type || 'obstacle',
+        rangeM: o.rangeM,
+        rangeDisp: Math.round(o.rangeM) + ' m',
+        bearingDeg: o.bearingDeg,
+        depthM: o.depthM != null ? o.depthM : '—',
+        classified: !!o.classified,
+        echo: o.echo
+      }));
+    },
+
+    refreshList() {
+      const ul = $('sp-contact-list');
+      if (!ul) return;
+      const contacts = this.getContacts();
+      ul.innerHTML = '';
+      if (!contacts.length) {
+        ul.innerHTML = '<li style="cursor:default;opacity:0.7"><span class="sp-id">NO CONTACTS</span><span class="sp-meta">Increase range or run a ping</span></li>';
+        $('sp-id-status').textContent = 'No returns in current filter';
+        return;
+      }
+      contacts.forEach((c) => {
+        const li = document.createElement('li');
+        if (c.id === state.sensorSelectedId) li.classList.add('selected');
+        li.dataset.id = c.id;
+        li.innerHTML =
+          '<div><span class="sp-id">' + c.id + '</span> · ' + (c.label || '') +
+          '<div class="sp-meta">BRG ' + String(Math.round(((c.bearingDeg % 360) + 360) % 360)).padStart(3, '0') +
+          '° · ' + c.rangeDisp + (c.depthM !== '—' ? ' · depth ' + c.depthM + ' m' : '') +
+          (c.classified ? ' · CLASSIFIED' : '') + '</div></div>' +
+          '<span class="sp-type">' + String(c.type).toUpperCase() + '</span>';
+        li.addEventListener('click', () => {
+          state.sensorSelectedId = c.id;
+          this.refreshList();
+          $('sp-id-status').textContent = 'Locked · ' + c.id + ' · ' + (c.label || c.type);
+          this.draw3d();
+        });
+        ul.appendChild(li);
+      });
+      $('sp-id-status').textContent = contacts.length + ' contact(s) · tap to select · CLASSIFY to label';
+    },
+
+    classifySelected() {
+      const id = state.sensorSelectedId;
+      if (!id) {
+        $('sp-id-status').textContent = 'Select a contact first';
+        return;
+      }
+      const types = ['wreck', 'reef', 'seabed', 'debris', 'vessel', 'unknown'];
+      let found = null;
+      (state.sonarObstacles || []).forEach((o) => {
+        if (o.id === id) {
+          const next = types[(types.indexOf(o.type) + 1) % types.length];
+          o.type = next;
+          o.classified = true;
+          o.label = (o.label || o.id).replace(/\s*\(.*\)/, '') + ' (' + next + ')';
+          found = o;
+        }
+      });
+      (state.radarContacts || []).forEach((c) => {
+        if (c.id === id) {
+          c.classified = true;
+          c.label = (c.label || c.id) + ' · ID';
+          found = c;
+        }
+      });
+      SoundFX.play('click');
+      this.refreshList();
+      this.draw3d();
+      if (found) {
+        showToast('CLASSIFIED · ' + id + ' → ' + (found.type || 'ID'));
+        $('sp-id-status').textContent = 'Classified · ' + id;
+      }
+    },
+
+    /* Simple interactive 3D-ish perspective canvas */
+    draw3d() {
+      const canvas = $('sensor-3d-canvas');
+      if (!canvas) return;
+      const g = canvas.getContext('2d');
+      const W = canvas.width, H = canvas.height;
+      g.fillStyle = '#031018';
+      g.fillRect(0, 0, W, H);
+
+      const cx = W * 0.5, cy = H * 0.58;
+      const yaw = state.sensorOrbitYaw;
+      const pitch = state.sensorOrbitPitch;
+      const dist = state.sensorOrbitDist;
+
+      function project(x, y, z) {
+        // yaw around Y, then pitch
+        let x1 = x * Math.cos(yaw) - z * Math.sin(yaw);
+        let z1 = x * Math.sin(yaw) + z * Math.cos(yaw);
+        let y1 = y * Math.cos(pitch) - z1 * Math.sin(pitch);
+        let z2 = y * Math.sin(pitch) + z1 * Math.cos(pitch);
+        const f = (220 / dist) / Math.max(0.35, z2 + 2.8);
+        return { x: cx + x1 * f, y: cy - y1 * f, s: Math.max(2, 6 * f / 40), z: z2 };
+      }
+
+      // Grid / water plane
+      g.strokeStyle = 'rgba(30,90,110,0.55)';
+      g.lineWidth = 1;
+      for (let i = -5; i <= 5; i++) {
+        const a = project(-1.4, 0, i * 0.28);
+        const b = project(1.4, 0, i * 0.28);
+        g.beginPath(); g.moveTo(a.x, a.y); g.lineTo(b.x, b.y); g.stroke();
+        const c = project(i * 0.28, 0, -1.4);
+        const d = project(i * 0.28, 0, 1.4);
+        g.beginPath(); g.moveTo(c.x, c.y); g.lineTo(d.x, d.y); g.stroke();
+      }
+
+      // Ship hull marker at origin
+      const hullPts = [
+        [0, 0.08, 0.22], [0.12, 0.04, -0.18], [-0.12, 0.04, -0.18], [0, 0.08, 0.22]
+      ].map((p) => project(p[0], p[1], p[2]));
+      g.fillStyle = 'rgba(54,191,192,0.85)';
+      g.beginPath();
+      hullPts.forEach((p, i) => { if (i === 0) g.moveTo(p.x, p.y); else g.lineTo(p.x, p.y); });
+      g.closePath(); g.fill();
+      g.fillStyle = '#7affd4';
+      g.font = '11px monospace';
+      g.fillText('OWN SHIP', project(0, 0.22, 0).x - 28, project(0, 0.22, 0).y - 8);
+
+      const contacts = this.getContacts();
+      const maxR = state.sensorMode === 'radar'
+        ? (state.radarRangeNm || 12) * 1852
+        : (state.sonarMaxRangeM || 500);
+
+      contacts.forEach((c) => {
+        const brg = ((c.bearingDeg - state.shipHeading) * Math.PI / 180);
+        const rNorm = Math.min(1.35, (c.rangeM || 0) / maxR) * 1.2;
+        const x = Math.sin(brg) * rNorm;
+        const z = -Math.cos(brg) * rNorm;
+        const y = (c.depthM != null && c.depthM !== '—') ? -Math.min(0.9, (c.depthM / 80)) : 0.05;
+        const p = project(x, y, z);
+        const selected = c.id === state.sensorSelectedId;
+        const classified = c.classified;
+        g.fillStyle = classified ? '#c5a66a' : (state.sensorMode === 'lidar' ? '#36f5d8' : '#ffb84d');
+        g.beginPath();
+        g.arc(p.x, p.y, selected ? p.s * 1.6 : p.s, 0, Math.PI * 2);
+        g.fill();
+        if (selected) {
+          g.strokeStyle = '#fff';
+          g.lineWidth = 1.5;
+          g.strokeRect(p.x - p.s * 2, p.y - p.s * 2, p.s * 4, p.s * 4);
+        }
+        g.fillStyle = selected ? '#fff' : 'rgba(200,230,235,0.85)';
+        g.font = (selected ? 'bold ' : '') + '10px monospace';
+        g.fillText(String(c.label || c.id).slice(0, 12), p.x + 8, p.y - 4);
+      });
+
+      g.fillStyle = 'rgba(120,180,190,0.7)';
+      g.font = '10px monospace';
+      g.fillText('YAW ' + (yaw * 180 / Math.PI).toFixed(0) + '°  ·  PITCH ' + (pitch * 180 / Math.PI).toFixed(0) + '°  ·  DIST ' + dist.toFixed(2), 12, H - 12);
+      g.fillText(contacts.length + ' contacts', W - 100, H - 12);
+    },
+
+    start3dLoop() {
+      this.stop3dLoop();
+      const loop = () => {
+        if (!state.sensorPanelOpen) return;
+        if (document.querySelector('#sp-view3d.active')) this.draw3d();
+        this._raf = requestAnimationFrame(loop);
+      };
+      this._raf = requestAnimationFrame(loop);
+    },
+
+    stop3dLoop() {
+      if (this._raf) { cancelAnimationFrame(this._raf); this._raf = null; }
+    },
+
+    bindUI() {
+      const panel = $('sensor-panel');
+      if (!panel || panel.dataset.bound) return;
+      panel.dataset.bound = '1';
+
+      $('sensor-close').addEventListener('click', () => this.close());
+      panel.querySelectorAll('.sp-tab').forEach((tab) => {
+        tab.addEventListener('click', () => this.switchTab(tab.dataset.tab));
+      });
+      $('sp-ping').addEventListener('click', () => this.doPing(true));
+      $('sp-focus').addEventListener('click', () => this.setFocus(!state.sensorFocus));
+      $('sp-autoscan').addEventListener('click', () => this.toggleAuto());
+      $('sp-wide').addEventListener('click', () => this.setScanMode('wide'));
+      $('sp-narrow').addEventListener('click', () => this.setScanMode('narrow'));
+      $('sp-classify').addEventListener('click', () => this.classifySelected());
+      $('sp-refresh').addEventListener('click', () => { this.doPing(false); this.refreshList(); });
+      $('sp-3d-reset').addEventListener('click', () => {
+        state.sensorOrbitYaw = 0.6; state.sensorOrbitPitch = 0.35; state.sensorOrbitDist = 1.0;
+        this.draw3d();
+      });
+      $('sp-3d-follow').addEventListener('click', () => {
+        const c = this.getContacts().find((x) => x.id === state.sensorSelectedId);
+        if (!c) { showToast('Select a contact in Identify first'); return; }
+        const brg = ((c.bearingDeg - state.shipHeading) * Math.PI / 180);
+        state.sensorOrbitYaw = -brg + Math.PI;
+        state.sensorOrbitPitch = 0.4;
+        state.sensorOrbitDist = 0.85;
+        this.draw3d();
+        showToast('3D view · following ' + (c.label || c.id));
+      });
+
+      const rangeEl = $('sp-range');
+      rangeEl.addEventListener('input', () => {
+        const v = Number(rangeEl.value);
+        if (state.sensorMode === 'radar') {
+          state.radarRangeNm = v;
+          $('sp-range-val').textContent = v + ' NM';
+        } else {
+          state.sonarMaxRangeM = v;
+          $('sp-range-val').textContent = v + ' m';
+        }
+        this.refreshList();
+        this.draw3d();
+      });
+
+      const canvas = $('sensor-3d-canvas');
+      canvas.addEventListener('pointerdown', (e) => {
+        this._drag = true; this._lastX = e.clientX; this._lastY = e.clientY;
+        canvas.setPointerCapture(e.pointerId);
+      });
+      canvas.addEventListener('pointermove', (e) => {
+        if (!this._drag) return;
+        const dx = e.clientX - this._lastX, dy = e.clientY - this._lastY;
+        this._lastX = e.clientX; this._lastY = e.clientY;
+        state.sensorOrbitYaw += dx * 0.008;
+        state.sensorOrbitPitch = Math.max(-0.2, Math.min(1.1, state.sensorOrbitPitch + dy * 0.006));
+        this.draw3d();
+      });
+      canvas.addEventListener('pointerup', () => { this._drag = false; });
+      canvas.addEventListener('pointercancel', () => { this._drag = false; });
+      canvas.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        state.sensorOrbitDist = Math.max(0.45, Math.min(2.4, state.sensorOrbitDist + (e.deltaY > 0 ? 0.08 : -0.08)));
+        this.draw3d();
+      }, { passive: false });
+
+      // Close on Escape
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && state.sensorPanelOpen) this.close();
+      });
+    }
+  };
+  window.SensorOps = SensorOps;
+
+  if (shipBus) {
+    shipBus.on('telemetry', onEngineTelemetry);
+    shipBus.on('status', (s) => {
+      engineLinked = !!(s && s.connected);
+      if (lastEngTelemetry) {
+        lastEngTelemetry.connected = engineLinked;
+        updateEnginePanelUI(lastEngTelemetry);
+      }
+    });
+    shipBus.startMainDeckReceiver();
+    // Seed UI from any cached telemetry
+    onEngineTelemetry(shipBus.getTelemetry());
+  }
+
+  function sendThrottleOrder(v) {
+    state.throttle = Number(v) || 0;
+    if (shipBus) shipBus.sendCommand('setThrottle', state.throttle);
+  }
+  function sendRudderOrder(v) {
+    state.rudder = Number(v) || 0;
+    if (shipBus) shipBus.sendCommand('setRudder', state.rudder);
+  }
+  function sendAllStop() {
+    state.throttle = 0;
+    state.rudder = 0;
+    if (shipBus) shipBus.sendCommand('allStop', 0);
+  }
+
+
+
+  /* ── Procedural Web Audio Maritime Sound Effects (no external files) ── */
+  const SoundFX = {
+    ctx: null,
+    ensure() {
+      if (!this.ctx) {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (AC) {
+          try { this.ctx = new AC(); } catch (e) {}
+        }
+      }
+      if (this.ctx && this.ctx.state === 'suspended') {
+        try { this.ctx.resume(); } catch (e) {}
+      }
+      return this.ctx;
+    },
+    play(type) {
+      const ctx = this.ensure();
+      if (!ctx) return;
+      const now = ctx.currentTime;
+      try {
+        if (type === 'sonar' || type === 'radar') {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(type === 'sonar' ? 1320 : 880, now);
+          osc.frequency.exponentialRampToValueAtTime(type === 'sonar' ? 980 : 620, now + 0.38);
+          gain.gain.setValueAtTime(0.08, now);
+          gain.gain.exponentialRampToValueAtTime(0.0008, now + 0.42);
+          osc.connect(gain); gain.connect(ctx.destination);
+          osc.start(now); osc.stop(now + 0.44);
+        } else if (type === 'bell') {
+          [1046.5, 1568, 2093, 2637].forEach((freq, idx) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, now);
+            gain.gain.setValueAtTime(0.07 / (idx + 1), now);
+            gain.gain.exponentialRampToValueAtTime(0.0005, now + 1.35 - idx * 0.18);
+            osc.connect(gain); gain.connect(ctx.destination);
+            osc.start(now); osc.stop(now + 1.4);
+          });
+        } else if (type === 'hatch' || type === 'door') {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(140, now);
+          osc.frequency.linearRampToValueAtTime(210, now + 0.25);
+          gain.gain.setValueAtTime(0.07, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
+          osc.connect(gain); gain.connect(ctx.destination);
+          osc.start(now); osc.stop(now + 0.30);
+        } else {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(640, now);
+          osc.frequency.setValueAtTime(840, now + 0.06);
+          gain.gain.setValueAtTime(0.05, now);
+          gain.gain.exponentialRampToValueAtTime(0.0008, now + 0.16);
+          osc.connect(gain); gain.connect(ctx.destination);
+          osc.start(now); osc.stop(now + 0.18);
+        }
+      } catch (e) {}
+    }
+  };
+
+  let toastTimer = null;
+  function showToast(msg) {
+    const el = $('system-toast');
+    if (!el) return;
+    el.textContent = msg;
+    el.classList.add('show');
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => {
+      el.classList.remove('show');
+    }, 3200);
+  }
+
+  /* ── Multi-touch Joystick with window-level pointer tracking ── */
+  const Joystick = {
+    dx: 0, dy: 0,
+    _padX: 0, _padY: 0, _padLookX: 0, _padLookY: 0,
+    _lookAccumX: 0, _lookAccumY: 0,
+    _stickId: null,
+    _lookId: null,
+    _lookLast: null,
+    doInteract() {},
+    init() {
+      const zone = $('joystick-zone');
+      const knob = $('joystick-knob');
+      const base = $('joystick-base');
+      const look = $('look-zone');
+      if (!zone || !knob || !base) return;
+
+      const maxR = () => Math.max(24, (base.clientWidth || 140) * 0.42);
+      const pointerKey = (e) => (e.pointerId != null ? e.pointerId : 'mouse');
+
+      const setStick = (clientX, clientY) => {
+        const r = base.getBoundingClientRect();
+        if (!r.width || !r.height) return;
+        const cx = r.left + r.width * 0.5;
+        const cy = r.top + r.height * 0.5;
+        let x = clientX - cx;
+        let y = clientY - cy;
+        const R = maxR();
+        const len = Math.hypot(x, y);
+        if (len > R) {
+          x = (x / len) * R;
+          y = (y / len) * R;
+        }
+        knob.style.transform = 'translate3d(' + x.toFixed(1) + 'px,' + y.toFixed(1) + 'px,0)';
+        const normX = clamp(x / R, -1, 1);
+        const normY = clamp(-y / R, -1, 1);
+        const mag = Math.hypot(normX, normY);
+        const deadzone = 0.06;
+        if (mag < deadzone) {
+          this.dx = 0;
+          this.dy = 0;
+        } else {
+          const scaled = (mag - deadzone) / (1 - deadzone);
+          this.dx = (normX / mag) * scaled;
+          this.dy = (normY / mag) * scaled;
+        }
+      };
+
+      const resetStick = () => {
+        knob.style.transform = 'translate3d(0,0,0)';
+        this.dx = 0;
+        this.dy = 0;
+        this._stickId = null;
+      };
+
+      const stickDown = (e) => {
+        if (this._stickId !== null || (e.button != null && e.button !== 0)) return;
+        this._stickId = pointerKey(e);
+        if (e.cancelable) e.preventDefault();
+        if (e.pointerId != null && zone.setPointerCapture) {
+          try { zone.setPointerCapture(e.pointerId); } catch (err) {}
+        }
+        setStick(e.clientX, e.clientY);
+      };
+      const stickMove = (e) => {
+        if (this._stickId === null || pointerKey(e) !== this._stickId) return;
+        if (e.cancelable) e.preventDefault();
+        setStick(e.clientX, e.clientY);
+      };
+      const stickUp = (e) => {
+        if (this._stickId !== null && pointerKey(e) === this._stickId) resetStick();
+      };
+
+      if (window.PointerEvent) {
+        zone.addEventListener('pointerdown', stickDown, { passive: false });
+        window.addEventListener('pointermove', stickMove, { passive: false });
+        window.addEventListener('pointerup', stickUp, { passive: false });
+        window.addEventListener('pointercancel', stickUp, { passive: false });
+      } else {
+        const touchPoint = (list, id) => {
+          for (let i = 0; i < list.length; i++) if (list[i].identifier === id) return list[i];
+          return null;
+        };
+        zone.addEventListener('touchstart', (e) => {
+          if (this._stickId !== null || !e.changedTouches.length) return;
+          const t = e.changedTouches[0];
+          this._stickId = t.identifier;
+          if (e.cancelable) e.preventDefault();
+          setStick(t.clientX, t.clientY);
+        }, { passive: false });
+        window.addEventListener('touchmove', (e) => {
+          if (this._stickId === null) return;
+          const t = touchPoint(e.changedTouches, this._stickId);
+          if (t) { if (e.cancelable) e.preventDefault(); setStick(t.clientX, t.clientY); }
+        }, { passive: false });
+        const touchEnd = (e) => { if (touchPoint(e.changedTouches, this._stickId)) resetStick(); };
+        window.addEventListener('touchend', touchEnd, { passive: false });
+        window.addEventListener('touchcancel', touchEnd, { passive: false });
+        zone.addEventListener('mousedown', stickDown, { passive: false });
+        window.addEventListener('mousemove', stickMove, { passive: false });
+        window.addEventListener('mouseup', stickUp, { passive: false });
+      }
+
+      const lookDown = (e) => {
+        if (e.target.closest && e.target.closest('#mobile-controls,#joystick-zone,#helm-panel,#hatch-modal,button,.ui-btn')) return;
+        if (this._lookId !== null || (e.button != null && e.button !== 0)) return;
+        this._lookId = pointerKey(e);
+        this._lookLast = { x: e.clientX, y: e.clientY };
+        if (e.cancelable) e.preventDefault();
+        if (e.pointerId != null && look && look.setPointerCapture) {
+          try { look.setPointerCapture(e.pointerId); } catch (err) {}
+        }
+      };
+      const lookMove = (e) => {
+        if (this._lookId === null || pointerKey(e) !== this._lookId || !this._lookLast) return;
+        const sens = isTouch ? 0.0045 : 0.0035;
+        this._lookAccumX += (e.clientX - this._lookLast.x) * sens;
+        this._lookAccumY += (e.clientY - this._lookLast.y) * sens;
+        this._lookLast = { x: e.clientX, y: e.clientY };
+        if (e.cancelable) e.preventDefault();
+      };
+      const lookUp = (e) => {
+        if (this._lookId !== null && pointerKey(e) === this._lookId) {
+          this._lookId = null;
+          this._lookLast = null;
+        }
+      };
+
+      if (look && window.PointerEvent) {
+        look.addEventListener('pointerdown', lookDown, { passive: false });
+        window.addEventListener('pointermove', lookMove, { passive: false });
+        window.addEventListener('pointerup', lookUp, { passive: false });
+        window.addEventListener('pointercancel', lookUp, { passive: false });
+      } else if (look) {
+        look.addEventListener('touchstart', (e) => {
+          if (this._lookId !== null || !e.changedTouches.length) return;
+          const t = e.changedTouches[0];
+          this._lookId = t.identifier;
+          this._lookLast = { x: t.clientX, y: t.clientY };
+          if (e.cancelable) e.preventDefault();
+        }, { passive: false });
+        window.addEventListener('touchmove', (e) => {
+          if (this._lookId === null || !this._lookLast) return;
+          for (let i = 0; i < e.changedTouches.length; i++) {
+            const t = e.changedTouches[i];
+            if (t.identifier === this._lookId) {
+              const sens = 0.0045;
+              this._lookAccumX += (t.clientX - this._lookLast.x) * sens;
+              this._lookAccumY += (t.clientY - this._lookLast.y) * sens;
+              this._lookLast = { x: t.clientX, y: t.clientY };
+              if (e.cancelable) e.preventDefault();
+              break;
+            }
+          }
+        }, { passive: false });
+        const lookTouchEnd = (e) => {
+          for (let i = 0; i < e.changedTouches.length; i++) {
+            if (e.changedTouches[i].identifier === this._lookId) {
+              this._lookId = null;
+              this._lookLast = null;
+              break;
+            }
+          }
+        };
+        window.addEventListener('touchend', lookTouchEnd, { passive: false });
+        window.addEventListener('touchcancel', lookTouchEnd, { passive: false });
+        look.addEventListener('mousedown', lookDown, { passive: false });
+        window.addEventListener('mousemove', lookMove, { passive: false });
+        window.addEventListener('mouseup', lookUp, { passive: false });
+      }
+
+      $('btn-interact').addEventListener('click', (e) => { e.preventDefault(); this.doInteract(); });
+      zone.addEventListener('contextmenu', (e) => e.preventDefault());
+      window.addEventListener('blur', () => {
+        resetStick();
+        this._lookId = null;
+        this._lookLast = null;
+        this._lookAccumX = 0;
+        this._lookAccumY = 0;
+      });
+      this.refreshVisibility();
+    },
+    consumeLook() {
+      const o = {
+        dx: this._lookAccumX + (this._padLookX || 0) * 0.045,
+        dy: this._lookAccumY + (this._padLookY || 0) * 0.045
+      };
+      this._lookAccumX = 0;
+      this._lookAccumY = 0;
+      return o;
+    },
+    refreshVisibility() {
+      const hideForUI = !!(state && (state.tableFocused || state.hatchPromptOpen));
+      const showJ = !hideForUI && !($('set-joystick') && !$('set-joystick').checked);
+      const showU = !hideForUI && !($('set-use-btn') && !$('set-use-btn').checked);
+      const showL = !hideForUI && !($('set-look-zone') && !$('set-look-zone').checked);
+      if (isTouch || navigator.maxTouchPoints > 0) {
+        $('joystick-zone').classList.toggle('visible', showJ);
+        $('mobile-controls').classList.toggle('visible', showU);
+        $('look-zone').classList.toggle('visible', showL);
+      } else {
+        $('joystick-zone').classList.remove('visible');
+        $('mobile-controls').classList.remove('visible');
+        $('look-zone').classList.remove('visible');
+      }
+    },
+    toggleFullscreen() {
+      const el = $('game') || document.documentElement;
+      const fs = document.fullscreenElement || document.webkitFullscreenElement;
+      if (!fs) {
+        const req = el.requestFullscreen || el.webkitRequestFullscreen;
+        if (req) {
+          try {
+            const result = req.call(el);
+            if (result && typeof result.catch === 'function') result.catch(() => {});
+          } catch (e) {}
+        }
+        el.classList.add('immersive');
+      } else {
+        const exit = document.exitFullscreen || document.webkitExitFullscreen;
+        if (exit) exit.call(document);
+        $('game').classList.remove('immersive');
+      }
+      setTimeout(() => { if (window._titanResize) window._titanResize(); }, 120);
+    },
+    show() { this.refreshVisibility(); }
+  };
+  window.Joystick = Joystick;
+
+  /* ── Scene & Geometry References ── */
+  let renderer, scene, camera, ship, water, waterPositions, waterBase, directionalSun;
+  let doorGroup, doorLeft, doorRight, bridgeInterior, bridgeCeilingMesh, radarSweepMesh;
+  let hatchLidGroup = null;
+  let craneTurretGroup = null, craneBeaconMat = null;
+  let windlassGypsies = [], capstanDrumMesh = null, bellPivotGroup = null;
+  let deckFloodGlowMeshes = [], bowWakeMeshes = [];
+  let tableHitMesh = null;
+  let cssRenderer, projIframe;
+
+  const liveScreens = [];
+  const clock = new THREE.Clock();
+  const raycaster = new THREE.Raycaster();
+  const interactables = [];
+  const interactiveStations = [];
+  const staticHitboxes = [];
+  let dynamicDoorHitboxes = [];
+  let dynamicHatchHitboxes = [];
+
+  const materialCache = new Map();
+  const boxGeometryCache = new Map();
+  const cylinderGeometryCache = new Map();
+
+  const forwardVec = new THREE.Vector3();
+  const rightVec = new THREE.Vector3();
+  const cameraLocalScratch = new THREE.Vector3();
+
+  /* Key Ship-Local Landmarks */
+  const DOOR_X = 2.95;
+  const DOOR_Z = -9.15;
+  const TABLE_X = 0;
+  const TABLE_Z = -7.73;
+  /* Floor Access Hatch in back-right of bridge interior (localX = 1.45, localZ = -3.65 -> shipZ = -15.25) */
+  const HATCH_LOCAL_X = 1.45;
+  const HATCH_LOCAL_Z = -3.65;
+  const HATCH_X = HATCH_LOCAL_X;
+  const HATCH_Z = -11.6 + HATCH_LOCAL_Z; /* -15.25 */
+
+  function addBoxHitbox(id, minX, maxX, minZ, maxZ) {
+    staticHitboxes.push({ id, minX, maxX, minZ, maxZ });
+  }
+
+  function registerInteractiveStation(id, x, z, radius, promptLabel, actionType) {
+    interactiveStations.push({ id, x, z, radius, promptLabel, actionType });
+  }
+
+  function shadowsAreEnabled() {
+    const toggle = $('set-shadows');
+    if (toggle && !toggle.checked) return false;
+    return state.quality !== 'LOW';
+  }
+
+  function makeMat(color, opts = {}) {
+    const roughness = 1.0;
+    const metalness = 0.0;
+    const side = opts.side || THREE.FrontSide;
+    const emissive = opts.emissive || 0;
+    const emissiveIntensity = opts.emissiveIntensity || 0;
+    const key = [color, side, emissive, emissiveIntensity].join('|');
+    if (materialCache.has(key)) return materialCache.get(key);
+    const mat = new THREE.MeshStandardMaterial({
+      color, roughness, metalness, side,
+      envMapIntensity: 0,
+      emissive: emissive ? new THREE.Color(emissive) : undefined,
+      emissiveIntensity,
+      flatShading: false
+    });
+    materialCache.set(key, mat);
+    return mat;
+  }
+
+  function getBoxGeometry(w, h, d) {
+    const key = w + '|' + h + '|' + d;
+    if (!boxGeometryCache.has(key)) boxGeometryCache.set(key, new THREE.BoxGeometry(w, h, d));
+    return boxGeometryCache.get(key);
+  }
+
+  function box(parent, x, y, z, w, h, d, color, opts = {}) {
+    const m = new THREE.Mesh(getBoxGeometry(w, h, d), makeMat(color, opts));
+    m.position.set(x, y, z);
+    m.userData.castShadowFlag = opts.cast !== false;
+    m.userData.receiveShadowFlag = opts.receive !== false;
+    const sh = shadowsAreEnabled();
+    m.castShadow = sh && m.userData.castShadowFlag;
+    m.receiveShadow = sh && m.userData.receiveShadowFlag;
+    if (opts.rotY) m.rotation.y = opts.rotY;
+    m.matrixAutoUpdate = false;
+    m.updateMatrix();
+    parent.add(m);
+    if (opts.hit) {
+      m.userData.interactable = opts.label || 'Equipment';
+      if (opts.actionType) m.userData.actionType = opts.actionType;
+      interactables.push(m);
+    }
+    return m;
+  }
+
+  function cyl(parent, x, y, z, rt, rb, h, color, seg = 12, opts = {}) {
+    const key = [rt, rb, h, seg].join('|');
+    if (!cylinderGeometryCache.has(key)) cylinderGeometryCache.set(key, new THREE.CylinderGeometry(rt, rb, h, seg));
+    const m = new THREE.Mesh(cylinderGeometryCache.get(key), makeMat(color, opts));
+    m.position.set(x, y, z);
+    m.userData.castShadowFlag = opts.cast !== false;
+    m.userData.receiveShadowFlag = opts.receive !== false;
+    const sh = shadowsAreEnabled();
+    m.castShadow = sh && m.userData.castShadowFlag;
+    m.receiveShadow = sh && m.userData.receiveShadowFlag;
+    m.matrixAutoUpdate = false;
+    m.updateMatrix();
+    parent.add(m);
+    if (opts.hit) {
+      m.userData.interactable = opts.label || 'Equipment';
+      if (opts.actionType) m.userData.actionType = opts.actionType;
+      interactables.push(m);
+    }
+    return m;
+  }
+
+  /* Procedural steel bulkhead door texture */
+  function doorTexture() {
+    const c = document.createElement('canvas');
+    c.width = 256; c.height = 512;
+    const g = c.getContext('2d');
+    g.fillStyle = '#2c3e4a'; g.fillRect(0, 0, 256, 512);
+    g.strokeStyle = '#1a2830'; g.lineWidth = 9; g.strokeRect(12, 12, 232, 488);
+    g.strokeStyle = '#3d5563'; g.lineWidth = 2; g.strokeRect(20, 20, 216, 472);
+    [140, 260, 380].forEach((y) => {
+      g.fillStyle = '#243640'; g.fillRect(24, y, 208, 7);
+      g.fillStyle = '#4a6270'; g.fillRect(24, y, 208, 2);
+    });
+    g.fillStyle = '#8a9aa4';
+    for (let y = 30; y < 490; y += 24) {
+      for (const x of [28, 228]) {
+        g.beginPath(); g.arc(x, y, 2.5, 0, Math.PI * 2); g.fill();
+      }
+    }
+    g.fillStyle = '#0d1e28';
+    g.beginPath(); g.arc(128, 100, 35, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = '#c5a66a'; g.lineWidth = 4;
+    g.beginPath(); g.arc(128, 100, 36, 0, Math.PI * 2); g.stroke();
+    g.fillStyle = '#1e2e38'; g.fillRect(190, 240, 35, 55);
+    g.fillStyle = '#c5a66a'; g.fillRect(200, 250, 14, 35);
+    const tex = new THREE.CanvasTexture(c);
+    tex.minFilter = THREE.LinearFilter;
+    tex.magFilter = THREE.LinearFilter;
+    tex.generateMipmaps = false;
+    return tex;
+  }
+
+  /* Live animated maritime scanner & telemetry display engine */
+  function drawScannerCanvas(c, g, kind, t) {
+    g.fillStyle = '#041019';
+    g.fillRect(0, 0, 512, 320);
+
+    g.strokeStyle = '#1a495c';
+    g.lineWidth = 4;
+    g.strokeRect(6, 6, 500, 308);
+    g.fillStyle = '#0a2232';
+    g.fillRect(10, 10, 492, 26);
+    g.fillStyle = '#36bfc0';
+    g.font = 'bold 13px monospace';
+    g.textBaseline = 'middle';
+
+    const hdgStr = String(Math.round(state.shipHeading)).padStart(3, '0');
+    const spdStr = state.shipSpeed.toFixed(1);
+
+    if (kind === 'radar') {
+      const rng = state.radarRangeNm;
+      g.fillText('ARPA X-BAND RADAR · RNG ' + rng.toFixed(1) + ' NM · HDG ' + hdgStr + '° · ' + spdStr + ' KN', 16, 23);
+      const cx = 195, cy = 175, r = 118;
+      g.fillStyle = '#031712';
+      g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.fill();
+
+      const sweepAng = (t * 1.65) % (Math.PI * 2);
+      /* Trailing radar sweep wedge */
+      for (let s = 0; s < 10; s++) {
+        const a0 = sweepAng - (s + 1) * 0.085;
+        const a1 = sweepAng - s * 0.085;
+        g.fillStyle = 'rgba(56, 245, 145, ' + (0.26 * (1 - s / 10)).toFixed(3) + ')';
+        g.beginPath();
+        g.moveTo(cx, cy);
+        g.arc(cx, cy, r, a0, a1);
+        g.closePath();
+        g.fill();
+      }
+
+      /* Range rings & crosshairs */
+      g.strokeStyle = '#1d6f52';
+      g.lineWidth = 1.4;
+      [0.25, 0.5, 0.75, 1.0].forEach((k) => {
+        g.beginPath(); g.arc(cx, cy, r * k, 0, Math.PI * 2); g.stroke();
+      });
+      g.beginPath();
+      g.moveTo(cx - r, cy); g.lineTo(cx + r, cy);
+      g.moveTo(cx, cy - r); g.lineTo(cx, cy + r);
+      g.stroke();
+
+      /* Live sweep line */
+      g.strokeStyle = '#5cff9e';
+      g.lineWidth = 2.4;
+      g.beginPath();
+      g.moveTo(cx, cy);
+      g.lineTo(cx + Math.cos(sweepAng) * r, cy + Math.sin(sweepAng) * r);
+      g.stroke();
+
+      /* Live ARPA contacts from TitanSensors / radarContacts */
+      const contacts = (state.radarContacts || []).filter((c) => c.rangeNm <= rng + 0.05);
+      contacts.forEach((tg, i) => {
+        const brgRad = ((tg.bearingDeg - state.shipHeading) * Math.PI / 180);
+        const d = Math.min(0.98, tg.rangeNm / Math.max(0.1, rng));
+        const bx = cx + Math.sin(brgRad) * r * d;
+        const by = cy - Math.cos(brgRad) * r * d;
+        let absBrg = ((tg.bearingDeg) * Math.PI / 180);
+        let diff = ((sweepAng - absBrg) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
+        const glow = diff < 1.1 ? 1.0 : 0.42;
+        g.fillStyle = 'rgba(122, 255, 178, ' + glow.toFixed(2) + ')';
+        g.beginPath(); g.arc(bx, by, diff < 0.4 ? 5.2 : 3.6, 0, Math.PI * 2); g.fill();
+        g.strokeStyle = 'rgba(122, 255, 178, ' + (glow * 0.85).toFixed(2) + ')';
+        g.strokeRect(bx - 7, by - 7, 14, 14);
+      });
+
+      g.fillStyle = '#071b26';
+      g.fillRect(334, 48, 160, 250);
+      g.strokeStyle = '#1a495c';
+      g.strokeRect(334, 48, 160, 250);
+      g.fillStyle = '#8be9e6';
+      g.font = '11px monospace';
+      const listLines = contacts.slice(0, 5).map((c) => {
+        const brg = String(Math.round(((c.bearingDeg % 360) + 360) % 360)).padStart(3, '0');
+        return (c.label || c.id).slice(0, 8) + ' ' + brg + '° ' + c.rangeNm.toFixed(1) + 'NM';
+      });
+      while (listLines.length < 4) listLines.push('—');
+      listLines.push('TRACKS: ' + contacts.length);
+      listLines.push('LINK: ' + (engineLinked ? 'ENG ONLINE' : 'LOCAL'));
+      listLines.push('[USE] CYCLE RANGE');
+      listLines.forEach((line, idx) => {
+        g.fillStyle = idx === listLines.length - 1 ? '#c5a66a' : '#8be9e6';
+        g.fillText(line, 342, 68 + idx * 28);
+      });
+    } else if (kind === 'lidar') {
+      g.fillText('3D SURFACE LIDAR & OBSTACLE SCANNER · 120 HZ', 18, 23);
+      g.strokeStyle = '#164d63';
+      g.lineWidth = 1;
+      for (let i = 0; i <= 10; i++) {
+        const y = 70 + i * 22;
+        g.beginPath(); g.moveTo(24, y); g.lineTo(488, y); g.stroke();
+      }
+      for (let i = -6; i <= 6; i++) {
+        g.beginPath(); g.moveTo(256 + i * 16, 70); g.lineTo(256 + i * 42, 290); g.stroke();
+      }
+      const wavePhase = ((t * 95) % 210);
+      [65, 115, 165, 210].forEach((rad) => {
+        g.strokeStyle = '#2596a8';
+        g.lineWidth = 1.6;
+        g.beginPath(); g.arc(256, 285, rad, Math.PI * 1.15, Math.PI * 1.85); g.stroke();
+      });
+      /* Active expanding laser scan arc */
+      g.strokeStyle = state.lidarPulse > 0 ? '#7affd4' : '#36f5d8';
+      g.lineWidth = state.lidarPulse > 0 ? 4 : 2.5;
+      g.beginPath(); g.arc(256, 285, 25 + wavePhase, Math.PI * 1.12, Math.PI * 1.88); g.stroke();
+
+      /* Dynamic point cloud clusters */
+      g.fillStyle = '#ffb84d';
+      const drift = Math.sin(t * 0.9) * 18;
+      for (let i = 0; i < 28; i++) {
+        const px = 148 + drift + (i % 7) * 8 + Math.sin(t * 3 + i) * 3;
+        const py = 128 + Math.floor(i / 7) * 6;
+        g.fillRect(px, py, 3.5, 3.5);
+      }
+      g.fillStyle = '#36bfc0';
+      g.fillRect(244, 255, 24, 36);
+      g.fillStyle = '#d7f9f8';
+      g.font = '12px monospace';
+      const clr = Math.round(1420 - state.shipSpeed * 6 + Math.sin(t) * 8);
+      g.fillText('CLEARANCE: ' + clr + ' M   DEBRIS: TRACKED   [USE] LASER PULSE', 22, 54);
+    } else if (kind === 'sonar') {
+      const maxR = state.sonarMaxRangeM || 500;
+      const returns = state.sonarLastReturns && state.sonarLastReturns.length
+        ? state.sonarLastReturns
+        : (state.sonarObstacles || []).filter((o) => o.rangeM <= maxR);
+      g.fillText('MULTIBEAM SONAR · 200 kHz · RNG ' + maxR + ' M · HDG ' + hdgStr + '°', 18, 23);
+
+      /* PPI-style water column */
+      const cx = 195, cy = 175, r = 118;
+      g.fillStyle = '#031712';
+      g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.fill();
+      g.strokeStyle = '#1d6f52';
+      g.lineWidth = 1.2;
+      [0.33, 0.66, 1.0].forEach((k) => {
+        g.beginPath(); g.arc(cx, cy, r * k, 0, Math.PI * 2); g.stroke();
+      });
+      g.beginPath();
+      g.moveTo(cx - r, cy); g.lineTo(cx + r, cy);
+      g.moveTo(cx, cy - r); g.lineTo(cx, cy + r);
+      g.stroke();
+
+      /* Expanding ping ring */
+      if (state.sonarPing > 0) {
+        const pr = (1 - state.sonarPing) * r;
+        g.strokeStyle = 'rgba(122, 255, 212, ' + Math.max(0.15, state.sonarPing).toFixed(2) + ')';
+        g.lineWidth = 3;
+        g.beginPath(); g.arc(cx, cy, Math.max(4, pr), 0, Math.PI * 2); g.stroke();
+      }
+
+      /* Detected obstacles as real echoes */
+      returns.forEach((o, i) => {
+        const brgRad = ((o.bearingDeg - state.shipHeading) * Math.PI / 180);
+        const d = Math.min(0.98, o.rangeM / maxR);
+        const bx = cx + Math.sin(brgRad) * r * d;
+        const by = cy - Math.cos(brgRad) * r * d;
+        const echo = o.echo != null ? o.echo : 0.7;
+        g.fillStyle = 'rgba(255, 184, 77, ' + (0.45 + echo * 0.55).toFixed(2) + ')';
+        g.beginPath(); g.arc(bx, by, 4 + echo * 3, 0, Math.PI * 2); g.fill();
+        g.strokeStyle = 'rgba(122, 255, 212, 0.9)';
+        g.lineWidth = 1.2;
+        g.strokeRect(bx - 6, by - 6, 12, 12);
+      });
+
+      /* Seabed profile line (influenced by nearest obstacle depth) */
+      g.strokeStyle = '#eef6f8';
+      g.lineWidth = 2;
+      g.beginPath();
+      for (let x = 20; x <= 370; x += 10) {
+        let y = 200 + Math.sin(x * 0.03 + t * 0.6) * 10;
+        returns.forEach((o) => {
+          const px = cx + Math.sin(((o.bearingDeg - state.shipHeading) * Math.PI / 180)) * r * (o.rangeM / maxR);
+          if (Math.abs(x - px) < 40) y += (80 - Math.min(80, o.depthM)) * 0.15;
+        });
+        if (x === 20) g.moveTo(x, y); else g.lineTo(x, y);
+      }
+      g.stroke();
+
+      const nearest = returns[0];
+      const keel = nearest
+        ? Math.max(8, (nearest.depthM || 40) - 6).toFixed(1)
+        : (state.sonarKeelClearanceM + Math.sin(t * 0.2) * 1.2).toFixed(1);
+      g.fillStyle = '#071b26';
+      g.fillRect(386, 52, 110, 240);
+      g.fillStyle = '#6cf5c2';
+      g.font = 'bold 16px monospace';
+      g.fillText(keel + ' M', 394, 88);
+      g.font = '11px monospace';
+      g.fillStyle = '#9ec7d4';
+      g.fillText('UNDER KEEL', 394, 108);
+      g.fillText('CONTACTS ' + returns.length, 394, 136);
+      g.fillText('MAX ' + maxR + ' M', 394, 158);
+      if (nearest) {
+        g.fillStyle = '#ffb84d';
+        g.fillText(String(nearest.label || nearest.id).slice(0, 10), 394, 188);
+        g.fillText(Math.round(nearest.rangeM) + ' M', 394, 208);
+        g.fillText('BRG ' + String(Math.round(nearest.bearingDeg)).padStart(3, '0') + '°', 394, 228);
+      } else {
+        g.fillStyle = '#5ddea0';
+        g.fillText('CLEAR', 394, 188);
+      }
+      g.fillStyle = '#c5a66a';
+      g.fillText('[USE] PING', 394, 254);
+    } else if (kind === 'hull') {
+      g.fillText('ULTRASONIC HULL STRESS & BALLAST SCANNER', 18, 23);
+      g.strokeStyle = '#36bfc0';
+      g.lineWidth = 2.2;
+      g.beginPath();
+      g.moveTo(45, 165); g.lineTo(120, 125); g.lineTo(395, 125); g.lineTo(465, 165);
+      g.lineTo(395, 205); g.lineTo(120, 205); g.closePath();
+      g.stroke();
+
+      /* Moving ultrasonic scan bar across hull */
+      const scanX = 55 + ((t * 140) % 400);
+      g.strokeStyle = state.hullScanPulse > 0 ? '#7affb2' : 'rgba(54, 245, 216, 0.65)';
+      g.lineWidth = 2.5;
+      g.beginPath(); g.moveTo(scanX, 116); g.lineTo(scanX, 214); g.stroke();
+
+      [130, 195, 260, 325, 385].forEach((nx, i) => {
+        const active = Math.abs(scanX - nx) < 28;
+        g.fillStyle = active ? '#7affb2' : (i === 2 ? '#ffd166' : '#48ff9b');
+        const r = active ? 8 : 5.5;
+        g.beginPath(); g.arc(nx, 142, r, 0, Math.PI * 2); g.fill();
+        g.beginPath(); g.arc(nx, 188, r, 0, Math.PI * 2); g.fill();
+      });
+      for (let tIdx = 0; tIdx < 6; tIdx++) {
+        const bx = 52 + tIdx * 70;
+        g.strokeStyle = '#29637a';
+        g.strokeRect(bx, 230, 52, 64);
+        const fillH = 26 + ((tIdx * 11) % 30) + Math.sin(t * 1.1 + tIdx) * 3;
+        g.fillStyle = '#2699b8';
+        g.fillRect(bx + 2, 294 - fillH, 48, fillH - 2);
+      }
+      g.fillStyle = '#b9e3ea';
+      g.font = '12px monospace';
+      g.fillText('HOGGING: +0.08°   BILGE: DRY   [USE] DIAGNOSTIC SCAN', 42, 76);
+    } else if (kind === 'ais') {
+      g.fillText('AIS TRANSPONDER & SATCOM · VHF CH-' + state.aisChannel, 18, 23);
+      g.fillStyle = '#7ef5d8';
+      g.font = '12px monospace';
+      const rows = [
+        'GPS-1: 41°43.52\'N  049°56.81\'W   HDG ' + hdgStr + '°',
+        'MMSI 367009410 · MV ATLANTIC GUARD · 14.2 KN',
+        'MMSI 235081220 · RV MERIDIAN STAR  · 11.8 KN',
+        'MMSI 316004891 · CG CUTTER VANGUARD· 16.5 KN',
+        'INMARSAT-C: LOCKED (-94 dBm) · EPIRB: ARMED',
+        'VHF CH-' + state.aisChannel + ' DSC WATCH: ACTIVE · [USE] SWITCH CH'
+      ];
+      rows.forEach((r, idx) => {
+        g.fillStyle = idx === 5 ? '#c5a66a' : '#7ef5d8';
+        g.fillText(r, 22, 64 + idx * 32);
+      });
+      for (let i = 0; i < 28; i++) {
+        const h = 12 + Math.abs(Math.sin(i * 0.7 + t * 3.2)) * 38;
+        g.fillStyle = i % 5 === 0 ? '#ffd166' : '#36bfc0';
+        g.fillRect(24 + i * 16, 300 - h, 10, h);
+      }
+    } else if (kind === 'engine') {
+      g.fillText('PROPULSION TELEMETRY & FIRE-ZONE SCANNER MATRIX', 18, 23);
+      const te = lastEngTelemetry || {};
+      const thr = (te.throttle != null ? te.throttle : state.throttle);
+      const rpm = te.rpm != null ? te.rpm : Math.round(thr * 12);
+      const pwr = te.powerKw != null ? te.powerKw : (te.elecPowerKw || thr * 2.8);
+      const temp = te.temperatureC != null ? te.temperatureC : 42;
+      const fuel = te.fuelPercent != null ? te.fuelPercent : 100;
+      const cond = (te.condition || 'normal').toUpperCase();
+      const heat = te.machineHeat || {};
+      const bars = [
+        { lbl: 'THROTTLE', v: thr / 100, warn: thr > 85 },
+        { lbl: 'SHAFT RPM', v: Math.min(1, rpm / 1200), warn: rpm > 1000 },
+        { lbl: 'BUS kW', v: Math.min(1, pwr / 380), warn: pwr > 300 },
+        { lbl: 'FUEL %', v: fuel / 100, warn: fuel < 25 }
+      ];
+      bars.forEach((b, idx) => {
+        const y = 52 + idx * 36;
+        g.fillStyle = '#9ec7d4';
+        g.font = '12px monospace';
+        g.fillText(b.lbl, 22, y + 12);
+        g.strokeStyle = '#255a70';
+        g.strokeRect(110, y, 170, 18);
+        g.fillStyle = b.warn ? '#ffb84d' : '#36bfc0';
+        g.fillRect(112, y + 2, Math.round(166 * Math.max(0.02, b.v)), 14);
+        g.fillStyle = '#d7eeee';
+        g.font = '11px monospace';
+        g.fillText(idx === 1 ? String(Math.round(rpm)) : idx === 2 ? pwr.toFixed(0) : idx === 3 ? fuel.toFixed(0) + '%' : Math.round(thr) + '%', 288, y + 13);
+      });
+      /* Heat zones from engine room */
+      g.fillStyle = '#c5a66a';
+      g.font = 'bold 11px monospace';
+      g.fillText('UNIT HEAT', 360, 58);
+      const zones = [
+        ['ELEC', heat.electrics || 0],
+        ['REAC', heat.reactor || 0],
+        ['REG', heat.regulator || 0],
+        ['MOT', heat.motors || 0]
+      ];
+      zones.forEach((z, i) => {
+        const y = 72 + i * 36;
+        const hv = Math.min(100, Number(z[1]) || 0);
+        g.fillStyle = '#9ec7d4';
+        g.font = '11px monospace';
+        g.fillText(z[0], 360, y);
+        g.strokeStyle = '#255a70';
+        g.strokeRect(400, y - 10, 90, 14);
+        g.fillStyle = hv > 75 ? '#ff3b4a' : hv > 50 ? '#e6b422' : '#36bfc0';
+        g.fillRect(402, y - 8, Math.round(86 * (hv / 100)), 10);
+      });
+      const linkStr = engineLinked ? 'ENGINE LINK ONLINE' : 'LOCAL / NO LINK';
+      g.fillStyle = engineLinked ? '#5ddea0' : '#e8a05c';
+      g.font = '12px monospace';
+      g.fillText(linkStr + ' · ' + cond + ' · TEMP ' + Number(temp).toFixed(0) + '°C', 22, 286);
+      g.fillStyle = '#6cf5c2';
+      g.fillText('SPD ' + spdStr + ' kn · HDG ' + hdgStr + '° · [USE] HELM', 22, 306);
+    } else {
+      g.fillText('GYROCOMPASS · ANEMOMETER · CLINOMETER', 18, 23);
+      const hdgRad = (state.shipHeading * Math.PI / 180) - Math.PI / 2;
+      const windRad = -0.9 + Math.sin(t * 0.8) * 0.14;
+      const heelRad = -Math.PI / 2 + Math.sin(t * 0.4) * 0.12;
+      [95, 256, 417].forEach((cx, idx) => {
+        g.strokeStyle = '#36bfc0';
+        g.lineWidth = 2.5;
+        g.beginPath(); g.arc(cx, 175, 64, 0, Math.PI * 2); g.stroke();
+        g.fillStyle = '#08202e';
+        g.beginPath(); g.arc(cx, 175, 60, 0, Math.PI * 2); g.fill();
+        g.strokeStyle = '#ffb84d';
+        g.lineWidth = 3;
+        g.beginPath(); g.moveTo(cx, 175);
+        const ang = idx === 0 ? hdgRad : idx === 1 ? windRad : heelRad;
+        g.lineTo(cx + Math.cos(ang) * 50, 175 + Math.sin(ang) * 50);
+        g.stroke();
+      });
+      g.fillStyle = '#d7f9f8';
+      g.font = 'bold 13px monospace';
+      g.fillText('HDG ' + hdgStr + '°', 64, 266);
+      g.fillText('WIND ' + Math.round(14 + state.shipSpeed * 0.6) + ' KT', 216, 266);
+      g.fillText('HEEL ' + Math.abs(Math.sin(t * 0.4) * 1.2).toFixed(1) + '°', 382, 266);
+    }
+  }
+
+  function createLiveScreenMaterial(kind) {
+    const c = document.createElement('canvas');
+    c.width = 512; c.height = 320;
+    const g = c.getContext('2d');
+    drawScannerCanvas(c, g, kind, 0);
+    const tex = new THREE.CanvasTexture(c);
+    tex.minFilter = THREE.LinearFilter;
+    tex.magFilter = THREE.LinearFilter;
+    tex.generateMipmaps = false;
+    liveScreens.push({ canvas: c, ctx: g, tex, kind });
+    return new THREE.MeshBasicMaterial({ map: tex, toneMapped: false });
+  }
+
+  let screenUpdateAccum = 0;
+  function updateLiveScreens(dt, t) {
+    if (!liveScreens.length) return;
+    if (state.lidarPulse > 0) state.lidarPulse = Math.max(0, state.lidarPulse - dt * 0.8);
+    if (state.sonarPing > 0) state.sonarPing = Math.max(0, state.sonarPing - dt * 0.9);
+    if (state.hullScanPulse > 0) state.hullScanPulse = Math.max(0, state.hullScanPulse - dt * 0.8);
+
+    screenUpdateAccum += dt;
+    const interval = state.quality === 'LOW' ? 0.25 : 0.11;
+    if (screenUpdateAccum < interval) return;
+    screenUpdateAccum = 0;
+
+    for (let i = 0; i < liveScreens.length; i++) {
+      const scr = liveScreens[i];
+      drawScannerCanvas(scr.canvas, scr.ctx, scr.kind, t);
+      scr.tex.needsUpdate = true;
+    }
+  }
+
+  /* Procedural hull draft marks & marine hazard stripe textures */
+  function makeHullMarkTexture(kind) {
+    const c = document.createElement('canvas');
+    c.width = 128; c.height = 256;
+    const g = c.getContext('2d');
+    if (kind === 'draft') {
+      g.fillStyle = '#3a5562';
+      g.fillRect(0, 0, 128, 256);
+      g.fillStyle = '#e8eceb';
+      g.font = 'bold 22px monospace';
+      g.textAlign = 'center';
+      ['10M', '8M', '6M', '4M'].forEach((t, i) => {
+        const y = 34 + i * 54;
+        g.fillText(t, 42, y);
+        g.fillRect(22, y + 6, 40, 4);
+      });
+      g.strokeStyle = '#e8eceb';
+      g.lineWidth = 4;
+      g.beginPath(); g.arc(92, 132, 22, 0, Math.PI * 2); g.stroke();
+      g.beginPath(); g.moveTo(62, 132); g.lineTo(122, 132); g.stroke();
+    } else {
+      g.fillStyle = '#c89b2b';
+      g.fillRect(0, 0, 128, 256);
+      g.fillStyle = '#1b262c';
+      for (let y = -128; y < 384; y += 32) {
+        g.beginPath();
+        g.moveTo(0, y); g.lineTo(128, y + 64);
+        g.lineTo(128, y + 80); g.lineTo(0, y + 16);
+        g.closePath(); g.fill();
+      }
+    }
+    const tex = new THREE.CanvasTexture(c);
+    tex.minFilter = THREE.LinearFilter;
+    tex.generateMipmaps = false;
+    return tex;
+  }
+
+  /* Procedural non-skid planked deck texture */
+  function makeDeckPlankTexture() {
+    const c = document.createElement('canvas');
+    c.width = 256; c.height = 256;
+    const g = c.getContext('2d');
+    g.fillStyle = '#9aa6a4';
+    g.fillRect(0, 0, 256, 256);
+    for (let x = 0; x < 256; x += 16) {
+      g.fillStyle = (x / 16) % 2 === 0 ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.035)';
+      g.fillRect(x, 0, 15, 256);
+      g.fillStyle = '#6f7c7b';
+      g.fillRect(x + 15, 0, 1, 256);
+    }
+    for (let y = 0; y < 256; y += 64) {
+      g.fillStyle = 'rgba(70,84,84,0.35)';
+      g.fillRect(0, y, 256, 1);
+    }
+    const tex = new THREE.CanvasTexture(c);
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(8, 28);
+    tex.minFilter = THREE.LinearFilter;
+    tex.generateMipmaps = false;
+    return tex;
+  }
+
+  function createSky() {
+    const c = document.createElement('canvas'); c.width = 512; c.height = 256;
+    const g = c.getContext('2d');
+    const gr = g.createLinearGradient(0, 0, 0, 256);
+    gr.addColorStop(0, '#5a7f96'); gr.addColorStop(0.45, '#a8b9bc'); gr.addColorStop(0.72, '#d4cfc0'); gr.addColorStop(1, '#c8bda8');
+    g.fillStyle = gr; g.fillRect(0, 0, 512, 256);
+    for (let i = 0; i < 40; i++) {
+      g.fillStyle = 'rgba(255,255,248,' + (0.015 + Math.random() * 0.04) + ')';
+      g.beginPath(); g.ellipse(Math.random() * 512, 20 + Math.random() * 70, 14 + Math.random() * 28, 4 + Math.random() * 7, 0, 0, Math.PI * 2); g.fill();
+    }
+    const sky = new THREE.Mesh(
+      new THREE.SphereGeometry(320, 24, 16),
+      new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), side: THREE.BackSide, depthWrite: false })
+    );
+    sky.matrixAutoUpdate = false;
+    sky.updateMatrix();
+    scene.add(sky);
+  }
+
+  function createOcean() {
+    const n = state.quality === 'LOW' ? 14 : state.quality === 'HIGH' ? 26 : 20;
+    const size = 420, pos = [], idx = [];
+    for (let iz = 0; iz <= n; iz++) for (let ix = 0; ix <= n; ix++) {
+      pos.push((ix / n - 0.5) * size, 0, (iz / n - 0.5) * size);
+    }
+    for (let iz = 0; iz < n; iz++) for (let ix = 0; ix < n; ix++) {
+      const a = iz * (n + 1) + ix, b = a + 1, c = a + n + 1, d = c + 1;
+      idx.push(a, c, b, b, c, d);
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geo.setIndex(idx);
+    geo.computeVertexNormals();
+    waterPositions = geo.attributes.position;
+    waterBase = Float32Array.from(waterPositions.array);
+    water = new THREE.Mesh(geo, makeMat(0x2a4d5c, { side: THREE.DoubleSide }));
+    water.receiveShadow = false;
+    waterPositions.setUsage(THREE.DynamicDrawUsage);
+    scene.add(water);
+  }
+
+  function buildHull() {
+    ship = new THREE.Group();
+    ship.scale.setScalar(SHIP_SCALE);
+    scene.add(ship);
+    if (directionalSun) {
+      directionalSun.target = ship;
+    }
+
+    const sh = shadowsAreEnabled();
+    const stations = [[-22, 1.0], [-18, 2.9], [-12, 4.15], [-4, 4.5], [6, 4.55], [14, 4.05], [19, 2.9], [23, 1.2], [25, 0.2]];
+    function hullSide(sign, under) {
+      const p = [], idx = [];
+      stations.forEach(([z, w]) => {
+        if (under) p.push(sign * w * 0.4, -2.4, z, sign * w * 0.9, 0.05, z);
+        else p.push(sign * w * 0.9, 0.05, z, sign * w, 3.2, z);
+      });
+      for (let i = 0; i < stations.length - 1; i++) {
+        const a = i * 2, b = a + 1, c = a + 2, d = a + 3;
+        idx.push(a, b, c, b, d, c);
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(p, 3));
+      geo.setIndex(idx); geo.computeVertexNormals();
+      const mesh = new THREE.Mesh(geo, makeMat(under ? 0x5c2826 : 0x3a5562, { side: THREE.DoubleSide }));
+      mesh.userData.castShadowFlag = !under;
+      mesh.userData.receiveShadowFlag = !under;
+      mesh.castShadow = sh && !under;
+      mesh.receiveShadow = sh && !under;
+      mesh.matrixAutoUpdate = false; mesh.updateMatrix();
+      ship.add(mesh);
+    }
+    hullSide(-1, true); hullSide(1, true); hullSide(-1, false); hullSide(1, false);
+    box(ship, 0, -2.1, -1, 0.9, 0.3, 36, 0x5d2929, { cast: false, receive: false });
+    box(ship, 0, 1.5, -23.2, 2.4, 2.6, 0.6, 0x334d5a);
+
+    /* Bulbous bow cap, stempost, boot-topping waterline stripe, rub-rail fenders & portholes */
+    const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.85, 14, 10), makeMat(0x5c2826));
+    bulb.scale.set(0.62, 0.72, 1.95);
+    bulb.position.set(0, -0.85, 24.4);
+    bulb.userData.castShadowFlag = false;
+    bulb.userData.receiveShadowFlag = false;
+    bulb.matrixAutoUpdate = false; bulb.updateMatrix();
+    ship.add(bulb);
+    box(ship, 0, 1.85, 24.65, 0.24, 3.1, 0.75, 0x2d434e);
+
+    /* Animated bow wake foam strips along waterline */
+    bowWakeMeshes = [];
+    const wakeMat = new THREE.MeshBasicMaterial({
+      color: 0xe6f6f8,
+      transparent: true,
+      opacity: 0.0,
+      side: THREE.DoubleSide,
+      depthWrite: false
+    });
+    for (const side of [-1, 1]) {
+      const wake = new THREE.Mesh(new THREE.PlaneGeometry(0.75, 24), wakeMat);
+      wake.rotation.x = -Math.PI / 2;
+      wake.rotation.z = side * 0.14;
+      wake.position.set(side * 3.85, 0.08, 10.5);
+      ship.add(wake);
+      bowWakeMeshes.push(wake);
+    }
+
+    const draftTex = makeHullMarkTexture('draft');
+    const draftMat = new THREE.MeshBasicMaterial({ map: draftTex, side: THREE.DoubleSide, toneMapped: false });
+    for (const side of [-1, 1]) {
+      box(ship, side * 4.18, 0.26, 1.0, 0.14, 0.28, 25.0, 0x7a3430, { cast: false });
+      box(ship, side * 4.46, 3.04, 1.0, 0.16, 0.16, 25.5, 0x22323a);
+      for (const fz of [-10, -3, 4, 11]) {
+        box(ship, side * 4.52, 1.85, fz, 0.16, 1.95, 0.28, 0x1e282d);
+      }
+      for (const pz of [-14, -10.5, -7, -3.5, 3.5, 7, 10.5]) {
+        const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.12, 12), makeMat(0xc5a66a));
+        ring.rotation.z = Math.PI / 2;
+        ring.position.set(side * 4.36, 2.25, pz);
+        ring.matrixAutoUpdate = false; ring.updateMatrix();
+        ship.add(ring);
+        const glass = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.14, 12), makeMat(0x132c38));
+        glass.rotation.z = Math.PI / 2;
+        glass.position.set(side * 4.37, 2.25, pz);
+        glass.matrixAutoUpdate = false; glass.updateMatrix();
+        ship.add(glass);
+      }
+      box(ship, side * 2.35, 2.25, 21.4, 0.22, 0.55, 0.65, 0x1f2d34);
+      box(ship, side * 2.44, 1.85, 21.4, 0.14, 0.72, 0.16, 0x45545c);
+      box(ship, side * 2.46, 1.52, 21.4, 0.16, 0.18, 0.68, 0x45545c);
+      const dPlate = new THREE.Mesh(new THREE.PlaneGeometry(0.75, 1.5), draftMat);
+      dPlate.position.set(side * 4.46, 1.45, 5.0);
+      dPlate.rotation.y = side * (Math.PI / 2);
+      dPlate.matrixAutoUpdate = false; dPlate.updateMatrix();
+      ship.add(dPlate);
+    }
+
+    const deckShape = new THREE.Shape();
+    const pts = [[-3.0, -21], [3.0, -21], [4.15, -17], [4.45, -8], [4.55, 6], [4.25, 15], [3.6, 19], [1.8, 22.5], [0, 24], [-1.8, 22.5], [-3.6, 19], [-4.25, 15], [-4.55, 6], [-4.45, -8], [-4.15, -17]];
+    pts.forEach((p, i) => { const x = p[0], y = -p[1]; if (i === 0) deckShape.moveTo(x, y); else deckShape.lineTo(x, y); });
+    deckShape.closePath();
+    const deckGeo = new THREE.ShapeGeometry(deckShape, 2);
+    deckGeo.rotateX(-Math.PI / 2);
+    const deckMat = new THREE.MeshStandardMaterial({
+      map: makeDeckPlankTexture(),
+      roughness: 1.0,
+      metalness: 0.0,
+      envMapIntensity: 0
+    });
+    const deckMesh = new THREE.Mesh(deckGeo, deckMat);
+    deckMesh.position.y = 3.2;
+    deckMesh.userData.castShadowFlag = false;
+    deckMesh.userData.receiveShadowFlag = true;
+    deckMesh.castShadow = false;
+    deckMesh.receiveShadow = sh;
+    deckMesh.matrixAutoUpdate = false; deckMesh.updateMatrix();
+    ship.add(deckMesh);
+    box(ship, 0, 3.15, -1, 8.6, 0.14, 30, 0x394c54, { cast: false });
+
+    /* Deck walkway safety lines & scupper coaming strips (flush on deck y = 3.205, non-blocking) */
+    for (const side of [-1, 1]) {
+      box(ship, side * 3.48, 3.205, 0.0, 0.06, 0.008, 31.0, 0xc9a336, { cast: false, receive: false });
+      box(ship, side * 4.16, 3.22, -1.0, 0.18, 0.04, 34.0, 0x45575f, { cast: false });
+    }
+
+    /* Deck perimeter rails — widened outward to x = ±4.25 for generous side corridors on BOTH Port & Starboard */
+    for (const side of [-1, 1]) {
+      const x = side * 4.25;
+      const sideTag = side < 0 ? 'Port' : 'Starboard';
+      for (let z = -17; z <= 19; z += 3) {
+        cyl(ship, x, 3.6, z, 0.04, 0.05, 0.78, 0x8ea0a4, 8);
+        box(ship, x, 3.24, z, 0.12, 0.06, 0.12, 0x43555d, { cast: false });
+      }
+      const railPts = [];
+      for (let z = -18; z <= 16; z += 4) railPts.push(new THREE.Vector3(x, 3.98, z));
+      railPts.push(new THREE.Vector3(side * 3.45, 3.98, 19.5));
+      railPts.push(new THREE.Vector3(side * 1.85, 3.98, 23.0));
+      const curve = new THREE.CatmullRomCurve3(railPts);
+      const railMesh = new THREE.Mesh(new THREE.TubeGeometry(curve, 22, 0.042, 6, false), makeMat(0x7c5c3e));
+      railMesh.userData.castShadowFlag = true;
+      railMesh.userData.receiveShadowFlag = false;
+      railMesh.castShadow = sh;
+      railMesh.matrixAutoUpdate = false; railMesh.updateMatrix();
+      ship.add(railMesh);
+
+      const midPts = railPts.map((p) => new THREE.Vector3(p.x, 3.62, p.z));
+      const midRailMesh = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(midPts), 22, 0.022, 6, false), makeMat(0x9caaac));
+      midRailMesh.matrixAutoUpdate = false; midRailMesh.updateMatrix();
+      ship.add(midRailMesh);
+
+      /* Interactive SOLAS Orange & White Lifebuoy Rings mounted on outer rail stanchions */
+      for (const lz of [-11.5, 2.5, 12.0]) {
+        const buoy = new THREE.Mesh(new THREE.TorusGeometry(0.32, 0.085, 8, 16), makeMat(0xe05a2b));
+        buoy.rotation.y = Math.PI / 2;
+        buoy.position.set(x + side * 0.08, 3.66, lz);
+        buoy.userData.castShadowFlag = true;
+        buoy.castShadow = sh;
+        buoy.userData.interactable = sideTag + ' SOLAS Lifebuoy';
+        buoy.userData.actionType = 'lifebuoy';
+        buoy.matrixAutoUpdate = false; buoy.updateMatrix();
+        ship.add(buoy);
+        interactables.push(buoy);
+        registerInteractiveStation('buoy-' + sideTag + '-' + lz, side * 3.65, lz, 1.55,
+          'USE · ' + sideTag + ' SOLAS Lifebuoy', 'lifebuoy');
+        box(ship, x + side * 0.08, 3.98, lz, 0.18, 0.08, 0.14, 0xf0f4f5, { cast: false });
+        box(ship, x + side * 0.08, 3.34, lz, 0.18, 0.08, 0.14, 0xf0f4f5, { cast: false });
+      }
+    }
+
+    /* Interactive Hydraulic Cargo Hatches 1, 2, 3 */
+    const hazardTex = makeHullMarkTexture('hazard');
+    const hazardMat = new THREE.MeshBasicMaterial({ map: hazardTex, toneMapped: false });
+    [-2, 6, 13].forEach((z, idx) => {
+      const hNum = idx + 1;
+      const hLabel = 'Cargo Hatch ' + hNum;
+      box(ship, 0, 3.34, z, 5.16, 0.26, 3.20, 0x3b4950, { hit: true, label: hLabel, actionType: 'cargo-hatch-' + hNum });
+      box(ship, 0, 3.51, z - 0.76, 4.92, 0.10, 1.42, 0x5d6c73, { hit: true, label: hLabel, actionType: 'cargo-hatch-' + hNum });
+      box(ship, 0, 3.51, z + 0.76, 4.92, 0.10, 1.42, 0x5d6c73, { hit: true, label: hLabel, actionType: 'cargo-hatch-' + hNum });
+      box(ship, 0, 3.57, z, 4.98, 0.04, 0.12, 0x243036, { cast: false });
+      for (const rx of [-1.8, -0.6, 0.6, 1.8]) {
+        box(ship, rx, 3.58, z, 0.10, 0.05, 2.92, 0x45535a, { cast: false });
+      }
+      for (const sx of [-2.62, 2.62]) {
+        for (const sz of [z - 1.2, z, z + 1.2]) {
+          box(ship, sx, 3.34, sz, 0.08, 0.24, 0.08, 0x2c383e, { cast: false });
+        }
+        cyl(ship, sx, 3.45, z - 1.45, 0.06, 0.07, 0.34, 0xc5a66a, 8);
+        cyl(ship, sx, 3.45, z + 1.45, 0.06, 0.07, 0.34, 0xc5a66a, 8);
+      }
+      const hStripF = new THREE.Mesh(new THREE.PlaneGeometry(5.12, 0.14), hazardMat);
+      hStripF.position.set(0, 3.30, z + 1.61);
+      hStripF.matrixAutoUpdate = false; hStripF.updateMatrix();
+      ship.add(hStripF);
+      const hStripA = new THREE.Mesh(new THREE.PlaneGeometry(5.12, 0.14), hazardMat);
+      hStripA.position.set(0, 3.30, z - 1.61);
+      hStripA.rotation.y = Math.PI;
+      hStripA.matrixAutoUpdate = false; hStripA.updateMatrix();
+      ship.add(hStripA);
+
+      addBoxHitbox('deck-hatch-' + hNum, -2.62, 2.62, z - 1.64, z + 1.64);
+      registerInteractiveStation('cargo-hatch-' + hNum, 0, z, 3.35, 'USE · Inspect ' + hLabel, 'cargo-hatch-' + hNum);
+    });
+
+    /* Mooring bollards & twin-drum mooring winches (positioned well inside tapered bow rails to prevent any pinch!) */
+    for (const side of [-1, 1]) {
+      const sideTag = side < 0 ? 'Port' : 'Starboard';
+      [[side * 2.25, 17.8], [side * 3.45, -15.8]].forEach(([x, z], idx) => {
+        box(ship, x, 3.24, z, 0.54, 0.08, 0.54, 0x2a363c, { cast: false });
+        cyl(ship, x - 0.11, 3.46, z, 0.11, 0.13, 0.44, 0x35444b, 10, { hit: true, label: sideTag + ' Twin Bollard', actionType: 'bollard' });
+        cyl(ship, x + 0.11, 3.46, z, 0.11, 0.13, 0.44, 0x35444b, 10, { hit: true, label: sideTag + ' Twin Bollard', actionType: 'bollard' });
+        cyl(ship, x - 0.11, 3.70, z, 0.15, 0.15, 0.06, 0xc5a66a, 10);
+        cyl(ship, x + 0.11, 3.70, z, 0.15, 0.15, 0.06, 0xc5a66a, 10);
+        addBoxHitbox('bollard-' + sideTag + '-' + idx, x - 0.30, x + 0.30, z - 0.30, z + 0.30);
+      });
+      const wx = side * 2.45, wz = 16.3;
+      box(ship, wx, 3.36, wz, 0.88, 0.24, 0.72, 0x34454c, { hit: true, label: sideTag + ' Mooring Winch', actionType: 'winch' });
+      const drum = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.52, 12), makeMat(0x8e836b));
+      drum.rotation.z = Math.PI / 2;
+      drum.position.set(wx, 3.62, wz);
+      drum.userData.castShadowFlag = true; drum.castShadow = sh;
+      drum.userData.interactable = sideTag + ' Mooring Winch';
+      drum.userData.actionType = 'winch';
+      drum.matrixAutoUpdate = false; drum.updateMatrix();
+      ship.add(drum);
+      interactables.push(drum);
+      box(ship, wx + side * 0.32, 3.58, wz, 0.20, 0.36, 0.42, 0x263840);
+      addBoxHitbox('winch-' + sideTag, wx - 0.45, wx + 0.45, wz - 0.38, wz + 0.38);
+      registerInteractiveStation('winch-' + sideTag, wx, wz, 1.45, 'USE · ' + sideTag + ' Mooring Winch', 'winch');
+    }
+
+    /* Interactive Anchor Windlass, Chain Stoppers & Rotating Gypsies */
+    windlassGypsies = [];
+    box(ship, 0, 3.42, 19.2, 2.36, 0.36, 1.80, 0x3a484e, { hit: true, label: 'Anchor Windlass', actionType: 'windlass' });
+    box(ship, 0, 3.68, 19.2, 0.82, 0.44, 0.92, 0x2b3940, { hit: true, label: 'Windlass Gear Housing', actionType: 'windlass' });
+    for (const x of [-0.70, 0.70]) {
+      const gyps = new THREE.Mesh(new THREE.CylinderGeometry(0.46, 0.46, 0.38, 14), makeMat(0x6d7c80));
+      gyps.rotation.z = Math.PI / 2;
+      gyps.position.set(x, 3.88, 19.15);
+      gyps.userData.castShadowFlag = true; gyps.castShadow = sh;
+      gyps.userData.interactable = 'Anchor Windlass';
+      gyps.userData.actionType = 'windlass';
+      ship.add(gyps);
+      interactables.push(gyps);
+      windlassGypsies.push(gyps);
+      box(ship, x, 3.46, 20.30, 0.34, 0.30, 0.40, 0x4f5e64, { hit: true, label: 'Chain Stopper', actionType: 'windlass' });
+      for (let step = 0; step < 6; step++) {
+        const t = step / 5;
+        const cx = x * (1 - t) + (x < 0 ? -1.45 : 1.45) * t;
+        const cz = 20.52 + t * 1.42;
+        box(ship, cx, 3.26, cz, 0.16, 0.09, 0.24, 0x293236, { cast: false });
+      }
+    }
+    addBoxHitbox('anchor-windlass', -1.24, 1.24, 18.26, 20.52);
+    registerInteractiveStation('anchor-windlass', 0, 19.2, 2.25, 'USE · Anchor Windlass Drive', 'windlass');
+
+    /* Bow Jackstaff & Anchor Light at Peak */
+    cyl(ship, 0, 3.95, 23.15, 0.03, 0.05, 1.55, 0xc5a66a, 8, { hit: true, label: 'Bow Jackstaff', actionType: 'jackstaff' });
+    cyl(ship, 0, 4.78, 23.15, 0.07, 0.07, 0.14, 0xfff2c2, 10, { emissive: 0xffd97d, emissiveIntensity: 0.9 });
+    addBoxHitbox('bow-jackstaff', -0.22, 0.22, 22.90, 23.40);
+
+    /* Interactive Slewing Port-Side Deck Cargo Crane (placed in open cross-deck bay x = -2.15, z = 2.0 so left corridor x = -3.90..-2.62 is 1.28m wide!) */
+    const craneX = -2.15, craneZ = 2.0;
+    cyl(ship, craneX, 3.95, craneZ, 0.34, 0.42, 1.50, 0x455860, 14, { hit: true, label: 'Deck Cargo Crane', actionType: 'crane' });
+    craneTurretGroup = new THREE.Group();
+    craneTurretGroup.position.set(craneX, 4.70, craneZ);
+    craneTurretGroup.rotation.y = state.craneAngle;
+    ship.add(craneTurretGroup);
+
+    box(craneTurretGroup, 0, 0.22, 0, 0.88, 0.72, 1.05, 0xc5a66a, { hit: true, label: 'Deck Cargo Crane', actionType: 'crane' });
+    box(craneTurretGroup, 0.15, 0.26, 0.54, 0.56, 0.44, 0.06, 0x162f3b);
+    craneBeaconMat = new THREE.MeshStandardMaterial({
+      color: 0xff9f1c, roughness: 1.0, metalness: 0.0,
+      emissive: new THREE.Color(0xff9f1c), emissiveIntensity: 0.85
+    });
+    const cBeacon = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.14, 10), craneBeaconMat);
+    cBeacon.position.set(0, 0.66, -0.35);
+    craneTurretGroup.add(cBeacon);
+
+    const boom = new THREE.Mesh(getBoxGeometry(0.28, 0.32, 5.2), makeMat(0x586b73));
+    boom.position.set(0.32, 1.15, 2.25);
+    boom.rotation.x = -0.34;
+    boom.userData.castShadowFlag = true; boom.castShadow = sh;
+    boom.userData.interactable = 'Deck Cargo Crane';
+    boom.userData.actionType = 'crane';
+    boom.matrixAutoUpdate = false; boom.updateMatrix();
+    craneTurretGroup.add(boom);
+    interactables.push(boom);
+
+    addBoxHitbox('port-cargo-crane', craneX - 0.45, craneX + 0.45, craneZ - 0.45, craneZ + 0.45);
+    registerInteractiveStation('port-cargo-crane', craneX, craneZ, 1.65, 'USE · Slew Deck Cargo Crane', 'crane');
+
+    /* Marine Cowl Ventilators (positioned in open cross-deck bays between hatches, keeping left & right walkways completely clear!) */
+    [[-2.20, 9.65, 'Port Forward Cowl Ventilator'], [2.20, 9.65, 'Starboard Forward Cowl Ventilator'],
+     [-2.15, -6.15, 'Port Bridge-Front Cowl Ventilator'], [2.15, -6.15, 'Starboard Bridge-Front Cowl Ventilator']].forEach(([vx, vz, vLabel], idx) => {
+      cyl(ship, vx, 3.68, vz, 0.16, 0.20, 0.96, 0xd8dedc, 12, { hit: true, label: vLabel, actionType: 'vent' });
+      const hood = new THREE.Mesh(new THREE.SphereGeometry(0.26, 12, 10), makeMat(0xd8dedc));
+      hood.position.set(vx, 4.22, vz + 0.06);
+      hood.userData.castShadowFlag = true; hood.castShadow = sh;
+      hood.userData.interactable = vLabel;
+      hood.userData.actionType = 'vent';
+      hood.matrixAutoUpdate = false; hood.updateMatrix();
+      ship.add(hood);
+      interactables.push(hood);
+      cyl(ship, vx, 4.22, vz + 0.24, 0.22, 0.22, 0.10, 0x8c2f2b, 12);
+      addBoxHitbox('cowl-vent-' + idx, vx - 0.26, vx + 0.26, vz - 0.26, vz + 0.26);
+    });
+
+    /* Interactive Deck Fire Hydrant & Hose Cabinets (flush on superstructure flanks, leaving 0.72m outer corridors) */
+    for (const side of [-1, 1]) {
+      const fx = side * 3.10, fz = -13.2;
+      const fLabel = (side < 0 ? 'Port' : 'Starboard') + ' Fire Hose Station';
+      box(ship, fx, 3.92, fz, 0.16, 0.68, 0.54, 0xb8382c, { hit: true, label: fLabel, actionType: 'fire-station' });
+      box(ship, fx + side * 0.09, 3.92, fz, 0.03, 0.42, 0.34, 0x162934, { cast: false });
+      addBoxHitbox('fire-cabinet-' + side, fx - 0.10, fx + 0.10, fz - 0.28, fz + 0.28);
+      registerInteractiveStation('fire-cabinet-' + side, side * 3.45, fz, 1.35, 'USE · ' + fLabel, 'fire-station');
+    }
+
+    /* Interactive Aft Warping Capstan, Coiled Hawser Pallets & Stern Ensign Flagstaff */
+    capstanDrumMesh = cyl(ship, 0, 3.55, -18.8, 0.30, 0.36, 0.70, 0x3b4b52, 12, { hit: true, label: 'Aft Warping Capstan', actionType: 'capstan' });
+    capstanDrumMesh.matrixAutoUpdate = true;
+    cyl(ship, 0, 3.94, -18.8, 0.38, 0.38, 0.08, 0xc5a66a, 12);
+    addBoxHitbox('aft-capstan', -0.40, 0.40, -19.20, -18.40);
+    registerInteractiveStation('aft-capstan', 0, -18.8, 1.75, 'USE · Aft Warping Capstan', 'capstan');
+
+    for (const side of [-1, 1]) {
+      const hx = side * 2.1, hz = -18.6;
+      box(ship, hx, 3.25, hz, 0.92, 0.10, 0.92, 0x7c5c3e, { hit: true, label: 'Hawser Rope Grating', actionType: 'capstan' });
+      const coil = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.11, 8, 16), makeMat(0xb8a882));
+      coil.rotation.x = Math.PI / 2;
+      coil.position.set(hx, 3.40, hz);
+      coil.userData.castShadowFlag = true; coil.castShadow = sh;
+      coil.matrixAutoUpdate = false; coil.updateMatrix();
+      ship.add(coil);
+      addBoxHitbox('hawser-pallet-' + side, hx - 0.48, hx + 0.48, hz - 0.48, hz + 0.48);
+    }
+    cyl(ship, 0, 4.10, -20.5, 0.035, 0.055, 1.80, 0xc5a66a, 8, { hit: true, label: 'Stern Ensign Staff' });
+    box(ship, 0, 4.65, -20.9, 0.04, 0.48, 0.76, 0x1d5b6e, { cast: false });
+    addBoxHitbox('stern-flagstaff', -0.25, 0.25, -20.75, -20.25);
+
+    /* Superstructure shell:
+       - Rectangular see-through window in front wall (z = -6.95, x = -0.90..+0.90, y = 4.35..5.40)
+       - Doorway opening closer up on the right (starboard) wall (x = +3.00, z = -10.20..-8.10) */
+    const superY = 4.55, superZ = -12.2, superH = 2.7;
+    box(ship, -3.00, superY, superZ, 0.12, superH, 10.5, 0xc5cbc9, { hit: true, label: 'Port Superstructure Bulkhead' });
+    box(ship,  3.00, superY, -13.795, 0.12, superH, 7.19, 0xc5cbc9, { hit: true, label: 'Starboard Bulkhead (Aft)' });
+    box(ship,  3.00, superY, -7.525,  0.12, superH, 1.15, 0xc5cbc9, { hit: true, label: 'Starboard Bulkhead (Forward)' });
+    box(ship,  3.00, 5.725, DOOR_Z,   0.12, 0.35,   2.10, 0xc5cbc9);
+    box(ship, 0, superY, -17.39, 6.12, superH, 0.12, 0xc5cbc9, { hit: true, label: 'Aft Superstructure Bulkhead' });
+
+    /* Superstructure exterior architectural trim, interactive floodlights & brass ship's bell */
+    for (const sx of [-3.04, 3.04]) {
+      for (const sz of [-17.36, -6.96]) {
+        box(ship, sx, superY, sz, 0.18, superH + 0.04, 0.18, 0x455860, { cast: false });
+      }
+      box(ship, sx, 3.32, superZ, 0.14, 0.22, 10.54, 0x3b4d55, { cast: false });
+      box(ship, sx, 5.82, superZ, 0.14, 0.18, 10.54, 0x3b4d55, { cast: false });
+    }
+    /* Exterior bulkhead floodlights + interactive Deck Lighting Control Box */
+    deckFloodGlowMeshes = [];
+    box(ship, 0, 5.56, -7.08, 0.44, 0.12, 0.18, 0x2c3c44);
+    const flFront = box(ship, 0, 5.52, -7.18, 0.34, 0.06, 0.10, 0xfff2c8, { emissive: 0xffe6a3, emissiveIntensity: 0.95, cast: false });
+    box(ship, 3.18, 5.66, DOOR_Z, 0.16, 0.12, 0.44, 0x2c3c44);
+    const flStbd = box(ship, 3.26, 5.62, DOOR_Z, 0.10, 0.06, 0.34, 0xfff2c8, { emissive: 0xffe6a3, emissiveIntensity: 0.95, cast: false });
+    box(ship, -3.18, 5.66, -11.5, 0.16, 0.12, 0.44, 0x2c3c44);
+    const flPort = box(ship, -3.26, 5.62, -11.5, 0.10, 0.06, 0.34, 0xfff2c8, { emissive: 0xffe6a3, emissiveIntensity: 0.95, cast: false });
+    deckFloodGlowMeshes.push(flFront, flStbd, flPort);
+
+    /* Deck Floodlight Switch Panel on exterior forward bulkhead (starboard of window) — offset clear of wall face */
+    box(ship, 1.45, 4.45, -7.10, 0.28, 0.36, 0.12, 0x24343c, { hit: true, label: 'Deck Floodlight Switch Box', actionType: 'floodlights' });
+    box(ship, 1.45, 4.52, -7.18, 0.08, 0.08, 0.04, 0x30d158, { emissive: 0x30d158, emissiveIntensity: 0.9, cast: false });
+    registerInteractiveStation('floodlight-switch', 1.45, -6.55, 1.55, 'USE · Toggle Deck Floodlights', 'floodlights');
+
+    /* Interactive Ship's Brass Bell beside starboard bridge entrance */
+    box(ship, 3.08, 5.05, -7.85, 0.16, 0.08, 0.08, 0x2c3c44, { cast: false });
+    bellPivotGroup = new THREE.Group();
+    bellPivotGroup.position.set(3.16, 5.03, -7.85);
+    ship.add(bellPivotGroup);
+    const bellBody = cyl(bellPivotGroup, 0, -0.10, 0, 0.05, 0.12, 0.20, 0xc5a66a, 12, { hit: true, label: "Ship's Brass Bell", actionType: 'bell' });
+    bellBody.userData.actionType = 'bell';
+    registerInteractiveStation('ships-bell', 3.45, -7.85, 1.45, "USE · Ring Ship's Brass Bell", 'bell');
+
+    /* Front bulkhead (z = -6.95) with a rectangular window (1.80m wide x 1.05m tall, y = 4.35..5.40) */
+    box(ship, 0, 3.775, -6.95, 6.12, 1.15, 0.15, 0xc5cbc9, { hit: true, label: 'Front Bridge Bulkhead (Lower)' });
+    box(ship, 0, 5.675, -6.95, 6.12, 0.55, 0.15, 0xc5cbc9);
+    box(ship, -1.98, 4.875, -6.95, 2.16, 1.05, 0.15, 0xc5cbc9, { hit: true, label: 'Front Bridge Bulkhead (Port)' });
+    box(ship,  1.98, 4.875, -6.95, 2.16, 1.05, 0.15, 0xc5cbc9, { hit: true, label: 'Front Bridge Bulkhead (Starboard)' });
+
+    box(ship, 0, 4.36, -6.95, 1.84, 0.05, 0.20, 0x263842);
+    box(ship, 0, 5.39, -6.95, 1.84, 0.05, 0.20, 0x263842);
+    box(ship, -0.90, 4.875, -6.95, 0.05, 1.05, 0.20, 0x263842);
+    box(ship,  0.90, 4.875, -6.95, 0.05, 1.05, 0.20, 0x263842);
+    const windowGlass = new THREE.Mesh(
+      new THREE.PlaneGeometry(1.76, 1.00),
+      new THREE.MeshBasicMaterial({
+        color: 0x9ad8e6,
+        transparent: true,
+        opacity: 0.14,
+        depthWrite: false,
+        side: THREE.DoubleSide
+      })
+    );
+    windowGlass.position.set(0, 4.875, -6.95);
+    windowGlass.matrixAutoUpdate = false;
+    windowGlass.updateMatrix();
+    ship.add(windowGlass);
+
+    /* Individual wall hitboxes matching DOOR_Z = -9.15 (opening z = -10.20 to -8.10) */
+    addBoxHitbox('super-port-wall',     -3.08, -2.86, -17.46, -6.82);
+    addBoxHitbox('super-stbd-wall-aft',  2.86,  3.08, -17.46, -10.20);
+    addBoxHitbox('super-stbd-wall-fwd',  2.86,  3.08,  -8.10, -6.82);
+    addBoxHitbox('super-aft-wall',      -3.08,  3.08, -17.46, -16.27);
+    addBoxHitbox('super-front-wall',    -3.08,  3.08,  -7.05, -6.78);
+
+    /* Upper Wheelhouse, Bridge Wings, Navigation Sidelights & Monkey Island Railings */
+    const upperDeckA = box(ship, 0, 5.95, -12.2, 6.30, 0.14, 10.65, 0x44575e);
+    const upperDeckB = box(ship, 0, 7.15, -12.2, 5.6, 2.2, 7.2, 0xb0bcbb);
+    const upperDeckC = box(ship, 0, 8.3, -12.2, 5.75, 0.14, 7.35, 0x364951);
+    bridgeCeilingMesh = [upperDeckA, upperDeckB, upperDeckC];
+
+    for (const side of [-1, 1]) {
+      const wSide = box(ship, side * 2.85, 7.35, -12.2, 0.1, 1.15, 6.4, 0x152e3a);
+      const wing = box(ship, side * 3.7, 7.05, -12.2, 1.8, 0.18, 6.6, 0x859293);
+      const wRail = box(ship, side * 4.54, 7.55, -12.2, 0.06, 0.85, 6.5, 0x9caaac);
+      const pelorus = cyl(ship, side * 4.15, 7.62, -10.2, 0.14, 0.18, 0.96, 0xc5a66a, 10);
+      const navBox = box(ship, side * 4.55, 7.85, -9.2, 0.24, 0.34, 0.42, 0x263840);
+      const navGlow = box(ship, side * 4.56, 7.85, -9.02, 0.18, 0.22, 0.08,
+        side < 0 ? 0xff3b30 : 0x30d158,
+        { emissive: side < 0 ? 0xff3b30 : 0x30d158, emissiveIntensity: 0.95, cast: false });
+      bridgeCeilingMesh.push(wSide, wing, wRail, pelorus, navBox, navGlow);
+    }
+    const wAft = box(ship, 0, 7.35, -15.7, 5.4, 1.15, 0.1, 0x152e3a);
+    const wFwd = box(ship, 0, 7.35, -8.7, 5.4, 1.15, 0.1, 0x152e3a);
+    const visor = box(ship, 0, 8.18, -8.35, 5.75, 0.12, 0.75, 0x364951);
+    const searchlight = cyl(ship, 1.45, 8.58, -8.85, 0.20, 0.20, 0.48, 0xc5a66a, 12);
+    bridgeCeilingMesh.push(wAft, wFwd, visor, searchlight);
+
+    /* Main Mast, Dual Radar Scanners, Satcom Radomes, Yardarms & Antennas */
+    const mast = new THREE.Group();
+    mast.position.set(0, 8.6, -12.2); ship.add(mast);
+    cyl(mast, 0, 1.35, 0, 0.14, 0.24, 2.9, 0x7d8d90, 10);
+    box(mast, 0, 1.85, 0, 3.2, 0.10, 0.12, 0x6a7b80);
+    cyl(mast, 0, 2.95, 0, 0.04, 0.06, 0.85, 0xc5a66a, 8);
+    cyl(mast, 0, 3.42, 0.06, 0.08, 0.08, 0.14, 0xfff5d6, 10, { emissive: 0xffe49e, emissiveIntensity: 0.9 });
+    cyl(mast, -1.45, 2.45, 0, 0.015, 0.025, 1.25, 0xd8e0e2, 6, { cast: false });
+    cyl(mast, 1.45, 2.45, 0, 0.015, 0.025, 1.25, 0xd8e0e2, 6, { cast: false });
+    cyl(mast, -0.55, 1.98, 0.20, 0.06, 0.11, 0.28, 0xc5a66a, 8);
+
+    radarSweepMesh = new THREE.Group(); radarSweepMesh.position.set(0, 2.5, 0); mast.add(radarSweepMesh);
+    box(radarSweepMesh, 0, 0, 0, 3.4, 0.14, 0.24, 0x2b3c43);
+    box(radarSweepMesh, 0, 0.1, 0, 0.4, 0.16, 0.42, 0x66787d);
+
+    for (const side of [-1, 1]) {
+      box(mast, side * 1.45, 2.05, 0.18, 0.65, 0.10, 0.65, 0x455860);
+      const dome = new THREE.Mesh(new THREE.SphereGeometry(0.46, 12, 10), makeMat(0xe8e4d6));
+      dome.scale.set(1, 0.72, 1); dome.position.set(side * 1.45, 2.38, 0.18);
+      dome.userData.castShadowFlag = true;
+      dome.castShadow = sh;
+      dome.matrixAutoUpdate = false; dome.updateMatrix(); mast.add(dome);
+    }
+
+    /* Exhaust Smokestack / Funnel with livery bands & twin exhaust uptakes */
+    box(ship, -1.6, 6.5, -17.2, 1.65, 4.0, 2.15, 0x4b5d64);
+    box(ship, -1.6, 7.65, -17.2, 1.72, 0.42, 2.22, 0x2a8e90, { cast: false });
+    box(ship, -1.6, 7.92, -17.2, 1.72, 0.12, 2.22, 0xc5a66a, { cast: false });
+    box(ship, -1.6, 8.55, -17.2, 1.82, 0.24, 2.32, 0x26343a);
+    cyl(ship, -1.6, 8.82, -16.85, 0.22, 0.24, 0.42, 0x1c262b, 10);
+    cyl(ship, -1.6, 8.82, -17.55, 0.22, 0.24, 0.42, 0x1c262b, 10);
+
+    /* Lifeboats & Gravity Davit Arms */
+    for (const side of [-1, 1]) {
+      const sideTag = side < 0 ? 'Port' : 'Starboard';
+      const bx = side * 4.45, bz = -12.2;
+      box(ship, bx, 4.92, bz, 1.04, 0.88, 4.65, 0xd45b2a, { hit: true, label: sideTag + ' Rescue Lifeboat' });
+      box(ship, bx, 4.52, bz, 0.82, 0.22, 4.10, 0xe8eceb, { cast: false });
+      box(ship, bx, 5.46, bz, 0.94, 0.26, 4.15, 0xf28c38, { hit: true, label: sideTag + ' Lifeboat Canopy' });
+      for (const dz of [bz - 1.85, bz + 1.85]) {
+        box(ship, side * 3.55, 5.65, dz, 1.35, 0.16, 0.18, 0x455860);
+        cyl(ship, bx, 5.65, dz, 0.02, 0.02, 0.55, 0x222c30, 6, { cast: false });
+      }
+    }
+
+    function label(text, w, h, bg, fg) {
+      const c = document.createElement('canvas'); c.width = 256; c.height = 64;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = bg; ctx.fillRect(0, 0, 256, 64);
+      ctx.strokeStyle = '#c5a66a'; ctx.lineWidth = 3; ctx.strokeRect(3, 3, 250, 58);
+      ctx.fillStyle = fg; ctx.font = 'bold 26px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(text, 128, 32, 230);
+      const tex = new THREE.CanvasTexture(c);
+      tex.minFilter = THREE.LinearFilter;
+      tex.generateMipmaps = false;
+      return new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide, toneMapped: false }));
+    }
+    const nL = label('THE TITAN', 3.2, 0.48, '#203b48', '#e8e8da');
+    nL.position.set(4.42, 2.65, -1); nL.rotation.y = Math.PI / 2; nL.matrixAutoUpdate = false; nL.updateMatrix(); ship.add(nL);
+    const nR = label('THE TITAN', 3.2, 0.48, '#203b48', '#e8e8da');
+    nR.position.set(-4.42, 2.65, -1); nR.rotation.y = -Math.PI / 2; nR.matrixAutoUpdate = false; nR.updateMatrix(); ship.add(nR);
+  }
+
+  function buildDoorAndInterior() {
+    const sh = shadowsAreEnabled();
+
+    /* Sliding bridge bulkhead doors mounted closer up on the RIGHT (starboard) side at x = 2.95, z = -9.15 */
+    doorGroup = new THREE.Group();
+    doorGroup.position.set(DOOR_X, 3.2, DOOR_Z);
+    doorGroup.rotation.y = Math.PI / 2;
+    ship.add(doorGroup);
+
+    box(doorGroup, -0.95, 1.15, 0, 0.22, 2.4, 0.28, 0x3a4e58);
+    box(doorGroup,  0.95, 1.15, 0, 0.22, 2.4, 0.28, 0x3a4e58);
+    box(doorGroup, 0, 2.35, 0, 2.12, 0.2, 0.28, 0x3a4e58);
+    box(doorGroup, 0, 0.05, 0, 2.12, 0.12, 0.28, 0x3a4e58);
+
+    const dTex = doorTexture();
+    const dMat = new THREE.MeshStandardMaterial({ map: dTex, roughness: 1.0, metalness: 0.0, envMapIntensity: 0 });
+    doorLeft = new THREE.Mesh(new THREE.BoxGeometry(0.92, 2.15, 0.1), dMat);
+    doorLeft.position.set(-0.46, 1.12, 0.04);
+    doorLeft.userData.castShadowFlag = true;
+    doorLeft.userData.receiveShadowFlag = true;
+    doorLeft.castShadow = sh;
+    doorLeft.receiveShadow = sh;
+    doorLeft.userData.interactable = 'Bridge door (Forward leaf)';
+    doorLeft.userData.isDoor = true;
+    doorGroup.add(doorLeft);
+    interactables.push(doorLeft);
+
+    doorRight = new THREE.Mesh(new THREE.BoxGeometry(0.92, 2.15, 0.1), dMat);
+    doorRight.position.set(0.46, 1.12, 0.04);
+    doorRight.userData.castShadowFlag = true;
+    doorRight.userData.receiveShadowFlag = true;
+    doorRight.castShadow = sh;
+    doorRight.receiveShadow = sh;
+    doorRight.userData.interactable = 'Bridge door (Aft leaf)';
+    doorRight.userData.isDoor = true;
+    doorGroup.add(doorRight);
+    interactables.push(doorRight);
+
+    const doorHit = new THREE.Mesh(new THREE.BoxGeometry(2.6, 2.6, 2.2), new THREE.MeshBasicMaterial({ visible: false }));
+    doorHit.position.set(0, 1.2, 0);
+    doorHit.userData.interactable = 'Bridge door';
+    doorHit.userData.isDoor = true;
+    doorGroup.add(doorHit);
+    interactables.push(doorHit);
+
+    /* Bridge interior room (centered at ship-local z = -11.6) */
+    bridgeInterior = new THREE.Group();
+    bridgeInterior.position.set(0, 3.2, -11.6);
+    ship.add(bridgeInterior);
+
+    const roomW = 5.8, roomD = 9.5, roomH = 2.85;
+    const wallColor = 0x829094;
+    box(bridgeInterior, 0, 0.03, 0, roomW, 0.08, roomD, 0x435058, { cast: false, receive: true });
+    /* Aft wall */
+    box(bridgeInterior, 0, roomH / 2, -roomD / 2, roomW, roomH, 0.12, wallColor, { hit: true, label: 'Bridge Aft Bulkhead' });
+    /* Port (left) wall */
+    box(bridgeInterior, -roomW / 2, roomH / 2, 0, 0.12, roomH, roomD, wallColor, { hit: true, label: 'Bridge Port Bulkhead' });
+    /* Starboard (right) inner wall split around right-side doorway at local z = +2.45 (span +1.40 to +3.50, i.e. ship z = -10.20 to -8.10) */
+    box(bridgeInterior, roomW / 2, roomH / 2, -1.675, 0.12, roomH, 6.15, wallColor, { hit: true, label: 'Bridge Starboard Bulkhead (Aft)' });
+    box(bridgeInterior, roomW / 2, roomH / 2,  4.125, 0.12, roomH, 1.25, wallColor, { hit: true, label: 'Bridge Starboard Bulkhead (Forward)' });
+    box(bridgeInterior, roomW / 2, 2.60, 2.45, 0.12, 0.50, 2.10, wallColor);
+
+    /* Front inner wall (local z = +4.75, ship z = -6.85) matching rectangular window opening */
+    box(bridgeInterior, 0, 0.575, roomD / 2, roomW, 1.15, 0.12, wallColor, { hit: true, label: 'Bridge Front Wall (Lower)' });
+    box(bridgeInterior, 0, 2.475, roomD / 2, roomW, 0.75, 0.12, wallColor);
+    box(bridgeInterior, -1.90, 1.675, roomD / 2, 2.00, 1.05, 0.12, wallColor, { hit: true, label: 'Bridge Front Wall (Port)' });
+    box(bridgeInterior,  1.90, 1.675, roomD / 2, 2.00, 1.05, 0.12, wallColor, { hit: true, label: 'Bridge Front Wall (Starboard)' });
+
+    const innerRoof = box(bridgeInterior, 0, roomH, 0, roomW, 0.1, roomD, 0x52636b);
+    if (Array.isArray(bridgeCeilingMesh)) bridgeCeilingMesh.push(innerRoof);
+
+    /* Tactical Chart Table placed against the front wall (ship z = -7.73, local z = +3.87) */
+    const localTableZ = TABLE_Z - (-11.6); /* +3.87 */
+    tableHitMesh = box(bridgeInterior, TABLE_X, 0.42, localTableZ, 2.24, 0.78, 1.48, 0x26343c,
+      { hit: true, label: 'Tactical Chart Table' });
+    tableHitMesh.userData.isTable = true;
+
+    box(bridgeInterior, TABLE_X, 0.84, localTableZ, 2.38, 0.08, 1.58, 0x66757a);
+    box(bridgeInterior, TABLE_X, 0.882, localTableZ, 2.16, 0.01, 1.38, 0x03080f,
+      { cast: false, receive: false });
+
+    for (const x of [TABLE_X - 1.13, TABLE_X + 1.13]) {
+      box(bridgeInterior, x, 0.895, localTableZ, 0.08, 0.025, 1.58, 0x263f49, { cast: false });
+    }
+    for (const z of [localTableZ - 0.75, localTableZ + 0.75]) {
+      box(bridgeInterior, TABLE_X, 0.895, z, 2.34, 0.025, 0.08, 0x263f49, { cast: false });
+    }
+    for (const lx of [TABLE_X - 0.92, TABLE_X + 0.92]) {
+      for (const lz of [localTableZ - 0.56, localTableZ + 0.56]) {
+        box(bridgeInterior, lx, 0.2, lz, 0.11, 0.4, 0.11, 0x34454e, { cast: false });
+      }
+    }
+
+    addBoxHitbox('tactical-chart-table', TABLE_X - 1.22, TABLE_X + 1.22, TABLE_Z - 0.82, TABLE_Z + 0.82);
+
+    /* ── Live, Interactive Ship Components, Scanners & Telemetry Stations Inside the Bridge Room ── */
+    const screenMats = {
+      radar: createLiveScreenMaterial('radar'),
+      lidar: createLiveScreenMaterial('lidar'),
+      sonar: createLiveScreenMaterial('sonar'),
+      hull: createLiveScreenMaterial('hull'),
+      ais: createLiveScreenMaterial('ais'),
+      engine: createLiveScreenMaterial('engine'),
+      gauges: createLiveScreenMaterial('gauges')
+    };
+
+    function addScreenDisplay(parent, x, y, z, w, h, rotY, rotZ, mat, label, actionType) {
+      const scr = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
+      scr.position.set(x, y, z);
+      if (rotY) scr.rotation.y = rotY;
+      if (rotZ) scr.rotation.z = rotZ;
+      scr.userData.interactable = label;
+      if (actionType) scr.userData.actionType = actionType;
+      scr.matrixAutoUpdate = false;
+      scr.updateMatrix();
+      parent.add(scr);
+      interactables.push(scr);
+      return scr;
+    }
+
+    /* 1. Port Forward ARPA Radar & 3D Surface LiDAR Scanner Console (localX = -2.42, localZ = +2.00 -> shipZ = -9.60) */
+    const portFwdZ = 2.00;
+    box(bridgeInterior, -2.42, 0.46, portFwdZ, 0.86, 0.92, 2.30, 0x26353e,
+      { hit: true, label: 'ARPA Radar & LiDAR Console', actionType: 'radar' });
+    box(bridgeInterior, -2.36, 0.94, portFwdZ, 0.92, 0.06, 2.34, 0x455862,
+      { hit: true, label: 'ARPA Radar & LiDAR Console', actionType: 'radar' });
+    box(bridgeInterior, -2.56, 1.32, portFwdZ + 0.56, 0.44, 0.72, 0.98, 0x1d2b33,
+      { hit: true, label: 'X-Band ARPA Radar Scanner', actionType: 'radar' });
+    box(bridgeInterior, -2.56, 1.32, portFwdZ - 0.56, 0.44, 0.72, 0.98, 0x1d2b33,
+      { hit: true, label: '3D Surface LiDAR Scanner', actionType: 'lidar' });
+    addScreenDisplay(bridgeInterior, -2.33, 1.32, portFwdZ + 0.56, 0.88, 0.56, Math.PI / 2, 0,
+      screenMats.radar, 'X-Band ARPA Radar Scanner', 'radar');
+    addScreenDisplay(bridgeInterior, -2.33, 1.32, portFwdZ - 0.56, 0.88, 0.56, Math.PI / 2, 0,
+      screenMats.lidar, '3D Surface LiDAR Scanner', 'lidar');
+    cyl(bridgeInterior, -2.14, 0.99, portFwdZ + 0.55, 0.045, 0.045, 0.04, 0x36bfc0, 10, { hit: true, label: 'Radar Range Trackball', actionType: 'radar' });
+    cyl(bridgeInterior, -2.14, 0.99, portFwdZ - 0.55, 0.045, 0.045, 0.04, 0xc5a66a, 10, { hit: true, label: 'LiDAR Pulse Trigger', actionType: 'lidar' });
+    box(bridgeInterior, -1.91, 0.95, portFwdZ, 0.04, 0.04, 2.28, 0x8ea0a4, { cast: false });
+    addBoxHitbox('bridge-port-radar-console', -2.90, -1.94, -10.78, -8.42);
+    registerInteractiveStation('radar-console', -1.85, -9.04, 1.35, 'USE · X-Band ARPA Radar', 'radar');
+    registerInteractiveStation('lidar-console', -1.85, -10.16, 1.35, 'USE · 3D Surface LiDAR Scanner', 'lidar');
+
+    /* 2. Port Aft Multibeam Bathymetric Sonar & Ultrasonic Hull Scanner Console (localX = -2.42, localZ = -1.50 -> shipZ = -13.10) */
+    const portAftZ = -1.50;
+    box(bridgeInterior, -2.42, 0.46, portAftZ, 0.86, 0.92, 2.30, 0x26353e,
+      { hit: true, label: 'Multibeam Sonar & Hull Console', actionType: 'sonar' });
+    box(bridgeInterior, -2.36, 0.94, portAftZ, 0.92, 0.06, 2.34, 0x455862,
+      { hit: true, label: 'Multibeam Sonar & Hull Console', actionType: 'sonar' });
+    box(bridgeInterior, -2.56, 1.32, portAftZ + 0.56, 0.44, 0.72, 0.98, 0x1d2b33,
+      { hit: true, label: 'Multibeam Bathymetric Sonar', actionType: 'sonar' });
+    box(bridgeInterior, -2.56, 1.32, portAftZ - 0.56, 0.44, 0.72, 0.98, 0x1d2b33,
+      { hit: true, label: 'Ultrasonic Hull Scanner', actionType: 'hull' });
+    addScreenDisplay(bridgeInterior, -2.33, 1.32, portAftZ + 0.56, 0.88, 0.56, Math.PI / 2, 0,
+      screenMats.sonar, 'Multibeam Bathymetric Sonar', 'sonar');
+    addScreenDisplay(bridgeInterior, -2.33, 1.32, portAftZ - 0.56, 0.88, 0.56, Math.PI / 2, 0,
+      screenMats.hull, 'Ultrasonic Hull Scanner', 'hull');
+    cyl(bridgeInterior, -2.14, 0.99, portAftZ + 0.55, 0.045, 0.045, 0.04, 0x36bfc0, 10, { hit: true, label: 'Sonar Ping Control', actionType: 'sonar' });
+    cyl(bridgeInterior, -2.14, 0.99, portAftZ - 0.55, 0.045, 0.045, 0.04, 0xc5a66a, 10, { hit: true, label: 'Hull Diagnostic Control', actionType: 'hull' });
+    box(bridgeInterior, -1.91, 0.95, portAftZ, 0.04, 0.04, 2.28, 0x8ea0a4, { cast: false });
+    addBoxHitbox('bridge-port-sonar-console', -2.90, -1.94, -14.28, -11.92);
+    registerInteractiveStation('sonar-console', -1.85, -12.54, 1.35, 'USE · Multibeam Sonar Ping', 'sonar');
+    registerInteractiveStation('hull-console', -1.85, -13.66, 1.35, 'USE · Ultrasonic Hull Scan', 'hull');
+
+    /* 3. Starboard Aft GMDSS Radio, AIS Transponder & Satcom Scanner Rack (localX = +2.44, localZ = -1.55 -> shipZ = -13.15) */
+    const stbdRackZ = -1.55;
+    box(bridgeInterior, 2.44, 0.98, stbdRackZ, 0.82, 1.96, 2.36, 0x223038,
+      { hit: true, label: 'AIS & GMDSS Communications Rack', actionType: 'ais' });
+    box(bridgeInterior, 2.44, 1.99, stbdRackZ, 0.86, 0.06, 2.40, 0x3e5059);
+    addScreenDisplay(bridgeInterior, 2.02, 1.46, stbdRackZ + 0.55, 0.90, 0.58, -Math.PI / 2, 0,
+      screenMats.ais, 'AIS & Satcom Scanner', 'ais');
+    addScreenDisplay(bridgeInterior, 2.02, 1.46, stbdRackZ - 0.55, 0.90, 0.58, -Math.PI / 2, 0,
+      screenMats.engine, 'Ship Systems Scanner', 'engine');
+    box(bridgeInterior, 2.01, 0.88, stbdRackZ + 0.60, 0.06, 0.24, 0.10, 0x121c22,
+      { hit: true, label: 'GMDSS VHF Marine Handset', actionType: 'ais' });
+    box(bridgeInterior, 2.01, 0.62, stbdRackZ - 0.55, 0.04, 0.52, 0.92, 0x16232b, { cast: false });
+    addBoxHitbox('bridge-stbd-comms-rack', 1.98, 2.90, -14.38, -11.92);
+    registerInteractiveStation('ais-rack', 1.85, -13.15, 1.45, 'USE · AIS & VHF Satcom Scanner', 'ais');
+
+    /* 4. Aft Bulkhead Machine — MOVED MORE TO THE LEFT (localX = -1.35, localZ = -4.25 -> shipX = -2.72..+0.02, shipZ = -15.85) */
+    const aftMachineX = -1.35;
+    const aftZ = -4.25;
+    box(bridgeInterior, aftMachineX, 0.94, aftZ, 2.72, 1.88, 0.78, 0x25343d,
+      { hit: true, label: 'Main Propulsion & Fire-Scanner Switchboard', actionType: 'engine' });
+    box(bridgeInterior, aftMachineX, 1.91, aftZ, 2.78, 0.06, 0.84, 0x455862);
+    addScreenDisplay(bridgeInterior, aftMachineX - 0.66, 1.38, aftZ + 0.40, 1.12, 0.68, 0, 0,
+      screenMats.engine, 'Propulsion & Smoke Scanner Matrix', 'engine');
+    addScreenDisplay(bridgeInterior, aftMachineX + 0.66, 1.38, aftZ + 0.40, 1.12, 0.68, 0, 0,
+      screenMats.hull, 'Hull & Ballast Telemetry Board', 'hull');
+    box(bridgeInterior, aftMachineX, 0.88, aftZ + 0.44, 2.68, 0.08, 0.18, 0x3b4d57, { cast: false });
+    addBoxHitbox('bridge-aft-switchboard', -2.74, 0.04, -16.30, -15.42);
+    registerInteractiveStation('aft-switchboard', aftMachineX, -15.05, 1.55, 'USE · Propulsion & Fire Switchboard', 'engine');
+
+    /* 5. Interactive Deck Access Hatch & Ladder Down (back-right of room: localX = +1.45, localZ = -3.65 -> shipX = +1.45, shipZ = -15.25) */
+    const hatchGroup = new THREE.Group();
+    hatchGroup.position.set(HATCH_LOCAL_X, 0.07, HATCH_LOCAL_Z);
+    bridgeInterior.add(hatchGroup);
+
+    const hazardHatchMat = new THREE.MeshBasicMaterial({ map: makeHullMarkTexture('hazard'), toneMapped: false });
+    /* Raised steel coaming perimeter (1.20m x 1.20m outer, 1.00m x 1.00m clear opening) */
+    box(hatchGroup, 0, 0.05, -0.55, 1.20, 0.12, 0.10, 0x374750, { hit: true, label: 'Deck Access Hatch Coaming', actionType: 'hatch' });
+    box(hatchGroup, 0, 0.05,  0.55, 1.20, 0.12, 0.10, 0x374750, { hit: true, label: 'Deck Access Hatch Coaming', actionType: 'hatch' });
+    box(hatchGroup, -0.55, 0.05, 0, 0.10, 0.12, 1.00, 0x374750, { hit: true, label: 'Deck Access Hatch Coaming', actionType: 'hatch' });
+    box(hatchGroup,  0.55, 0.05, 0, 0.10, 0.12, 1.00, 0x374750, { hit: true, label: 'Deck Access Hatch Coaming', actionType: 'hatch' });
+
+    /* Caution hazard strips around hatch coaming */
+    const hzF = new THREE.Mesh(new THREE.PlaneGeometry(1.20, 0.10), hazardHatchMat);
+    hzF.position.set(0, 0.05, 0.605); hzF.matrixAutoUpdate = false; hzF.updateMatrix(); hatchGroup.add(hzF);
+    const hzL = new THREE.Mesh(new THREE.PlaneGeometry(1.20, 0.10), hazardHatchMat);
+    hzL.position.set(-0.605, 0.05, 0); hzL.rotation.y = -Math.PI / 2; hzL.matrixAutoUpdate = false; hzL.updateMatrix(); hatchGroup.add(hzL);
+    const hzR = new THREE.Mesh(new THREE.PlaneGeometry(1.20, 0.10), hazardHatchMat);
+    hzR.position.set(0.605, 0.05, 0); hzR.rotation.y = Math.PI / 2; hzR.matrixAutoUpdate = false; hzR.updateMatrix(); hatchGroup.add(hzR);
+
+    /* Deep vertical companionway ladder shaft — extended well below floor so ladder is clearly visible when hatch is open (cosmetic only) */
+    box(hatchGroup, 0, -0.002, 0, 0.98, 0.012, 0.98, 0x050c12, { cast: false, receive: false });
+    /* Shaft walls extended to ~4.8 m depth */
+    box(hatchGroup, 0, -2.40, -0.50, 1.00, 4.80, 0.06, 0x15232c, { cast: false });
+    box(hatchGroup, 0, -2.40,  0.50, 1.00, 4.80, 0.06, 0x15232c, { cast: false });
+    box(hatchGroup, -0.50, -2.40, 0, 0.06, 4.80, 1.00, 0x15232c, { cast: false });
+    box(hatchGroup,  0.50, -2.40, 0, 0.06, 4.80, 1.00, 0x15232c, { cast: false });
+    /* Darker lower continuation so it does not hard-cut */
+    box(hatchGroup, 0, -5.10, -0.50, 1.00, 0.60, 0.06, 0x0a141c, { cast: false });
+    box(hatchGroup, 0, -5.10,  0.50, 1.00, 0.60, 0.06, 0x0a141c, { cast: false });
+    box(hatchGroup, -0.50, -5.10, 0, 0.06, 0.60, 1.00, 0x0a141c, { cast: false });
+    box(hatchGroup,  0.50, -5.10, 0, 0.06, 0.60, 1.00, 0x0a141c, { cast: false });
+    /* Warm lower-deck shaft glow strips (mid + far) */
+    box(hatchGroup, 0, -1.85, 0.45, 0.64, 0.08, 0.04, 0xffd166, { emissive: 0xffb84d, emissiveIntensity: 0.9, cast: false });
+    box(hatchGroup, 0, -3.60, 0.45, 0.64, 0.08, 0.04, 0xffc866, { emissive: 0xffa83d, emissiveIntensity: 0.75, cast: false });
+
+    /* Vertical steel ladder with twin side rails & extended yellow safety rungs (clearly visible when lid open) */
+    for (const lx of [-0.24, 0.24]) {
+      box(hatchGroup, lx, -2.25, -0.38, 0.045, 4.50, 0.07, 0x6f8087, { hit: true, label: 'Companionway Ladder', actionType: 'hatch' });
+    }
+    for (let r = 0; r < 14; r++) {
+      const ry = 0.02 - r * 0.30;
+      cyl(hatchGroup, 0, ry, -0.38, 0.018, 0.018, 0.48, 0xd9a72e, 8, { hit: true, label: 'Companionway Ladder', actionType: 'hatch' })
+        .rotation.z = Math.PI / 2;
+      const lastRung = hatchGroup.children[hatchGroup.children.length - 1];
+      lastRung.updateMatrix();
+    }
+
+    /* Hinged Heavy Watertight Hatch Lid (pivoted on aft edge z = -0.54, y = 0.11) */
+    hatchLidGroup = new THREE.Group();
+    hatchLidGroup.position.set(0, 0.11, -0.54);
+    hatchGroup.add(hatchLidGroup);
+
+    const lidPanel = box(hatchLidGroup, 0, 0.03, 0.54, 1.06, 0.06, 1.06, 0x354852,
+      { hit: true, label: 'Deck Access Hatch', actionType: 'hatch' });
+    lidPanel.userData.isHatch = true;
+    /* Stiffener ribs & brass dogging wheel on lid */
+    box(hatchLidGroup, -0.28, 0.07, 0.54, 0.07, 0.04, 0.96, 0x4d626d, { cast: false });
+    box(hatchLidGroup,  0.28, 0.07, 0.54, 0.07, 0.04, 0.96, 0x4d626d, { cast: false });
+    const handwheel = new THREE.Mesh(new THREE.TorusGeometry(0.14, 0.022, 8, 16), makeMat(0xc5a66a));
+    handwheel.rotation.x = Math.PI / 2;
+    handwheel.position.set(0, 0.11, 0.62);
+    handwheel.userData.interactable = 'Deck Access Hatch';
+    handwheel.userData.actionType = 'hatch';
+    handwheel.userData.isHatch = true;
+    handwheel.matrixAutoUpdate = false; handwheel.updateMatrix();
+    hatchLidGroup.add(handwheel);
+    interactables.push(handwheel);
+
+    /* 6. Forward Bulkhead Flank Instrument Panels (clear of front window & chart table) */
+    box(bridgeInterior, -1.95, 1.65, 4.62, 0.78, 0.54, 0.16, 0x1e2c34,
+      { hit: true, label: 'Gyrocompass & Anemometer Repeater', actionType: 'gauges' });
+    addScreenDisplay(bridgeInterior, -1.95, 1.65, 4.53, 0.70, 0.46, Math.PI, 0,
+      screenMats.gauges, 'Gyrocompass & Anemometer Repeater', 'gauges');
+    addBoxHitbox('bridge-fwd-port-panel', -2.36, -1.54, -7.12, -6.85);
+    registerInteractiveStation('fwd-port-panel', -1.95, -7.65, 1.35, 'USE · Gyrocompass & Wind Repeater', 'gauges');
+
+    box(bridgeInterior, 1.95, 1.65, 4.62, 0.78, 0.54, 0.16, 0x1e2c34,
+      { hit: true, label: 'Watertight Door & EPIRB Panel', actionType: 'ais' });
+    addScreenDisplay(bridgeInterior, 1.95, 1.65, 4.53, 0.70, 0.46, Math.PI, 0,
+      screenMats.ais, 'Watertight Door & EPIRB Panel', 'ais');
+    addBoxHitbox('bridge-fwd-stbd-panel', 1.54, 2.36, -7.12, -6.85);
+    registerInteractiveStation('fwd-stbd-panel', 1.95, -7.65, 1.35, 'USE · Watertight Door & EPIRB Monitor', 'ais');
+
+    /* 7. Starboard Aft-of-Door Marine CO2 Fire Extinguisher & Safety Locker (localX = +2.76, localZ = +0.75 -> shipZ = -10.85) */
+    box(bridgeInterior, 2.76, 0.92, 0.75, 0.24, 1.32, 0.56, 0xb8382c,
+      { hit: true, label: 'Bridge CO2 Fire & SCBA Locker', actionType: 'fire-station' });
+    cyl(bridgeInterior, 2.74, 0.78, 0.75, 0.08, 0.08, 0.74, 0xd63c2e, 10,
+      { hit: true, label: 'CO2 Marine Fire Extinguisher', actionType: 'fire-station' });
+    addBoxHitbox('bridge-fire-locker', 2.60, 2.90, -11.15, -10.55);
+    registerInteractiveStation('bridge-fire-locker', 2.25, -10.85, 1.35, 'USE · Bridge CO2 Fire & SCBA Locker', 'fire-station');
+
+    /* 8. Overhead Ceiling Gyro-Repeater Pod, Sensor Conduits & Optical Smoke Scanners (added to bridgeCeilingMesh) */
+    const ovPod = box(bridgeInterior, 0, 2.62, 1.20, 1.35, 0.28, 0.42, 0x223038,
+      { hit: true, label: 'Overhead Gyro & Rudder Repeater Pod', actionType: 'gauges' });
+    const ovScrF = addScreenDisplay(bridgeInterior, 0, 2.62, 1.42, 1.22, 0.22, 0, 0,
+      screenMats.gauges, 'Overhead Gyrocompass Repeater', 'gauges');
+    const ovScrA = addScreenDisplay(bridgeInterior, 0, 2.62, 0.98, 1.22, 0.22, Math.PI, 0,
+      screenMats.gauges, 'Overhead Gyrocompass Repeater', 'gauges');
+    const trayP = box(bridgeInterior, -1.85, 2.76, 0, 0.26, 0.06, 8.8, 0x384952, { cast: false });
+    const trayS = box(bridgeInterior, 1.85, 2.76, 0, 0.26, 0.06, 8.8, 0x384952, { cast: false });
+    const lightF = box(bridgeInterior, 0, 2.77, -1.40, 1.20, 0.05, 0.24, 0xdff6f5,
+      { emissive: 0x9ce8e6, emissiveIntensity: 0.75, cast: false });
+    const lightA = box(bridgeInterior, 0, 2.77, 2.40, 1.20, 0.05, 0.24, 0xdff6f5,
+      { emissive: 0x9ce8e6, emissiveIntensity: 0.75, cast: false });
+    const smoke1 = cyl(bridgeInterior, -1.10, 2.74, 0.40, 0.09, 0.11, 0.08, 0xe4e9eb, 10,
+      { hit: true, label: 'Ceiling Optical Smoke Scanner', actionType: 'hull' });
+    const smoke2 = cyl(bridgeInterior, 1.10, 2.74, -2.20, 0.09, 0.11, 0.08, 0xe4e9eb, 10,
+      { hit: true, label: 'Ceiling Optical Smoke Scanner', actionType: 'hull' });
+    if (Array.isArray(bridgeCeilingMesh)) {
+      bridgeCeilingMesh.push(ovPod, ovScrF, ovScrA, trayP, trayS, lightF, lightA, smoke1, smoke2);
+    }
+  }
+
+  /* CSS3D projection: renders projection.html flat on the chart table surface */
+  function initProjectionCSS3D() {
+    const layer = $('css3d-layer');
+    layer.innerHTML = '';
+
+    const cameraElement = document.createElement('div');
+    cameraElement.style.position = 'absolute';
+    cameraElement.style.left = '0';
+    cameraElement.style.top = '0';
+    cameraElement.style.width = '100%';
+    cameraElement.style.height = '100%';
+    cameraElement.style.transformStyle = 'preserve-3d';
+    cameraElement.style.pointerEvents = 'none';
+    layer.appendChild(cameraElement);
+
+    projIframe = document.createElement('iframe');
+    projIframe.id = 'proj-iframe';
+    projIframe.src = resolveSameDirFile('projection.html');
+    projIframe.title = 'Tactical projection table';
+    projIframe.style.display = 'block';
+    projIframe.style.width = '1024px';
+    projIframe.style.height = '640px';
+    projIframe.style.margin = '0';
+    projIframe.style.padding = '0';
+    projIframe.style.pointerEvents = 'none';
+
+    const objectDiv = document.createElement('div');
+    objectDiv.style.position = 'absolute';
+    objectDiv.style.left = '0';
+    objectDiv.style.top = '0';
+    objectDiv.style.width = '1024px';
+    objectDiv.style.height = '640px';
+    objectDiv.style.transformStyle = 'preserve-3d';
+    objectDiv.style.transformOrigin = '50% 50%';
+    objectDiv.style.pointerEvents = 'none';
+    objectDiv.style.backfaceVisibility = 'visible';
+    objectDiv.appendChild(projIframe);
+    cameraElement.appendChild(objectDiv);
+
+    const projPosition = new THREE.Vector3(TABLE_X, 4.088, TABLE_Z);
+    const projEuler = new THREE.Euler(-Math.PI / 2, 0, Math.PI, 'XYZ');
+    const projQuaternion = new THREE.Quaternion().setFromEuler(projEuler);
+    const displayWidth = 2.12;
+    const displayScale = displayWidth / 1024;
+    const projScale = new THREE.Vector3(displayScale, displayScale, displayScale);
+
+    const epsilon = (v) => (Math.abs(v) < 1e-10 ? 0 : v);
+
+    const getCameraCSSMatrix = (matrix) => {
+      const e = matrix.elements;
+      return 'matrix3d(' +
+        epsilon(e[0]) + ',' + epsilon(-e[1]) + ',' + epsilon(e[2]) + ',' + epsilon(e[3]) + ',' +
+        epsilon(e[4]) + ',' + epsilon(-e[5]) + ',' + epsilon(e[6]) + ',' + epsilon(e[7]) + ',' +
+        epsilon(e[8]) + ',' + epsilon(-e[9]) + ',' + epsilon(e[10]) + ',' + epsilon(e[11]) + ',' +
+        epsilon(e[12]) + ',' + epsilon(-e[13]) + ',' + epsilon(e[14]) + ',' + epsilon(e[15]) +
+      ')';
+    };
+
+    const getObjectCSSMatrix = (matrix) => {
+      const e = matrix.elements;
+      return 'matrix3d(' +
+        epsilon(e[0]) + ',' + epsilon(e[1]) + ',' + epsilon(e[2]) + ',' + epsilon(e[3]) + ',' +
+        epsilon(-e[4]) + ',' + epsilon(-e[5]) + ',' + epsilon(-e[6]) + ',' + epsilon(-e[7]) + ',' +
+        epsilon(e[8]) + ',' + epsilon(e[9]) + ',' + epsilon(e[10]) + ',' + epsilon(e[11]) + ',' +
+        epsilon(e[12]) + ',' + epsilon(e[13]) + ',' + epsilon(e[14]) + ',' + epsilon(e[15]) +
+      ')';
+    };
+
+    const localMatrix = new THREE.Matrix4();
+    const worldMatrix = new THREE.Matrix4();
+    const inverseCameraMatrix = new THREE.Matrix4();
+    const tableWorldCenter = new THREE.Vector3();
+    const tableCamCenter = new THREE.Vector3();
+    const portalCorners = [
+      new THREE.Vector3(),
+      new THREE.Vector3(),
+      new THREE.Vector3(),
+      new THREE.Vector3()
+    ];
+    let lastCamTransform = '';
+    let lastObjTransform = '';
+    let lastClipPath = '';
+
+    cssRenderer = {
+      render(cam) {
+        const width = layer.clientWidth;
+        const height = layer.clientHeight;
+        if (!width || !height || !ship) return;
+
+        cam.updateMatrixWorld(true);
+        ship.updateMatrixWorld(true);
+        inverseCameraMatrix.copy(cam.matrixWorldInverse);
+
+        const px = state.playerLocal.x;
+        const pz = state.playerLocal.z;
+        const insideBridge = (px >= -2.92 && px <= 2.92 && pz >= -16.35 && pz <= -6.88);
+
+        if (!state.tableFocused && !insideBridge) {
+          if (pz > -6.88) {
+            portalCorners[0].set(-0.88, 5.38, -6.95);
+            portalCorners[1].set( 0.88, 5.38, -6.95);
+            portalCorners[2].set( 0.88, 4.37, -6.95);
+            portalCorners[3].set(-0.88, 4.37, -6.95);
+
+            const pts = [];
+            for (let i = 0; i < 4; i++) {
+              ship.localToWorld(portalCorners[i]);
+              portalCorners[i].project(cam);
+              const sx = ((portalCorners[i].x * 0.5 + 0.5) * width).toFixed(1) + 'px';
+              const sy = ((-portalCorners[i].y * 0.5 + 0.5) * height).toFixed(1) + 'px';
+              pts.push(sx + ' ' + sy);
+            }
+            const poly = 'polygon(' + pts.join(',') + ')';
+            if (poly !== lastClipPath) {
+              layer.style.clipPath = poly;
+              layer.style.webkitClipPath = poly;
+              lastClipPath = poly;
+            }
+          } else if (px > 2.92 && pz >= -16.35) {
+            const gapHalfZ = doorRight ? Math.max(0, doorRight.position.x - 0.46) : 0;
+            if (gapHalfZ <= 0.02) {
+              objectDiv.style.visibility = 'hidden';
+              return;
+            }
+            portalCorners[0].set(DOOR_X, 5.42, DOOR_Z - gapHalfZ);
+            portalCorners[1].set(DOOR_X, 5.42, DOOR_Z + gapHalfZ);
+            portalCorners[2].set(DOOR_X, 3.26, DOOR_Z + gapHalfZ);
+            portalCorners[3].set(DOOR_X, 3.26, DOOR_Z - gapHalfZ);
+
+            const pts = [];
+            for (let i = 0; i < 4; i++) {
+              ship.localToWorld(portalCorners[i]);
+              portalCorners[i].project(cam);
+              const sx = ((portalCorners[i].x * 0.5 + 0.5) * width).toFixed(1) + 'px';
+              const sy = ((-portalCorners[i].y * 0.5 + 0.5) * height).toFixed(1) + 'px';
+              pts.push(sx + ' ' + sy);
+            }
+            const poly = 'polygon(' + pts.join(',') + ')';
+            if (poly !== lastClipPath) {
+              layer.style.clipPath = poly;
+              layer.style.webkitClipPath = poly;
+              lastClipPath = poly;
+            }
+          } else {
+            objectDiv.style.visibility = 'hidden';
+            return;
+          }
+        } else if (lastClipPath !== 'none') {
+          layer.style.clipPath = 'none';
+          layer.style.webkitClipPath = 'none';
+          lastClipPath = 'none';
+        }
+
+        tableWorldCenter.copy(projPosition);
+        ship.localToWorld(tableWorldCenter);
+        tableCamCenter.copy(tableWorldCenter).applyMatrix4(inverseCameraMatrix);
+        if (tableCamCenter.z >= 1.8) {
+          objectDiv.style.visibility = 'hidden';
+          return;
+        }
+        objectDiv.style.visibility = 'visible';
+
+        const fovPixels = (0.5 / Math.tan(THREE.MathUtils.degToRad(cam.fov * 0.5))) * height;
+
+        const perspStr = fovPixels.toFixed(2) + 'px';
+        if (layer.style.perspective !== perspStr) {
+          layer.style.perspective = perspStr;
+        }
+        const camTransform =
+          'translate3d(0,0,' + perspStr + ')' +
+          getCameraCSSMatrix(inverseCameraMatrix) +
+          ' translate3d(' + (width * 0.5).toFixed(2) + 'px,' + (height * 0.5).toFixed(2) + 'px,0)';
+        if (camTransform !== lastCamTransform) {
+          cameraElement.style.transform = camTransform;
+          lastCamTransform = camTransform;
+        }
+
+        localMatrix.compose(projPosition, projQuaternion, projScale);
+        worldMatrix.copy(ship.matrixWorld).multiply(localMatrix);
+        const objTransform = 'translate(-50%,-50%) ' + getObjectCSSMatrix(worldMatrix);
+        if (objTransform !== lastObjTransform) {
+          objectDiv.style.transform = objTransform;
+          lastObjTransform = objTransform;
+        }
+      }
+    };
+
+    if (camera) cssRenderer.render(camera);
+  }
+
+  function initScene() {
+    if (state.ready) return;
+    const host = $('canvas-host');
+    const w = Math.max(320, host.clientWidth), h = Math.max(240, host.clientHeight);
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x8aa3ab);
+    scene.fog = new THREE.Fog(0x9eb3b5, 100, 300);
+    camera = new THREE.PerspectiveCamera(70, w / h, 0.12, 450);
+    camera.position.set(0, PLAYER_EYE_LOCAL_Y * SHIP_SCALE, 3 * SHIP_SCALE);
+    camera.rotation.order = 'YXZ';
+    camera.rotation.set(state.pitch, state.yaw, 0);
+    if (window.TitanCharacterRuntime) {
+      window.TitanDeckCharacterConfig = window.TitanCharacterRuntime.readCharacter();
+      window.TitanDeckArms = window.TitanCharacterRuntime.createFirstPersonArms(THREE, window.TitanDeckCharacterConfig);
+      camera.add(window.TitanDeckArms);
+    }
+
+    try {
+      renderer = new THREE.WebGLRenderer({
+        antialias: !isTouch,
+        stencil: false,
+        powerPreference: 'high-performance',
+        alpha: false
+      });
+      renderer.domElement.className = 'deck-renderer';
+      renderer.setSize(w, h, false);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, state.quality === 'HIGH' ? (isTouch ? 1.2 : 1.45) : state.quality === 'MED' ? 1.0 : 0.75));
+      renderer.shadowMap.enabled = shadowsAreEnabled();
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      renderer.outputEncoding = THREE.sRGBEncoding;
+      host.insertBefore(renderer.domElement, host.firstChild);
+    } catch (err) {
+      host.innerHTML = '<div style="padding:2rem;color:#fff;font-family:sans-serif">WebGL is required. Enable it in your browser settings.</div>';
+      state.ready = true;
+      return;
+    }
+
+    createSky();
+    scene.add(new THREE.HemisphereLight(0xe4f0ee, 0x3b4d54, 1.05));
+    const sun = new THREE.DirectionalLight(0xffe6c4, 1.65);
+    directionalSun = sun;
+    sun.position.set(-42, 68, 28);
+    sun.castShadow = shadowsAreEnabled();
+    const sMap = state.quality === 'HIGH' ? 2048 : 1024;
+    sun.shadow.mapSize.set(sMap, sMap);
+    sun.shadow.camera.left = -36; sun.shadow.camera.right = 36;
+    sun.shadow.camera.top = 36; sun.shadow.camera.bottom = -36;
+    sun.shadow.camera.near = 10; sun.shadow.camera.far = 140;
+    sun.shadow.bias = -0.00025;
+    sun.shadow.normalBias = 0.025;
+    scene.add(sun);
+
+    createOcean();
+    buildHull();
+    buildDoorAndInterior();
+    initProjectionCSS3D();
+
+    state.ready = true;
+    resize();
+  }
+
+  function resize() {
+    if (!renderer || !camera) return;
+    const host = $('canvas-host');
+    const w = Math.max(320, host.clientWidth), h = Math.max(240, host.clientHeight);
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+    if (state.tableFocused) {
+      applyTableFocusCamera();
+      syncCameraToShip();
+    }
+    if (cssRenderer) cssRenderer.render(camera);
+  }
+  window._titanResize = resize;
+
+  function applyQuality() {
+    if (!renderer) return;
+    const q = state.quality;
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, q === 'HIGH' ? (isTouch ? 1.2 : 1.45) : q === 'MED' ? 1.0 : 0.75));
+    const sh = shadowsAreEnabled();
+    renderer.shadowMap.enabled = sh;
+    renderer.shadowMap.needsUpdate = true;
+    if (directionalSun) {
+      directionalSun.castShadow = sh;
+      const sMap = q === 'HIGH' ? 2048 : 1024;
+      directionalSun.shadow.mapSize.set(sMap, sMap);
+      directionalSun.shadow.needsUpdate = true;
+    }
+    if (scene) scene.traverse((obj) => {
+      if (!obj.isMesh || !obj.userData) return;
+      if (obj.userData.castShadowFlag != null) obj.castShadow = sh && obj.userData.castShadowFlag;
+      if (obj.userData.receiveShadowFlag != null) obj.receiveShadow = sh && obj.userData.receiveShadowFlag;
+    });
+    renderer.setSize($('canvas-host').clientWidth, $('canvas-host').clientHeight, false);
+    $('quality-btn').textContent = 'Quality: ' + q;
+    try { localStorage.setItem('titan-deck-q', q); } catch (e) {}
+  }
+
+  let waterAccumulator = 0;
+  function updateWater(dt, t) {
+    if (!waterPositions || state.quality === 'LOW') return;
+    waterAccumulator += dt;
+    if (waterAccumulator < 0.1) return;
+    waterAccumulator = 0;
+    const arr = waterPositions.array;
+    for (let i = 0; i < arr.length; i += 3) {
+      const x = waterBase[i], z = waterBase[i + 2];
+      arr[i + 1] = 0.045 * Math.sin(x * 0.07 + t * 0.72) + 0.028 * Math.cos(z * 0.085 - t * 0.48);
+    }
+    waterPositions.needsUpdate = true;
+  }
+
+  /* ── Unified Ship-Local Sliding Collision Engine (Glitch-Free Port & Starboard Walkways) ── */
+  const PLAYER_RADIUS = 0.30;
+
+  function resolveCircleVsAABB(pos, boxObj, radius) {
+    const cx = clamp(pos.x, boxObj.minX, boxObj.maxX);
+    const cz = clamp(pos.z, boxObj.minZ, boxObj.maxZ);
+    const dx = pos.x - cx;
+    const dz = pos.z - cz;
+    const distSq = dx * dx + dz * dz;
+
+    if (distSq >= radius * radius) return;
+
+    if (distSq > 1e-8) {
+      const dist = Math.sqrt(distSq);
+      const push = radius - dist;
+      pos.x += (dx / dist) * push;
+      pos.z += (dz / dist) * push;
+    } else {
+      const dLeft = Math.abs(pos.x - (boxObj.minX - radius));
+      const dRight = Math.abs((boxObj.maxX + radius) - pos.x);
+      const dBack = Math.abs(pos.z - (boxObj.minZ - radius));
+      const dFront = Math.abs((boxObj.maxZ + radius) - pos.z);
+      const minD = Math.min(dLeft, dRight, dBack, dFront);
+      if (minD === dLeft) pos.x = boxObj.minX - radius;
+      else if (minD === dRight) pos.x = boxObj.maxX + radius;
+      else if (minD === dBack) pos.z = boxObj.minZ - radius;
+      else pos.z = boxObj.maxZ + radius;
+    }
+  }
+
+  function constrainDeckBoundaries(pos) {
+    /* Smooth bow taper matching outer deck rails (x = ±4.25 up to z = 15.5, tapering smoothly to ±1.85 at z = 23.0).
+       Both Port (left) and Starboard (right) exterior corridors remain wide open (-3.90 to +3.90) all the way aft
+       with ZERO abrupt x-clamp discontinuity at z = -6.85! */
+    if (pos.z > 15.5) {
+      const t = clamp((pos.z - 15.5) / 7.5, 0, 1);
+      const maxHalfWidth = 3.90 * (1 - t) + 1.45 * t;
+      pos.x = clamp(pos.x, -maxHalfWidth, maxHalfWidth);
+    } else {
+      pos.x = clamp(pos.x, -3.90, 3.90);
+    }
+    pos.z = clamp(pos.z, -17.65, 22.10);
+  }
+
+  function movePlayerShipLocal(moveX, moveZ) {
+    if (!moveX && !moveZ) return;
+    const steps = Math.max(1, Math.ceil(Math.hypot(moveX, moveZ) / 0.12));
+    const sx = moveX / steps;
+    const sz = moveZ / steps;
+
+    for (let s = 0; s < steps; s++) {
+      state.playerLocal.x += sx;
+      state.playerLocal.z += sz;
+
+      constrainDeckBoundaries(state.playerLocal);
+      for (let iter = 0; iter < 3; iter++) {
+        for (let i = 0; i < staticHitboxes.length; i++) {
+          resolveCircleVsAABB(state.playerLocal, staticHitboxes[i], PLAYER_RADIUS);
+        }
+        for (let i = 0; i < dynamicDoorHitboxes.length; i++) {
+          resolveCircleVsAABB(state.playerLocal, dynamicDoorHitboxes[i], PLAYER_RADIUS);
+        }
+        for (let i = 0; i < dynamicHatchHitboxes.length; i++) {
+          resolveCircleVsAABB(state.playerLocal, dynamicHatchHitboxes[i], PLAYER_RADIUS);
+        }
+        constrainDeckBoundaries(state.playerLocal);
+      }
+    }
+  }
+
+  function applyTableFocusCamera() {
+    if (!camera) return;
+    const tableLocalW = 2.12;
+    const tableLocalD = 1.325;
+    const vTan = Math.tan(THREE.MathUtils.degToRad(camera.fov * 0.5));
+    const hTan = Math.max(0.15, vTan * camera.aspect);
+    const heightForWidth = (tableLocalW * 0.5) / (hTan * 0.94);
+    const heightForDepth = (tableLocalD * 0.5) / (vTan * 0.90);
+    const heightAboveTable = Math.max(heightForWidth, heightForDepth);
+
+    state.playerLocal.x = TABLE_X;
+    state.playerLocal.y = 4.088 + heightAboveTable;
+    state.playerLocal.z = TABLE_Z;
+    state.yaw = Math.PI;
+    state.pitch = -Math.PI / 2 + 0.002;
+  }
+
+  function setTableFocused(focused) {
+    state.tableFocused = !!focused;
+    const layer = $('css3d-layer');
+    const exitBtn = $('btn-exit-table');
+    if (state.tableFocused) {
+      state.savedPose = {
+        x: state.playerLocal.x,
+        y: state.playerLocal.y,
+        z: state.playerLocal.z,
+        yaw: state.yaw,
+        pitch: state.pitch
+      };
+      if (document.pointerLockElement && document.exitPointerLock) {
+        try { document.exitPointerLock(); } catch (e) {}
+      }
+      if (Array.isArray(bridgeCeilingMesh)) {
+        bridgeCeilingMesh.forEach((m) => { if (m) m.visible = false; });
+      }
+      applyTableFocusCamera();
+      layer.classList.add('interactive-table');
+      exitBtn.classList.add('show');
+      $('door-prompt').classList.remove('show');
+      Joystick.refreshVisibility();
+      if (projIframe && projIframe.contentWindow) {
+        try {
+          projIframe.contentWindow.postMessage({
+            type: 'titan-table-focus',
+            focused: true,
+            width: window.innerWidth,
+            height: window.innerHeight
+          }, '*');
+          projIframe.contentWindow.dispatchEvent(new Event('resize'));
+        } catch (e) {}
+      }
+    } else {
+      if (Array.isArray(bridgeCeilingMesh)) {
+        bridgeCeilingMesh.forEach((m) => { if (m) m.visible = true; });
+      }
+      if (state.savedPose) {
+        state.playerLocal.x = state.savedPose.x;
+        state.playerLocal.y = PLAYER_EYE_LOCAL_Y;
+        state.playerLocal.z = state.savedPose.z;
+        state.yaw = state.savedPose.yaw;
+        state.pitch = state.savedPose.pitch;
+        state.savedPose = null;
+      } else {
+        state.playerLocal.y = PLAYER_EYE_LOCAL_Y;
+      }
+      layer.classList.remove('interactive-table');
+      exitBtn.classList.remove('show');
+      Joystick.refreshVisibility();
+      if (projIframe && projIframe.contentWindow) {
+        try {
+          projIframe.contentWindow.postMessage({ type: 'titan-table-focus', focused: false }, '*');
+        } catch (e) {}
+      }
+    }
+  }
+
+  function setHatchPromptOpen(open) {
+    state.hatchPromptOpen = !!open;
+    const modal = $('hatch-modal');
+    if (modal) modal.hidden = !state.hatchPromptOpen;
+    if (state.hatchPromptOpen) {
+      if (document.pointerLockElement && document.exitPointerLock) {
+        try { document.exitPointerLock(); } catch (e) {}
+      }
+      $('door-prompt').classList.remove('show');
+    }
+    Joystick.refreshVisibility();
+  }
+
+  function syncCameraToShip() {
+    if (!ship || !camera) return;
+    ship.updateMatrixWorld(true);
+    cameraLocalScratch.set(state.playerLocal.x, state.playerLocal.y, state.playerLocal.z);
+    ship.localToWorld(cameraLocalScratch);
+    camera.position.copy(cameraLocalScratch);
+    camera.rotation.order = 'YXZ';
+    camera.rotation.set(state.pitch, state.yaw + ship.rotation.y, 0);
+  }
+
+  /* Shared character bridge used by the menu and companion TITAN pages. */
+  window.TitanDeckGame = {
+    get scene() { return scene; },
+    get camera() { return camera; },
+    get ship() { return ship; },
+    getPose() {
+      return {
+        x: state.playerLocal.x, z: state.playerLocal.z, yaw: state.yaw,
+        scale: SHIP_SCALE, deckY: 3.372
+      };
+    }
+  };
+
+  function updateDoor(dt) {
+    const target = state.doorOpen ? 1 : 0;
+    state.doorProgress += (target - state.doorProgress) * Math.min(1, dt * 3.5);
+    if (doorLeft && doorRight) {
+      const ease = state.doorProgress * state.doorProgress * (3 - 2 * state.doorProgress);
+      doorLeft.position.x = -0.46 - ease * 0.95;
+      doorRight.position.x = 0.46 + ease * 0.95;
+
+      const leafHalfSpan = 0.46;
+      const fwdLeafCenterZ = DOOR_Z - doorLeft.position.x;
+      const aftLeafCenterZ = DOOR_Z - doorRight.position.x;
+      dynamicDoorHitboxes = [
+        { id: 'door-leaf-fwd', minX: DOOR_X - 0.12, maxX: DOOR_X + 0.12, minZ: fwdLeafCenterZ - leafHalfSpan, maxZ: fwdLeafCenterZ + leafHalfSpan },
+        { id: 'door-leaf-aft', minX: DOOR_X - 0.12, maxX: DOOR_X + 0.12, minZ: aftLeafCenterZ - leafHalfSpan, maxZ: aftLeafCenterZ + leafHalfSpan }
+      ];
+    }
+  }
+
+  function updateHatchAndDeckAnimations(dt, t) {
+    /* Hinged Deck Access Hatch lid rotation & safety pit hitbox */
+    const hTarget = state.hatchOpen ? 1 : 0;
+    state.hatchProgress += (hTarget - state.hatchProgress) * Math.min(1, dt * 4.2);
+    if (hatchLidGroup) {
+      const ease = state.hatchProgress * state.hatchProgress * (3 - 2 * state.hatchProgress);
+      hatchLidGroup.rotation.x = -ease * 1.78; /* Opens upward ~102 deg against aft coaming */
+    }
+    if (state.hatchProgress > 0.25) {
+      /* Open shaft safety perimeter hitboxes so player walks right up to the ladder without falling through floor */
+      dynamicHatchHitboxes = [
+        { id: 'hatch-pit-port', minX: HATCH_X - 0.56, maxX: HATCH_X - 0.34, minZ: HATCH_Z - 0.56, maxZ: HATCH_Z + 0.56 },
+        { id: 'hatch-pit-stbd', minX: HATCH_X + 0.34, maxX: HATCH_X + 0.56, minZ: HATCH_Z - 0.56, maxZ: HATCH_Z + 0.56 },
+        { id: 'hatch-pit-aft',  minX: HATCH_X - 0.56, maxX: HATCH_X + 0.56, minZ: HATCH_Z - 0.56, maxZ: HATCH_Z - 0.34 },
+        { id: 'hatch-pit-fwd',  minX: HATCH_X - 0.56, maxX: HATCH_X + 0.56, minZ: HATCH_Z + 0.34, maxZ: HATCH_Z + 0.56 }
+      ];
+    } else {
+      dynamicHatchHitboxes = [];
+    }
+
+    /* Slewing Deck Cargo Crane */
+    if (craneTurretGroup) {
+      const targetAngle = state.craneDeployed ? -1.15 : 0.22;
+      state.craneAngle += (targetAngle - state.craneAngle) * Math.min(1, dt * 1.8);
+      craneTurretGroup.rotation.y = state.craneAngle;
+    }
+    if (craneBeaconMat) {
+      craneBeaconMat.emissiveIntensity = state.craneDeployed ? (0.4 + 0.6 * Math.abs(Math.sin(t * 5.0))) : 0.25;
+    }
+
+    /* Rotating Anchor Windlass Gypsies & Aft Warping Capstan */
+    if (state.windlassRunning && windlassGypsies.length) {
+      for (let i = 0; i < windlassGypsies.length; i++) {
+        windlassGypsies[i].rotation.x += dt * 1.6;
+      }
+    }
+    if (state.capstanRunning && capstanDrumMesh) {
+      capstanDrumMesh.rotation.y += dt * 1.4;
+    }
+
+    /* Ship's Brass Bell damping swing */
+    if (bellPivotGroup) {
+      if (state.bellSwing > 0.001) {
+        bellPivotGroup.rotation.z = Math.sin(t * 14.0) * state.bellSwing * 0.42;
+        state.bellSwing = Math.max(0, state.bellSwing - dt * 0.45);
+      } else {
+        bellPivotGroup.rotation.z = 0;
+      }
+    }
+
+    /* Bow wake foam visibility tied to ship speed */
+    if (bowWakeMeshes.length) {
+      const wakeOp = clamp((state.shipSpeed / 18) * 0.45, 0, 0.45);
+      bowWakeMeshes[0].material.opacity = wakeOp;
+    }
+  }
+
+  function updateShipMotion(dt) {
+    if (engineLinked && lastEngTelemetry) {
+      // Authoritative speed & heading from Engine Room
+      const targetSpd = lastEngTelemetry.shipSpeedKn != null ? lastEngTelemetry.shipSpeedKn : state.shipSpeed;
+      state.shipSpeed += (targetSpd - state.shipSpeed) * Math.min(1, dt * 4.0);
+      if (lastEngTelemetry.headingDeg != null) {
+        // Smooth heading toward engine value
+        let diff = lastEngTelemetry.headingDeg - state.shipHeading;
+        while (diff > 180) diff -= 360;
+        while (diff < -180) diff += 360;
+        state.shipHeading += diff * Math.min(1, dt * 3.5);
+        state.shipHeading = ((state.shipHeading % 360) + 360) % 360;
+      }
+      // Bridge still issues rudder orders; engine applies them to heading
+      if (shipBus && Math.abs(state.rudder) > 0.1) {
+        // keep sending at low rate is handled by input; no spam here
+      }
+    } else {
+      // Local fallback simulation when engine room is offline
+      const targetSpeed = (state.throttle / 100) * 18;
+      state.shipSpeed += (targetSpeed - state.shipSpeed) * Math.min(1, dt * 0.75);
+      if (Math.abs(state.shipSpeed) > 0.05) {
+        state.shipHeading += state.rudder * 0.32 * (state.shipSpeed / 10) * dt;
+        state.shipHeading = ((state.shipHeading % 360) + 360) % 360;
+      }
+    }
+    if (ship) {
+      const rad = state.shipHeading * Math.PI / 180;
+      const move = state.shipSpeed * 0.07 * dt;
+      ship.position.x += Math.sin(rad) * move;
+      ship.position.z += Math.cos(rad) * move;
+      ship.rotation.y = -rad;
+      if (directionalSun) {
+        directionalSun.position.set(ship.position.x - 42, 68, ship.position.z + 28);
+      }
+    }
+    if ($('val-speed')) $('val-speed').textContent = state.shipSpeed.toFixed(1);
+    if ($('helm-status')) {
+      $('helm-status').textContent = state.throttle < 1 ? 'ENGINES STANDBY' :
+        state.throttle < 40 ? 'SLOW AHEAD' : state.throttle < 75 ? 'HALF AHEAD' : 'FULL AHEAD';
+      if (engineLinked) $('helm-status').textContent += ' · LINKED';
+    }
+  }
+
+  function checkProximity() {
+    const px = state.playerLocal.x;
+    const pz = state.playerLocal.z;
+    const insideBridge = (px >= -2.92 && px <= 2.92 && pz >= -16.35 && pz <= -6.88);
+
+    state.nearDoor = Math.hypot(px - DOOR_X, pz - DOOR_Z) < 2.55;
+    state.nearHelm = false;
+    state.nearTable = insideBridge && Math.abs(px - TABLE_X) < 2.05 && Math.abs(pz - TABLE_Z) < 2.05;
+    state.nearHatch = insideBridge && Math.hypot(px - HATCH_X, pz - HATCH_Z) < 1.85;
+
+    const prompt = $('door-prompt');
+    if (state.tableFocused || state.hatchPromptOpen) {
+      prompt.classList.remove('show');
+      state.nearestTarget = null;
+      return;
+    }
+
+    if (state.nearDoor) {
+      state.nearestTarget = { actionType: 'door' };
+      prompt.textContent = state.doorOpen ? 'USE · Close Bridge Door' : 'USE · Open Bridge Door';
+      prompt.classList.add('show');
+      return;
+    }
+    if (state.nearHatch) {
+      state.nearestTarget = { actionType: 'hatch' };
+      prompt.textContent = state.hatchOpen
+        ? 'USE · Descend Ladder (Engine / Storage)'
+        : 'USE · Open Deck Access Hatch';
+      prompt.classList.add('show');
+      return;
+    }
+    if (state.nearTable) {
+      state.nearestTarget = { actionType: 'table' };
+      prompt.textContent = 'USE · Tactical Chart Table';
+      prompt.classList.add('show');
+      return;
+    }
+
+    /* Check nearest interactive scanner, console, or main deck fixture */
+    let best = null;
+    let bestDist = Infinity;
+    for (let i = 0; i < interactiveStations.length; i++) {
+      const st = interactiveStations[i];
+      const stInside = (st.x >= -2.92 && st.x <= 2.92 && st.z >= -16.35 && st.z <= -6.88);
+      if (stInside !== insideBridge) continue;
+      const d = Math.hypot(px - st.x, pz - st.z);
+      if (d <= st.radius && d < bestDist) {
+        bestDist = d;
+        best = st;
+      }
+    }
+    state.nearestTarget = best;
+    if (best) {
+      prompt.textContent = best.promptLabel;
+      prompt.classList.add('show');
+    } else {
+      prompt.classList.remove('show');
+    }
+  }
+
+  function setHelmOpen(open) {
+    state.helmOpen = !!open;
+    $('helm-panel').classList.toggle('open', state.helmOpen);
+    if (state.helmOpen) $('door-prompt').classList.remove('show');
+  }
+
+  function triggerStationAction(actionType) {
+    if (!actionType) return false;
+    if (window.TitanCharacterRuntime && window.TitanDeckArms) window.TitanCharacterRuntime.playFirstPersonAction(window.TitanDeckArms);
+    if (actionType === 'door') {
+      state.doorOpen = !state.doorOpen;
+      SoundFX.play('door');
+      return true;
+    }
+    if (actionType === 'hatch') {
+      if (!state.hatchOpen) {
+        state.hatchOpen = true;
+        SoundFX.play('hatch');
+        showToast('DECK ACCESS HATCH OPENED · Press USE again to descend ladder');
+      } else {
+        SoundFX.play('click');
+        setHatchPromptOpen(true);
+      }
+      return true;
+    }
+    if (actionType === 'table') {
+      setTableFocused(true);
+      return true;
+    }
+    if (actionType === 'radar' || actionType === 'lidar' || actionType === 'sonar' || actionType === 'hull') {
+      // Open internal Sensor Ops menu for efficient scan / identify / 3D
+      if (window.SensorOps) {
+        SensorOps.open(actionType);
+      } else {
+        // Fallback to legacy single-shot actions
+        if (actionType === 'radar') {
+          const ranges = [3, 6, 12, 24];
+          state.radarRangeNm = ranges[(ranges.indexOf(state.radarRangeNm) + 1) % ranges.length];
+          SoundFX.play('radar');
+          showToast('ARPA · Range ' + state.radarRangeNm + ' NM');
+        } else if (actionType === 'lidar') {
+          state.lidarPulse = 1.0;
+          SoundFX.play('radar');
+          showToast('LiDAR pulse');
+        } else if (actionType === 'sonar') {
+          const hits = TitanSensors.ping();
+          SoundFX.play('sonar');
+          showToast(hits.length ? ('SONAR · ' + hits.length + ' contacts') : 'SONAR · clear');
+        } else {
+          state.hullScanPulse = 1.0;
+          SoundFX.play('click');
+          showToast('HULL SCAN · nominal');
+        }
+      }
+      return true;
+    }
+    if (actionType === 'ais') {
+      const channels = [16, 70, 87, 88];
+      state.aisChannel = channels[(channels.indexOf(state.aisChannel) + 1) % channels.length];
+      SoundFX.play('click');
+      showToast('AIS & GMDSS SATCOM · Tuned to VHF CH-' + state.aisChannel + ' · 3 vessels in range');
+      return true;
+    }
+    if (actionType === 'engine') {
+      SoundFX.play('click');
+      setHelmOpen(!state.helmOpen);
+      // Live plant data is shown on the in-room engine screens (no floating ENGINES panel)
+      const te = lastEngTelemetry;
+      const link = engineLinked ? 'LINKED' : 'LOCAL';
+      const thr = te && te.throttle != null ? Math.round(te.throttle) : state.throttle;
+      const spd = (te && te.shipSpeedKn != null ? te.shipSpeedKn : state.shipSpeed).toFixed(1);
+      showToast('PROPULSION · Thr ' + thr + '% · ' + spd + ' kn · ' + link);
+      return true;
+    }
+    if (actionType === 'gauges') {
+      SoundFX.play('click');
+      showToast('GYRO & ANEMOMETER · Heading ' + String(Math.round(state.shipHeading)).padStart(3, '0') + '° · Wind 14 kt');
+      return true;
+    }
+    if (actionType === 'bell') {
+      state.bellSwing = 1.0;
+      SoundFX.play('bell');
+      showToast("SHIP'S BRASS BELL · Watch bell rung");
+      return true;
+    }
+    if (actionType === 'crane') {
+      state.craneDeployed = !state.craneDeployed;
+      SoundFX.play('hatch');
+      showToast(state.craneDeployed ? 'DECK CARGO CRANE · Slewing boom outboard' : 'DECK CARGO CRANE · Stowing boom amidships');
+      return true;
+    }
+    if (actionType === 'windlass') {
+      state.windlassRunning = !state.windlassRunning;
+      SoundFX.play('hatch');
+      showToast(state.windlassRunning ? 'ANCHOR WINDLASS · Chain gypsies engaged' : 'ANCHOR WINDLASS · Brake locked & standby');
+      return true;
+    }
+    if (actionType === 'capstan') {
+      state.capstanRunning = !state.capstanRunning;
+      SoundFX.play('hatch');
+      showToast(state.capstanRunning ? 'AFT WARPING CAPSTAN · Hauling hawser line' : 'AFT WARPING CAPSTAN · Stopped');
+      return true;
+    }
+    if (actionType === 'floodlights') {
+      state.deckFloodlightsOn = !state.deckFloodlightsOn;
+      deckFloodGlowMeshes.forEach((m) => {
+        if (m && m.material) m.material.emissiveIntensity = state.deckFloodlightsOn ? 0.95 : 0.05;
+      });
+      SoundFX.play('click');
+      showToast(state.deckFloodlightsOn ? 'DECK FLOODLIGHTS · High-output perimeter lights ON' : 'DECK FLOODLIGHTS · Perimeter lights dimmed');
+      return true;
+    }
+    if (actionType === 'lifebuoy') {
+      SoundFX.play('click');
+      showToast('SOLAS LIFEBUOY · Hydrostatic release & strobe line inspected · READY');
+      return true;
+    }
+    if (actionType === 'fire-station') {
+      SoundFX.play('click');
+      showToast('FIRE & SAFETY STATION · Hydrant pressure 7.4 bar · CO2 & SCBA charged');
+      return true;
+    }
+    if (actionType && actionType.startsWith('cargo-hatch-')) {
+      const num = actionType.split('-')[2];
+      SoundFX.play('click');
+      showToast('CARGO HOLD #' + num + ' · Weathertight seals locked · Temp 14.2°C · Dry');
+      return true;
+    }
+    return false;
+  }
+
+  function performInteract() {
+    if (state.sensorPanelOpen) { SensorOps.close(); return; }
+    if (state.hatchPromptOpen) { setHatchPromptOpen(false); return; }
+    if (state.tableFocused) { setTableFocused(false); return; }
+    if (state.nearDoor) { triggerStationAction('door'); return; }
+    if (state.nearHatch) { triggerStationAction('hatch'); return; }
+    if (state.nearTable) { triggerStationAction('table'); return; }
+    if (state.nearestTarget && triggerStationAction(state.nearestTarget.actionType)) return;
+
+    raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+    const hits = raycaster.intersectObjects(interactables, true);
+    if (hits.length) {
+      let obj = hits[0].object;
+      while (obj && !obj.userData.interactable) obj = obj.parent;
+      if (obj) {
+        if (obj.userData.isDoor) triggerStationAction('door');
+        else if (obj.userData.isHatch) triggerStationAction('hatch');
+        else if (obj.userData.isTable) triggerStationAction('table');
+        else if (obj.userData.actionType) triggerStationAction(obj.userData.actionType);
+      }
+    }
+  }
+
+  let frameAccumulator = 0;
+  let titanWalkAmount = 0;
+  const frameInterval = isTouch ? 1 / 45 : 1 / 60;
+  function animate() {
+    if (!state.ready || !renderer) return;
+    requestAnimationFrame(animate);
+    const frameDelta = Math.min(clock.getDelta(), 0.1);
+    frameAccumulator += frameDelta;
+    if (frameAccumulator < frameInterval) return;
+    const dt = Math.min(frameAccumulator, 0.05);
+    frameAccumulator = 0;
+    state.time += dt;
+    titanWalkAmount = 0;
+
+    updateWater(dt, state.time);
+    updateDoor(dt);
+    updateHatchAndDeckAnimations(dt, state.time);
+    updateShipMotion(dt);
+    updateLiveScreens(dt, state.time);
+    if (radarSweepMesh) radarSweepMesh.rotation.y = state.time * 1.65;
+    if (ship) ship.rotation.z = Math.sin(state.time * 0.4) * 0.0014;
+
+    const settingsOpen = $('settings-panel') && !$('settings-panel').hidden;
+    if (!settingsOpen && !state.helmOpen && !state.tableFocused && !state.hatchPromptOpen && !state.sensorPanelOpen) {
+      const mx = clamp((keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0) + (Joystick.dx || 0) + (Joystick._padX || 0), -1, 1);
+      const mz = clamp((keys.KeyW ? 1 : 0) - (keys.KeyS ? 1 : 0) + (Joystick.dy || 0) - (Joystick._padY || 0), -1, 1);
+      const look = Joystick.consumeLook();
+      state.yaw -= look.dx;
+      state.pitch = clamp(state.pitch - look.dy, -1.25, 0.95);
+
+      const inputMag = Math.min(1, Math.hypot(mx, mz));
+      titanWalkAmount = inputMag;
+      if (inputMag > 0.001) {
+        const len = Math.hypot(mx, mz);
+        const speed = ((keys.ShiftLeft || keys.ShiftRight ? 5.8 : 4.0) / SHIP_SCALE) * dt;
+        forwardVec.set(-Math.sin(state.yaw), 0, -Math.cos(state.yaw));
+        rightVec.set(Math.cos(state.yaw), 0, -Math.sin(state.yaw));
+        const moveForward = (mz / len) * speed * inputMag;
+        const moveSide = (mx / len) * speed * inputMag;
+        const requestedMoveX = forwardVec.x * moveForward + rightVec.x * moveSide;
+        const requestedMoveZ = forwardVec.z * moveForward + rightVec.z * moveSide;
+        movePlayerShipLocal(requestedMoveX, requestedMoveZ);
+      }
+      state.playerLocal.y = PLAYER_EYE_LOCAL_Y;
+    }
+
+    syncCameraToShip();
+    if (window.TitanCharacterRuntime && window.TitanDeckArms) {
+      window.TitanCharacterRuntime.updateFirstPersonArms(window.TitanDeckArms, state.time, titanWalkAmount, (window.TitanDeckCharacterConfig && window.TitanDeckCharacterConfig.animationSpeed) || 1);
+    }
+    checkProximity();
+
+    renderer.render(scene, camera);
+    if (cssRenderer) cssRenderer.render(camera);
+  }
+
+  function enter() {
+    if (state.entered) return;
+    try {
+      if (!localStorage.getItem('titan-character-v1')) {
+        window.location.replace('main-menu.html');
+        return;
+      }
+    } catch (e) {}
+    state.entered = true;
+    $('loading-screen').classList.add('hidden');
+    $('game').classList.remove('hidden');
+    try {
+      const q = localStorage.getItem('titan-deck-q');
+      if (['LOW', 'MED', 'HIGH'].includes(q)) state.quality = q;
+    } catch (e) {}
+    initScene();
+    applyQuality();
+    Joystick.doInteract = performInteract;
+    Joystick.init();
+    Joystick.show();
+    if (renderer) animate();
+    resize();
+  }
+
+  function bindHelm() {
+    const throttle = $('helm-throttle'), rudder = $('helm-rudder');
+    throttle.addEventListener('input', () => {
+      sendThrottleOrder(Number(throttle.value));
+      $('val-throttle').textContent = state.throttle;
+    });
+    rudder.addEventListener('input', () => {
+      sendRudderOrder(Number(rudder.value));
+      $('val-rudder').textContent = state.rudder;
+      document.querySelectorAll('#helm-port,#helm-amid,#helm-stbd').forEach((b) => b.classList.remove('active'));
+      if (state.rudder < -5) $('helm-port').classList.add('active');
+      else if (state.rudder > 5) $('helm-stbd').classList.add('active');
+      else $('helm-amid').classList.add('active');
+    });
+    $('helm-port').addEventListener('click', () => { rudder.value = -25; rudder.dispatchEvent(new Event('input')); });
+    $('helm-amid').addEventListener('click', () => { rudder.value = 0; rudder.dispatchEvent(new Event('input')); });
+    $('helm-stbd').addEventListener('click', () => { rudder.value = 25; rudder.dispatchEvent(new Event('input')); });
+    $('helm-stop').addEventListener('click', () => {
+      throttle.value = 0; rudder.value = 0;
+      sendAllStop();
+      $('val-throttle').textContent = '0';
+      $('val-rudder').textContent = '0';
+      document.querySelectorAll('#helm-port,#helm-amid,#helm-stbd').forEach((b) => b.classList.remove('active'));
+      $('helm-amid').classList.add('active');
+    });
+  }
+
+  function bindUI() {
+    $('btn-start').addEventListener('click', enter);
+    $('btn-exit-table').addEventListener('click', () => setTableFocused(false));
+    $('btn-settings').addEventListener('click', () => { $('settings-panel').hidden = false; });
+    $('settings-close').addEventListener('click', () => { $('settings-panel').hidden = true; });
+    $('settings-panel').addEventListener('click', (e) => {
+      if (e.target === $('settings-panel')) $('settings-panel').hidden = true;
+    });
+
+    /* Deck Access Hatch Ladder Destination Modal Bindings
+       Storage → storage.html · Engine Room → engine-room.html
+       (same folder as main-deck.html) */
+    const goStorage = () => goToSameDirPage('storage.html', 'STORAGE COMPARTMENT');
+    const goEngine = () => goToSameDirPage('engine-room.html', 'ENGINE ROOM');
+    const btnStorage = $('btn-go-storage');
+    const btnEngine = $('btn-go-engine');
+    if (btnStorage) {
+      btnStorage.addEventListener('click', (e) => { e.preventDefault(); goStorage(); });
+    }
+    if (btnEngine) {
+      btnEngine.addEventListener('click', (e) => { e.preventDefault(); goEngine(); });
+    }
+    $('btn-hatch-back').addEventListener('click', () => {
+      setHatchPromptOpen(false);
+    });
+    $('btn-hatch-close-lid').addEventListener('click', () => {
+      state.hatchOpen = false;
+      SoundFX.play('hatch');
+      setHatchPromptOpen(false);
+      showToast('DECK ACCESS HATCH CLOSED & DOGGED');
+    });
+    $('hatch-modal').addEventListener('click', (e) => {
+      if (e.target === $('hatch-modal')) setHatchPromptOpen(false);
+    });
+
+    $('quality-btn').addEventListener('click', () => {
+      const levels = ['LOW', 'MED', 'HIGH'];
+      state.quality = levels[(levels.indexOf(state.quality) + 1) % 3];
+      applyQuality();
+    });
+    $('btn-fullscreen').addEventListener('click', () => Joystick.toggleFullscreen());
+
+    ['set-joystick', 'set-use-btn', 'set-look-zone'].forEach((id) => {
+      const el = $(id); if (el) el.addEventListener('change', () => Joystick.refreshVisibility());
+    });
+    const sh = $('set-shadows'); if (sh) sh.addEventListener('change', applyQuality);
+    window.addEventListener('resize', resize);
+    window.addEventListener('orientationchange', () => setTimeout(resize, 150));
+    document.addEventListener('fullscreenchange', () => {
+      if (!document.fullscreenElement) $('game').classList.remove('immersive');
+      setTimeout(resize, 100);
+    });
+    document.addEventListener('webkitfullscreenchange', () => setTimeout(resize, 100));
+
+    window.addEventListener('keydown', (e) => {
+      if (e.target && ['INPUT', 'TEXTAREA'].includes(e.target.tagName)) return;
+      keys[e.code] = true;
+      if (e.code === 'KeyE' && !e.repeat) performInteract();
+      if (e.code === 'KeyF' && !e.repeat) Joystick.toggleFullscreen();
+      if (e.code === 'Escape') {
+        $('settings-panel').hidden = true;
+        setHelmOpen(false);
+        setEnginePanelOpen(false);
+        setTableFocused(false);
+        setHatchPromptOpen(false);
+      }
+    });
+    window.addEventListener('keyup', (e) => { keys[e.code] = false; });
+    window.addEventListener('blur', () => { Object.keys(keys).forEach((k) => { keys[k] = false; }); });
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        Object.keys(keys).forEach((k) => { keys[k] = false; });
+        Joystick.dx = 0; Joystick.dy = 0;
+        Joystick._stickId = null; Joystick._lookId = null;
+      }
+    });
+
+    const host = $('canvas-host');
+    host.addEventListener('click', (e) => {
+      if (renderer && e.target === renderer.domElement && !isTouch && !document.pointerLockElement && !state.tableFocused && !state.hatchPromptOpen && !state.sensorPanelOpen) {
+        renderer.domElement.requestPointerLock && renderer.domElement.requestPointerLock();
+      }
+    });
+    document.addEventListener('mousemove', (e) => {
+      if (document.pointerLockElement && !state.helmOpen && !state.tableFocused && !state.hatchPromptOpen && !state.sensorPanelOpen && $('settings-panel').hidden) {
+        state.yaw -= e.movementX * 0.0022;
+        state.pitch = clamp(state.pitch - e.movementY * 0.0018, -1.25, 0.95);
+      }
+    });
+
+    bindHelm();
+    $('helm-close').addEventListener('click', () => setHelmOpen(false));
+    if (window.SensorOps) SensorOps.bindUI();
+    setInterval(() => {
+      $('sim-clock').textContent = new Date().toLocaleTimeString([], { hour12: false });
+    }, 1000);
+    /* Auto-start: skip loading menu */
+    enter();
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bindUI);
+  else bindUI();
+})();
+</script>
+
+</body>
+</html>

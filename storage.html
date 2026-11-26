@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>THE TITAN — Storage Compartment</title>
+<style>
+  body { margin:0; min-height:100dvh; display:flex; align-items:center; justify-content:center;
+    background:#071725; color:#eef6f8; font-family:system-ui,sans-serif; text-align:center; padding:1.5rem; }
+  .card { max-width:420px; padding:1.5rem; border:1px solid #1e4054; border-radius:14px;
+    background:linear-gradient(165deg,#102a3b,#071725); }
+  h1 { letter-spacing:0.1em; font-size:1.2rem; margin:0 0 0.5rem; color:#36BFC0; }
+  p { color:#8aa4b3; font-size:0.9rem; line-height:1.45; margin:0 0 1.2rem; }
+  .links { display:flex; flex-direction:column; gap:0.65rem; align-items:stretch; }
+  a, button.linkish {
+    display:block; padding:0.75rem 1.2rem; border-radius:9px; border:1px solid #36BFC0;
+    color:#eefdfa; text-decoration:none; font-weight:600; background:transparent; cursor:pointer;
+    font:inherit; text-align:center;
+  }
+  a:hover, button.linkish:hover { background:rgba(54,191,192,0.15); }
+  a.secondary, button.linkish.secondary { border-color:#1e4054; color:#9ec7d4; font-weight:500; font-size:0.9rem; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>STORAGE COMPARTMENT</h1>
+    <p>Deck B forward hold is reserved for a future walk-mode module. Use the ladder links below to return to the Main Deck bridge or continue to the Engine Room (same folder).</p>
+    <div class="links">
+      <a id="link-main" href="main-deck.html">↑ Return to Main Deck</a>
+      <a id="link-engine" class="secondary" href="engine-room.html">→ Engine Room</a>
+    </div>
+  </div>
+  <script>
+  (function () {
+    function resolveSameDirFile(filename) {
+      var name = String(filename || '').replace(/^\.?\//, '');
+      try {
+        if (window.location.protocol === 'about:' || window.location.protocol === 'blob:') return name;
+        return new URL(name, window.location.href).href;
+      } catch (e) {
+        try {
+          var cleanHref = (window.location.href || '').split('#')[0].split('?')[0];
+          var slashIdx = cleanHref.lastIndexOf('/');
+          var baseDir = slashIdx >= 0 ? cleanHref.substring(0, slashIdx + 1) : '';
+          return baseDir + name;
+        } catch (e2) {
+          return name;
+        }
+      }
+    }
+    function wire(id, file) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      var href = resolveSameDirFile(file);
+      el.setAttribute('href', href);
+      el.addEventListener('click', function (e) {
+        e.preventDefault();
+        try { window.location.assign(href); } catch (_) { window.location.href = href; }
+      });
+    }
+    wire('link-main', 'main-deck.html');
+    wire('link-engine', 'engine-room.html');
+  })();
+  </script>
+
+</body>
+</html>

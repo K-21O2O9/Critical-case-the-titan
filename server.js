@@ -1,0 +1,24 @@
+'use strict';
+// THE TITAN private multiplayer race server. Node 18+; npm install; npm start
+const http=require('http'),fs=require('fs'),path=require('path');
+const WebSocket=require('ws');
+const ROOT=__dirname,PORT=Number(process.env.PORT||3000),rooms=new Map();
+const mime={'.html':'text/html; charset=utf-8','.js':'application/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json','.png':'image/png','.jpg':'image/jpeg','.svg':'image/svg+xml','.pdf':'application/pdf'};
+const server=http.createServer((req,res)=>{let pathname=decodeURIComponent(new URL(req.url,'http://localhost').pathname);if(pathname==='/'||pathname==='/race')pathname='/race.html';let file=path.join(ROOT,pathname);if(!file.startsWith(ROOT)){res.writeHead(403);return res.end('Forbidden');}fs.readFile(file,(err,data)=>{if(err){res.writeHead(404);return res.end('Not found');}res.writeHead(200,{'Content-Type':mime[path.extname(file)]||'application/octet-stream','Cache-Control':'no-cache'});res.end(data);});});
+const wss=new WebSocket.Server({server});
+function code(){let s;do{s=Math.random().toString(36).slice(2,7).toUpperCase();}while(rooms.has(s));return s;}
+function snapshot(r){return {code:r.code,hostId:r.hostId,phase:r.phase,startedAt:r.startedAt,finishDistance:r.finishDistance,ships:r.ships,players:[...r.players.values()].map(p=>({id:p.id,name:p.name,team:p.team,host:p.id===r.hostId,connected:true})),winner:r.winner};}
+function send(ws,type,data){if(ws.readyState===WebSocket.OPEN)ws.send(JSON.stringify({type,data}));}
+function broadcast(r,type='state'){const s=snapshot(r);r.players.forEach(p=>send(p.ws,type,s));}
+function removePlayer(r,id){const p=r.players.get(id);if(!p)return;r.players.delete(id);if(!r.players.size){rooms.delete(r.code);return;}if(id===r.hostId){r.hostId=r.players.keys().next().value;const next=r.players.get(r.hostId);if(next)next.host=true;}broadcast(r);}
+wss.on('connection',ws=>{ws.id=Math.random().toString(36).slice(2);ws.room=null;ws.on('message',raw=>{let m;try{m=JSON.parse(raw)}catch{return;}const d=m.data||{};
+if(m.type==='create'){let roomCode=code(),player={id:ws.id,ws,name:String(d.name||'Host').slice(0,20),team:'A',host:true};let r={code:roomCode,hostId:ws.id,phase:'lobby',startedAt:0,finishDistance:10000,winner:null,players:new Map([[ws.id,player]]),ships:{A:{progress:0,speed:0,throttle:0,heading:0,damage:0},B:{progress:0,speed:0,throttle:0,heading:0,damage:0}}};rooms.set(roomCode,r);ws.room=roomCode;send(ws,'created',snapshot(r));broadcast(r);}
+else if(m.type==='join'){let r=rooms.get(String(d.code||'').toUpperCase());if(!r)return send(ws,'error',{message:'Room not found. Check the code.'});if(r.phase!=='lobby')return send(ws,'error',{message:'Race already started.'});let team=d.team==='B'?'B':'A';if([...r.players.values()].filter(p=>p.team===team).length>=15)return send(ws,'error',{message:'That ship is full (15 players maximum).'});let p={id:ws.id,ws,name:String(d.name||'Crew').slice(0,20),team,host:false};r.players.set(ws.id,p);ws.room=r.code;send(ws,'joined',snapshot(r));broadcast(r);}
+else if(m.type==='team'){let r=rooms.get(ws.room),p=r&&r.players.get(ws.id);if(!p||r.phase!=='lobby')return;let team=d.team==='B'?'B':'A';if([...r.players.values()].filter(x=>x.team===team).length>=15)return send(ws,'error',{message:'Ship full.'});p.team=team;broadcast(r);}
+else if(m.type==='start'){let r=rooms.get(ws.room);if(!r||r.hostId!==ws.id||r.phase!=='lobby')return;if(!r.players.size)return; r.phase='countdown';r.startedAt=Date.now()+5000;broadcast(r);setTimeout(()=>{if(rooms.get(r.code)===r&&r.phase==='countdown'){r.phase='race';r.startedAt=Date.now();broadcast(r);}},5000);}
+else if(m.type==='control'){let r=rooms.get(ws.room),p=r&&r.players.get(ws.id);if(!p||r.phase!=='race')return;let s=r.ships[p.team];if(d.action==='throttle'){s.throttle=Math.max(0,Math.min(100,Number(d.value)||0));}else if(d.action==='heading'){s.heading=Math.max(-45,Math.min(45,Number(d.value)||0));}broadcast(r);}
+else if(m.type==='reset'){let r=rooms.get(ws.room);if(!r||r.hostId!==ws.id)return;r.phase='lobby';r.winner=null;r.startedAt=0;r.ships={A:{progress:0,speed:0,throttle:0,heading:0,damage:0},B:{progress:0,speed:0,throttle:0,heading:0,damage:0}};broadcast(r);}
+else if(m.type==='leave'){let r=rooms.get(ws.room);if(r)removePlayer(r,ws.id);ws.room=null;}
+});ws.on('close',()=>{let r=rooms.get(ws.room);if(r)removePlayer(r,ws.id);});});
+setInterval(()=>{for(const r of rooms.values()){if(r.phase!=='race')continue;for(const k of ['A','B']){let s=r.ships[k];s.speed+=(s.throttle*.48-s.speed)*.06;s.progress+=s.speed*0.16;}if(r.ships.A.progress>=r.finishDistance||r.ships.B.progress>=r.finishDistance){r.phase='finished';r.winner=r.ships.A.progress>=r.finishDistance?'A':'B';broadcast(r,'finish');}else broadcast(r,'tick');}},100);
+server.listen(PORT,'0.0.0.0',()=>console.log(`THE TITAN multiplayer server listening on ${PORT}`));

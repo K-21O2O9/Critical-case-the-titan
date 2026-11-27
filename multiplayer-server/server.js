@@ -292,7 +292,7 @@ function routeProgress(route, x, z) {
 }
 
 function acceptMapGeometry(room, raw) {
-  if (!raw || typeof raw !== 'object' || raw.source !== 'projection.html') return false;
+  if (!raw || typeof raw !== 'object' || raw.source !== 'map.html') return false;
   const sourceObstacles = Array.isArray(raw.obstacles) ? raw.obstacles.slice(0, 100) : [];
   const obstacles = [];
   for (const o of sourceObstacles) {
@@ -354,8 +354,8 @@ function createRoom(ws, message = {}) {
     code, status: 'lobby', createdAt: now, lastActivity: now,
     startedAt: null, countdownEndsAt: null, countdownTimer: null,
     winner: null, hostWs: ws, clients: new Set(), players: new Map(), dirty: true,
-    settings: { maxPerTeam: MAX_PER_TEAM, destination: 'VIRTUAL FINISH GATE', map: 'PROJECTION.HTML · LIVE TACTICAL WORLD' },
-    map: { source: 'projection.html', width: 82, depth: 64, bounds: MAP_BOUNDS, geometryReady: false, geometryRevision: 0, obstacles: [], route: [] },
+    settings: { maxPerTeam: MAX_PER_TEAM, destination: 'VIRTUAL FINISH GATE', map: 'MAP.HTML · LIVE TACTICAL WORLD' },
+    map: { source: 'map.html', width: 82, depth: 64, bounds: MAP_BOUNDS, geometryReady: false, geometryRevision: 0, obstacles: [], route: [] },
     ships: { A: makeShip('A'), B: makeShip('B') }
   };
   createHostActor(room);
@@ -384,7 +384,7 @@ function addPlayer(room, ws, msg) {
   if (existing?.ws && existing.ws.readyState === WebSocket.OPEN && existing.ws !== ws) {
     return error(ws, 'This player is already connected from another tab or device.', 'PLAYER_ALREADY_CONNECTED');
   }
-  if (room.status !== 'lobby' && !existing) return error(ws, 'This race has already started. New players cannot join now.', 'RACE_ALREADY_STARTED');
+  if (room.status === 'finished' && !existing) return error(ws, 'This match has finished. Ask the host to reset the room before joining.', 'RACE_FINISHED');
   if (teamCount(room, team, existing?.id || null) >= MAX_PER_TEAM) {
     return error(ws, `Ship ${team} is full. Each ship can have a maximum of 15 players.`, 'TEAM_FULL');
   }
@@ -395,7 +395,7 @@ function addPlayer(room, ws, msg) {
     const spawnColumns = [-1.30, -0.65, 0, 0.65, 1.30];
     const spawnRows = [-14.95, -13.60, -12.25];
     player = {
-      id: deviceId, isHost: false, name, team, ready: false, connected: true,
+      id: deviceId, isHost: false, name, team, ready: room.status !== 'lobby', connected: true,
       x: spawnColumns[n % spawnColumns.length],
       z: spawnRows[Math.floor(n / spawnColumns.length)] || -10.90,
       yaw: 0, area: 'main-deck', character: safeCharacter(msg.character, name), ws: null,
@@ -513,13 +513,13 @@ wss.on('connection', ws => {
       send(ws, 'room:checked', {
         state: getSnapshot(room),
         seats: { A: Math.max(0, MAX_PER_TEAM - teamA), B: Math.max(0, MAX_PER_TEAM - teamB) },
-        canJoin: room.status === 'lobby'
+        canJoin: room.status !== 'finished', phase: room.status
       });
       return;
     }
 
     if (msg.type === 'join') {
-      if (session.role && session.role !== 'player') return error(ws, 'This connection is already in use.', 'SESSION_EXISTS');
+      if (session.role) return error(ws, 'This connection is already attached to a room. Leave it or reconnect with a fresh connection.', 'SESSION_EXISTS');
       const code = cleanText(msg.code, 8).toUpperCase();
       const room = rooms.get(code);
       if (!room) return error(ws, 'Room not found. Ask the host for the current room code.', 'ROOM_NOT_FOUND');
@@ -527,6 +527,7 @@ wss.on('connection', ws => {
     }
 
     if (msg.type === 'watch') {
+      if (session.role) return error(ws, 'This connection is already attached to a room.', 'SESSION_EXISTS');
       const code = cleanText(msg.code, 8).toUpperCase();
       const room = rooms.get(code);
       if (!room) return error(ws, 'Room not found. Ask the host for the current room code.', 'ROOM_NOT_FOUND');
@@ -589,7 +590,7 @@ wss.on('connection', ws => {
 
     if (msg.type === 'host:start' && session.role === 'host') {
       if (room.status !== 'lobby') return error(ws, 'The race is not in the lobby.', 'RACE_NOT_IN_LOBBY');
-      if (!room.map.geometryReady) return error(ws, 'The original projection has not finished registering its map geometry. Keep the host multiplayer page open and retry.', 'MAP_GEOMETRY_NOT_READY');
+      if (!room.map.geometryReady) return error(ws, 'map.html has not finished registering its map geometry. Keep the host multiplayer page open and retry.', 'MAP_GEOMETRY_NOT_READY');
       const crew = crewPlayers(room);
       if (![...room.players.values()].some(p => p.team === 'A') || ![...room.players.values()].some(p => p.team === 'B')) {
         return error(ws, 'At least one player must be on each ship before starting.', 'BOTH_TEAMS_REQUIRED');

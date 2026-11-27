@@ -675,7 +675,9 @@ wss.on('connection', ws => {
     if (msg.type === 'player:move' && session.role === 'player') {
       const player = room.players.get(session.playerId);
       if (!player) return error(ws, 'Player session has expired. Rejoin the room.', 'PLAYER_NOT_FOUND');
-      if (room.status !== 'racing') return;
+      // Avatar locomotion is independent of the race phase. A joined player
+      // may move in any active room state; ship/race commands retain their own
+      // phase checks, so this does not start or alter the race itself.
       setPlayerPose(room, player, msg, !!msg.transition);
       return;
     }

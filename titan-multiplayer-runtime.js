@@ -384,13 +384,17 @@
     playerArea = area;
     lastPoseSent = 0;
   }
-  function setPose(x, z, yaw, area, moving) {
+  function setPose(x, z, yaw, area, moving, running) {
     if (area) playerArea = area;
     lastPose = { x: Number(x) || 0, z: Number(z) || 0, yaw: Number(yaw) || 0 };
     lastPoseArea = playerArea;
-    if (joined && socket && socket.readyState === WebSocket.OPEN && performance.now() - lastPoseSent > 70) {
-      lastPoseSent = performance.now();
-      send('player:move', { x: lastPose.x, z: lastPose.z, yaw: lastPose.yaw, area: playerArea, moving: !!moving });
+    var now = performance.now();
+    if (joined && socket && socket.readyState === WebSocket.OPEN && now - lastPoseSent > 70) {
+      lastPoseSent = now;
+      send('player:move', {
+        x: lastPose.x, z: lastPose.z, yaw: lastPose.yaw,
+        area: playerArea, moving: !!moving, running: !!running
+      });
     }
   }
 
@@ -403,11 +407,8 @@
         var pose = game.getPose();
         var changed = !lastPose || Math.hypot(pose.x - lastPose.x, pose.z - lastPose.z) > 0.025 || Math.abs(pose.yaw - lastPose.yaw) > 0.015;
         if ((changed && now - lastPoseSent > 80) || now - lastPoseSent > 1000) {
-          lastPoseSent = now;
-          lastPose = { x: pose.x, z: pose.z, yaw: pose.yaw };
-          lastPoseArea = playerArea;
-          send('player:move', { x: pose.x, z: pose.z, yaw: pose.yaw, area: playerArea,
-            moving: pose.moving == null ? changed : !!pose.moving, running: !!pose.running });
+          setPose(pose.x, pose.z, pose.yaw, playerArea,
+            pose.moving == null ? changed : !!pose.moving, !!pose.running);
         }
       } else if (lastPose && lastPoseArea === playerArea && now - lastHeartbeatAt > 1000) {
         // Do not invent a spawn pose while another deck/page is still loading.
@@ -448,7 +449,15 @@
 
   function handleDeckMessage(payload) {
     if (!payload || typeof payload !== 'object') return;
-    if (payload.type === 'POSE' || payload.type === 'DECK_READY') return;
+    if (payload.type === 'POSE') {
+      var pose = payload.pose;
+      if (!pose || !Number.isFinite(Number(pose.x)) || !Number.isFinite(Number(pose.z))) return;
+      // Direct-entry Main Deck publishes its exact local pose. Forward it
+      // immediately instead of depending solely on the secondary polling loop.
+      setPose(pose.x, pose.z, pose.yaw, pose.area || 'main-deck', pose.moving, pose.running);
+      return;
+    }
+    if (payload.type === 'DECK_READY') return;
     if (payload.type === 'AREA_CHANGE') { setArea(payload.area, payload.pose); return; }
     if (payload.type === 'INTERACTION') {
       var pose = payload.pose || currentPosePayload();

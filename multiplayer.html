@@ -212,7 +212,19 @@ function renderState(s){
   const hasA=players.some(p=>p.team==='A'&&p.connected),hasB=players.some(p=>p.team==='B'&&p.connected);
   const canStart=s.status==='lobby'&&!!s.map?.geometryReady&&hasA&&hasB&&crew.length>=1&&crew.every(p=>p.ready&&p.connected)&&players.some(p=>p.isHost&&p.connected);
   $('start-race').disabled=!canStart;
-  if(s.status==='lobby'&&!s.map?.geometryReady)$('host-room-status').textContent+=' · WAITING FOR MAP GEOMETRY';
+  if(s.status==='lobby'&&!s.map?.geometryReady){
+    $('host-room-status').textContent+=' · MAP LOADING (waiting for geometry from map.html)';
+    // Auto-retry geometry request every 4s while waiting
+    if(!window.__titanMapGeoRetry){
+      window.__titanMapGeoRetry=setInterval(function(){
+        if(roomState&&roomState.map&&roomState.map.geometryReady){clearInterval(window.__titanMapGeoRetry);window.__titanMapGeoRetry=null;return;}
+        try{
+          const frames=document.querySelectorAll('iframe');
+          frames.forEach(function(f){try{f.contentWindow&&f.contentWindow.postMessage({source:'TITAN_MULTIPLAYER',type:'REQUEST_MAP_GEOMETRY'},window.location.origin);}catch(_){}});
+        }catch(_){}
+      },4000);
+    }
+  } else if(window.__titanMapGeoRetry){clearInterval(window.__titanMapGeoRetry);window.__titanMapGeoRetry=null;}
   $('host-manifest').innerHTML=playerManifest(players);
   $('player-crew-count').textContent=crew.length+' / 30 CREW';$('player-phase').textContent=String(s.status||'lobby').toUpperCase();
   $('player-manifest').innerHTML=playerManifest(players);

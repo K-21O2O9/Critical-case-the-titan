@@ -302,7 +302,12 @@
   function updateRemotePlayers() {
     var deck = getDeck();
     if (!deck || !roomState || !session) return;
-    if (window.TitanDeckGame && typeof window.TitanDeckGame.setMultiplayerState === 'function') return;
+    // When main-deck.html provides its own setMultiplayerState / remote actor system,
+    // do not create a second set of remote player models (avoids duplicates / hidden players).
+    if (window.TitanDeckGame && typeof window.TitanDeckGame.setMultiplayerState === 'function') {
+      clearRemoteActors();
+      return;
+    }
     var live = new Set();
     (roomState.players || []).filter(function (p) {
       return p.connected && p.id !== playerId && p.team === session.team && (p.area || 'main-deck') === 'main-deck';
@@ -339,9 +344,12 @@
       session.team = self.team;
       if (self.area) playerArea = self.area;
       var deck = getDeck();
-      if (deck && typeof window.TitanDeckGame.getPose === 'function') {
+      // Soft correction only on large desync. Main-deck owns local position authority.
+      // Blind snaps on every snapshot were a major source of the teleport-to-spawn bug.
+      if (deck && typeof window.TitanDeckGame.getPose === 'function' && window.TitanDeckGame.setMultiplayerPose) {
         var pose = window.TitanDeckGame.getPose();
-        if (Math.hypot((Number(self.x) || 0) - pose.x, (Number(self.z) || 0) - pose.z) > 0.9 && window.TitanDeckGame.setMultiplayerPose) {
+        var dist = Math.hypot((Number(self.x) || 0) - pose.x, (Number(self.z) || 0) - pose.z);
+        if (dist > 4.5) {
           window.TitanDeckGame.setMultiplayerPose(self.x, self.z, self.yaw);
         }
       }

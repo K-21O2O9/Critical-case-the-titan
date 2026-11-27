@@ -3475,17 +3475,29 @@ html, body {
       camera.add(window.TitanDeckArms);
     }
 
+    // Auto-detect low-end devices (3GB RAM class / limited cores) and force LOW quality
     try {
+      const mem = navigator.deviceMemory || 8;
+      const cores = navigator.hardwareConcurrency || 4;
+      const lowEnd = mem <= 3.5 || cores <= 4 || (isTouch && mem <= 4);
+      if (lowEnd && state.quality !== 'LOW') {
+        state.quality = 'LOW';
+        try { localStorage.setItem('titan-quality', 'LOW'); } catch (_) {}
+      }
+    } catch (_) {}
+
+    try {
+      const isLow = state.quality === 'LOW';
       renderer = new THREE.WebGLRenderer({
-        antialias: !isTouch,
+        antialias: !isTouch && !isLow,
         stencil: false,
-        powerPreference: 'high-performance',
+        powerPreference: isLow ? 'low-power' : 'high-performance',
         alpha: false
       });
       renderer.domElement.className = 'deck-renderer';
       renderer.setSize(w, h, false);
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, state.quality === 'HIGH' ? (isTouch ? 1.2 : 1.45) : state.quality === 'MED' ? 1.0 : 0.75));
-      renderer.shadowMap.enabled = shadowsAreEnabled();
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, state.quality === 'HIGH' ? (isTouch ? 1.2 : 1.45) : state.quality === 'MED' ? 1.0 : 0.65));
+      renderer.shadowMap.enabled = shadowsAreEnabled() && !isLow;
       renderer.shadowMap.type = THREE.PCFSoftShadowMap;
       renderer.outputEncoding = THREE.sRGBEncoding;
       host.insertBefore(renderer.domElement, host.firstChild);
@@ -3759,6 +3771,8 @@ html, body {
   let mpServerShip = null;
   let mpLastInteractionAt = 0;
   let mpLastMapPose = 0;
+  let mpHasAppliedInitialPose = false;
+  let mpLastSelfArea = 'main-deck';
   function mpPost(payload) {
     if (!mpEnabled) return;
     if (mpEmbedded) window.parent.postMessage(Object.assign({ source: 'TITAN_MAIN_DECK' }, payload), window.location.origin);
@@ -3782,11 +3796,33 @@ html, body {
     const shipState = packet.state.ships && packet.state.ships[mpTeam];
     if (shipState) mpServerShip = shipState;
     const self = (packet.state.players || []).find(p => p.id === mpLocalPlayerId);
-    if (self) {
+    // CRITICAL FIX: Never force local player position on every network snapshot.
+    // Only apply server position on first join, large desync, or explicit respawn/area change.
+    // Blind overwrite was the primary cause of the "teleported to spawn" bug.
+    if (self && state.ready) {
+      const sx = Number(self.x) || 0;
+      const sz = Number(self.z) || 0;
+      const syaw = Number(self.yaw) || 0;
+      const dx = sx - state.playerLocal.x;
+      const dz = sz - state.playerLocal.z;
+      const dist = Math.hypot(dx, dz);
+      const isFirstPose = !mpHasAppliedInitialPose;
+      const largeDesync = dist > 4.5;
+      const areaChanged = self.area && self.area !== (mpLastSelfArea || 'main-deck');
+      if (isFirstPose || largeDesync || areaChanged || self.forceRespawn) {
+        state.playerLocal.x = Math.max(-3.9, Math.min(3.9, sx));
+        state.playerLocal.z = Math.max(-17.65, Math.min(22.1, sz));
+        state.yaw = syaw;
+        syncCameraToShip();
+        mpHasAppliedInitialPose = true;
+      }
+      mpLastSelfArea = self.area || 'main-deck';
+    } else if (self && !state.ready) {
+      // Pre-ready: seed position so first frame is correct
       state.playerLocal.x = Math.max(-3.9, Math.min(3.9, Number(self.x) || 0));
       state.playerLocal.z = Math.max(-17.65, Math.min(22.1, Number(self.z) || 0));
       state.yaw = Number(self.yaw) || 0;
-      if (state.ready) syncCameraToShip();
+      mpHasAppliedInitialPose = true;
     }
     const systems = shipState && shipState.systems;
     if (systems) {
@@ -3818,16 +3854,41 @@ html, body {
         const model = window.TitanCharacterRuntime.createModel(THREE, p.character || { name: p.name }, { scale: .78 });
         model.name = 'MP_REMOTE_' + p.id;
         ship.add(model);
-        actor = { model, moving: false, speed: p.character && p.character.animationSpeed || 1 };
+        actor = {
+          model,
+          target: new THREE.Vector3(Number(p.x) || 0, 0.06, Number(p.z) || 0),
+          targetYaw: Number(p.yaw) || 0,
+          moving: false,
+          speed: (p.character && p.character.animationSpeed) || 1
+        };
+        model.position.copy(actor.target);
+        model.rotation.y = actor.targetYaw;
         mpRemoteActors.set(p.id, actor);
       }
-      actor.model.position.set(Number(p.x) || 0, .06, Number(p.z) || 0);
-      actor.model.rotation.y = Number(p.yaw) || 0;
+      actor.target.set(Number(p.x) || 0, 0.06, Number(p.z) || 0);
+      actor.targetYaw = Number(p.yaw) || 0;
       actor.moving = Date.now() < (p.movingUntil || 0);
-      actor.speed = p.character && p.character.animationSpeed || 1;
+      actor.speed = (p.character && p.character.animationSpeed) || 1;
     });
     for (const [id, actor] of mpRemoteActors) {
       if (!alive.has(id)) { mpDisposeActor(actor); mpRemoteActors.delete(id); }
+    }
+  }
+
+  function mpLerpRemoteActors(dt) {
+    if (!mpEnabled || !mpRemoteActors.size) return;
+    const lerpFactor = Math.min(1, dt * 12); // smooth but responsive
+    for (const actor of mpRemoteActors.values()) {
+      if (!actor.model || !actor.target) continue;
+      actor.model.position.lerp(actor.target, lerpFactor);
+      // shortest-path yaw lerp
+      let dy = actor.targetYaw - actor.model.rotation.y;
+      while (dy > Math.PI) dy -= Math.PI * 2;
+      while (dy < -Math.PI) dy += Math.PI * 2;
+      actor.model.rotation.y += dy * lerpFactor;
+      if (window.TitanCharacterRuntime && window.TitanCharacterRuntime.animateModel) {
+        window.TitanCharacterRuntime.animateModel(actor.model, state.time, actor.moving ? 1 : 0, actor.speed);
+      }
     }
   }
   if (mpEnabled) {
@@ -4218,6 +4279,7 @@ html, body {
       state.shipSpeed = Number(mpServerShip.speed) || 0;
     }
     mpUpdateRemoteActors();
+    mpLerpRemoteActors(dt);
     updateLiveScreens(dt, state.time);
     if (radarSweepMesh) radarSweepMesh.rotation.y = state.time * 1.65;
     if (ship) ship.rotation.z = Math.sin(state.time * 0.4) * 0.0014;

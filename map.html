@@ -1462,6 +1462,9 @@
             if (mpFlyActive) { camState.goalRadius = Math.min(camState.goalRadius, 58); }
           }
           if (event.data.type === 'MAP_FOCUS') { camState.goalTarget.set(0, 1, 0); camState.goalRadius = 70; camState.goalPhi = 0.78; }
+          if (event.data.type === 'REQUEST_MAP_GEOMETRY') {
+            try { if (typeof mpSendMapGeometry === 'function') mpSendMapGeometry(); } catch (_) {}
+          }
         });
         window.addEventListener('keydown', function (event) {
           if (!mpFlyActive) return;
@@ -2946,7 +2949,16 @@
           geometry: { source: 'map.html', bounds: { minX: -41, maxX: 41, minZ: -32, maxZ: 32 }, obstacles: obstacles, route: route }
         }, window.location.origin);
       }
-      if (mpEmbedded) mpSendMapGeometry();
+      if (mpEmbedded) {
+        mpSendMapGeometry();
+        // Retry a few times so the host lobby never stays stuck on "WAITING FOR MAP GEOMETRY"
+        var geoRetries = 0;
+        var geoTimer = setInterval(function () {
+          geoRetries++;
+          mpSendMapGeometry();
+          if (geoRetries >= 8) clearInterval(geoTimer);
+        }, 1500);
+      }
 
       // ── Ghost Preview Mesh for Pre-Placement Customization ───
       function rebuildGhostPreview() {

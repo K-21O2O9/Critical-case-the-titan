@@ -150,12 +150,14 @@ function safeCharacter(input, fallbackName) {
   const clamp = (v, lo, hi, fallback) => Number.isFinite(Number(v)) ? Math.max(lo, Math.min(hi, Number(v))) : fallback;
   return {
     name: cleanText(c.name || fallbackName || 'Crew Member', 24),
+    gender: ['male', 'female'].includes(c.gender) ? c.gender : 'male',
+    outfitStyle: ['deck-uniform', 'engineering', 'casual'].includes(c.outfitStyle) ? c.outfitStyle : 'deck-uniform',
     skinColor: color(c.skinColor, '#d9a47f'),
     outfitColor: color(c.outfitColor, '#2b8990'),
     accentColor: color(c.accentColor, '#e2bd78'),
     hairColor: color(c.hairColor, '#28333b'),
-    hairStyle: ['short', 'long', 'curly', 'none'].includes(c.hairStyle) ? c.hairStyle : 'short',
-    accessory: ['none', 'glasses', 'cap'].includes(c.accessory) ? c.accessory : 'none',
+    hairStyle: ['short', 'long', 'curly', 'braid', 'bun', 'none'].includes(c.hairStyle) ? c.hairStyle : 'short',
+    accessory: ['none', 'glasses', 'cap', 'headset', 'visor'].includes(c.accessory) ? c.accessory : 'none',
     height: clamp(c.height, .88, 1.12, 1),
     bodyBuild: clamp(c.bodyBuild, .84, 1.18, 1),
     animationSpeed: clamp(c.animationSpeed, .65, 1.5, 1)
@@ -167,7 +169,9 @@ function getSnapshot(room) {
     // Keep reconnecting crew visible briefly while an HTML room is replaced.
     connected: p.isHost ? !!room.hostWs && room.hostWs.readyState === WebSocket.OPEN : !!p.connected,
     isHost: !!p.isHost, x: p.x, z: p.z, yaw: p.yaw,
-    movingUntil: p.movingUntil || 0, running: !!p.running, character: p.character,
+    movingUntil: p.movingUntil || 0, running: !!p.running,
+    moveForward: (p.movingUntil || 0) > Date.now() ? (p.moveForward || 0) : 0,
+    moveStrafe: (p.movingUntil || 0) > Date.now() ? (p.moveStrafe || 0) : 0, character: p.character,
     area: p.area || 'main-deck', poses: p.poses || {}
   }));
   return {
@@ -201,7 +205,7 @@ function createHostActor(room) {
   room.hostPlayerId = id;
   room.players.set(id, {
     id, isHost: true, name: 'Captain', team: 'A', ready: true, connected: true,
-    x: 0.85, z: -14.35, yaw: 0, area: 'main-deck', poses: { 'main-deck': { x: 0.85, z: -14.35, yaw: 0 } },
+    x: 0.85, z: -14.35, yaw: 0, moveForward: 0, moveStrafe: 0, movingUntil: 0, running: false, area: 'main-deck', poses: { 'main-deck': { x: 0.85, z: -14.35, yaw: 0 } },
     character: safeCharacter({ name: 'Captain', outfitColor: '#237f93', accentColor: '#e2bd78' }, 'Captain'),
     ws: null, reconnectTimer: null, lastMoveAt: 0
   });
@@ -250,6 +254,8 @@ function changePlayerArea(room, player, area) {
   player.yaw = clampNumber(nextPose.yaw, -Math.PI, Math.PI, 0);
   player.movingUntil = 0;
   player.running = false;
+  player.moveForward = 0;
+  player.moveStrafe = 0;
   player.poses[area] = { x: player.x, z: player.z, yaw: player.yaw };
   if (room) room.dirty = true;
   return true;
@@ -451,7 +457,7 @@ function addPlayer(room, ws, msg) {
       x: initialPose.x, z: initialPose.z, yaw: initialPose.yaw, area: requestedArea,
       poses: { [requestedArea]: { ...initialPose }, ...(requestedArea === 'main-deck' ? {} : { 'main-deck': mainDeckPose }) },
       character: safeCharacter(msg.character, name), ws: null,
-      reconnectTimer: null, visibilityTimer: null, reconnecting: false, lastMoveAt: 0, running: false
+      reconnectTimer: null, visibilityTimer: null, reconnecting: false, lastMoveAt: 0, running: false, movingUntil: 0, moveForward: 0, moveStrafe: 0
     };
     room.players.set(deviceId, player);
   } else {
@@ -491,7 +497,7 @@ function resetRoom(room) {
   room.startedAt = null; room.countdownEndsAt = null;
   for (const p of room.players.values()) {
     p.ready = !!p.isHost;
-    if (p.isHost) { p.x = 0.85; p.z = -14.35; p.yaw = 0; }
+    if (p.isHost) { p.x = 0.85; p.z = -14.35; p.yaw = 0; p.movingUntil = 0; p.running = false; p.moveForward = 0; p.moveStrafe = 0; }
   }
   room.ships.A = makeShip('A'); room.ships.B = makeShip('B');
   if (room.map.geometryReady) {
@@ -513,18 +519,32 @@ function setPlayerPose(room, player, msg, force = false) {
     // Older clients sent the source-room coordinates under the destination
     // area during a transition. Do not reinterpret that pose in new geometry.
     if (msg.transition) {
-      player.movingUntil = 0;
+      player.movingUntil = 0; player.running = false; player.moveForward = 0; player.moveStrafe = 0;
       room.dirty = true;
       return true;
     }
   }
   const bounds = AREA_BOUNDS[player.area] || DECK_BOUNDS;
+  const previousX = Number(player.x) || 0;
+  const previousZ = Number(player.z) || 0;
   player.x = clampNumber(msg.x, bounds.minX, bounds.maxX, player.x);
   player.z = clampNumber(msg.z, bounds.minZ, bounds.maxZ, player.z);
   if (player.area === 'main-deck') resolveMainDeckCollisions(room, player);
   player.yaw = clampNumber(msg.yaw, -Math.PI, Math.PI, player.yaw);
-  player.movingUntil = msg.moving === false ? 0 : now + 450;
-  player.running = msg.moving === false ? false : !!msg.running;
+  const dx = player.x - previousX;
+  const dz = player.z - previousZ;
+  const distance = Math.hypot(dx, dz);
+  if (msg.moving === false || distance < 0.001) {
+    player.movingUntil = 0; player.running = false; player.moveForward = 0; player.moveStrafe = 0;
+  } else {
+    // All TITAN room movement uses yaw=0 facing world -Z. Project the accepted
+    // world-space displacement into that same local forward/right basis.
+    const forwardX = -Math.sin(player.yaw), forwardZ = -Math.cos(player.yaw);
+    const rightX = Math.cos(player.yaw), rightZ = -Math.sin(player.yaw);
+    player.moveForward = clampNumber((dx * forwardX + dz * forwardZ) / distance, -1, 1, 0);
+    player.moveStrafe = clampNumber((dx * rightX + dz * rightZ) / distance, -1, 1, 0);
+    player.movingUntil = now + 450; player.running = !!msg.running;
+  }
   saveActiveAreaPose(player);
   room.dirty = true;
   return true;
@@ -687,6 +707,19 @@ wss.on('connection', ws => {
       if (!hostActor) return error(ws, 'Host avatar not found.', 'HOST_PLAYER_NOT_FOUND');
       setPlayerPose(room, hostActor, msg, !!msg.transition);
       return;
+    }
+
+    if (msg.type === 'player:character' && session.role === 'player') {
+      const player = room.players.get(session.playerId);
+      if (!player) return error(ws, 'Player session has expired. Rejoin the room.', 'PLAYER_NOT_FOUND');
+      player.character = safeCharacter(msg.character, player.name);
+      room.dirty = true; broadcast(room); return;
+    }
+    if (msg.type === 'host:character' && session.role === 'host') {
+      const hostActor = room.players.get(room.hostPlayerId);
+      if (!hostActor) return error(ws, 'Host avatar not found.', 'HOST_PLAYER_NOT_FOUND');
+      hostActor.character = safeCharacter(msg.character, hostActor.name);
+      room.dirty = true; broadcast(room); return;
     }
 
     if (msg.type === 'host:map-geometry' && session.role === 'host') {

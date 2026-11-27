@@ -54,8 +54,10 @@
     this._publishFn = null;
     this._cmdHandler = null;
     this._mpParams = new URLSearchParams(window.location.search);
-    this._mpEnabled = this._mpParams.get('multiplayer') === '1' && window.parent !== window;
-    this._mpTeam = this._mpParams.get('team') === 'B' ? 'B' : 'A';
+    this._mpEmbedded = this._mpParams.get('multiplayer') === '1' && window.parent !== window;
+    this._mpDirect = !this._mpEmbedded && !!(window.TitanMultiplayerRuntime && window.TitanMultiplayerRuntime.active);
+    this._mpEnabled = this._mpEmbedded || this._mpDirect;
+    this._mpTeam = this._mpParams.get('team') === 'B' ? 'B' : (window.TitanMultiplayerRuntime?.session?.team === 'B' ? 'B' : 'A');
     this._mpStateHandler = (ev) => {
       if (!this._mpEnabled || ev.origin !== window.location.origin || !ev.data || ev.data.source !== 'TITAN_MULTIPLAYER' || ev.data.type !== 'STATE') return;
       const ship = ev.data.packet && ev.data.packet.state && ev.data.packet.state.ships && ev.data.packet.state.ships[this._mpTeam];
@@ -93,7 +95,16 @@
         this._emit('telemetry', this.telemetry); this._emit('status', { connected: true, role: 'multiplayer-server' });
       }
     };
-    if (this._mpEnabled) { window.addEventListener('message', this._mpStateHandler); setTimeout(() => { const area = /engine-room\.html/i.test(location.pathname) ? 'engine-room' : (/storage\.html/i.test(location.pathname) ? 'storage' : 'main-deck'); try { window.parent.postMessage({ source: 'TITAN_MAIN_DECK', type: 'AREA_CHANGE', area: area }, window.location.origin); } catch (e) {} }, 0); }
+    if (this._mpEnabled) {
+      window.addEventListener('message', this._mpStateHandler);
+      setTimeout(() => {
+        const area = /engine-room\.html/i.test(location.pathname) ? 'engine-room' : (/storage\.html/i.test(location.pathname) ? 'storage' : 'main-deck');
+        try {
+          if (this._mpEmbedded) window.parent.postMessage({ source: 'TITAN_MAIN_DECK', type: 'AREA_CHANGE', area: area }, window.location.origin);
+          else window.TitanMultiplayerRuntime?.setArea?.(area);
+        } catch (e) {}
+      }, 0);
+    }
     this._storageHandler = this._onStorage.bind(this);
 
     try {
@@ -195,7 +206,13 @@
       localStorage.setItem(STORAGE_KEY, JSON.stringify(snap));
     } catch (e) {}
     this._emit('telemetry', snap);
-    if (this._mpEnabled && this.role === 'engine') { try { window.parent.postMessage({ source: 'TITAN_ENGINE_ROOM', type: 'TELEMETRY', telemetry: { shipSpeedKn: snap.shipSpeedKn, headingDeg: snap.headingDeg, rpm: snap.rpm, powerKw: snap.powerKw, elecPowerKw: snap.elecPowerKw, temperatureC: snap.temperatureC, fuelPercent: snap.fuelPercent, loadDemandKw: snap.loadDemandKw, mainPower: !!(snap.electrics && snap.electrics.main), motor1: !!(snap.electrics && snap.electrics.motor1), motor2: !!(snap.electrics && snap.electrics.motor2), generator: !!(snap.reactor && snap.reactor.generator), clutch: !!(snap.motors && snap.motors.clutch), lubPump: !!(snap.cooling && snap.cooling.lubPump), swPump: !!(snap.cooling && snap.cooling.swPump) } }, window.location.origin); } catch (e) {} }
+    if (this._mpEnabled && this.role === 'engine') {
+      const telemetry = { shipSpeedKn: snap.shipSpeedKn, headingDeg: snap.headingDeg, rpm: snap.rpm, powerKw: snap.powerKw, elecPowerKw: snap.elecPowerKw, temperatureC: snap.temperatureC, fuelPercent: snap.fuelPercent, loadDemandKw: snap.loadDemandKw, mainPower: !!(snap.electrics && snap.electrics.main), motor1: !!(snap.electrics && snap.electrics.motor1), motor2: !!(snap.electrics && snap.electrics.motor2), generator: !!(snap.reactor && snap.reactor.generator), clutch: !!(snap.motors && snap.motors.clutch), lubPump: !!(snap.cooling && snap.cooling.lubPump), swPump: !!(snap.cooling && snap.cooling.swPump) };
+      try {
+        if (this._mpEmbedded) window.parent.postMessage({ source: 'TITAN_ENGINE_ROOM', type: 'TELEMETRY', telemetry: telemetry }, window.location.origin);
+        else window.TitanMultiplayerRuntime?.handleEngineTelemetry?.(telemetry);
+      } catch (e) {}
+    }
   };
 
   TitanShipBus.prototype.sendCommand = function (action, value, extra) {
@@ -220,7 +237,10 @@
     // In a multiplayer iframe the parent owns the server WebSocket. Forward
     // ship control intent to it; never create a second client-side simulation.
     if (this._mpEnabled) {
-      try { window.parent.postMessage({ source: 'TITAN_SHIP_BUS', type: 'COMMAND', payload: cmd }, window.location.origin); } catch (e) {}
+      try {
+        if (this._mpEmbedded) window.parent.postMessage({ source: 'TITAN_SHIP_BUS', type: 'COMMAND', payload: cmd }, window.location.origin);
+        else window.TitanMultiplayerRuntime?.handleBusCommand?.(cmd);
+      } catch (e) {}
     }
     return cmd;
   };

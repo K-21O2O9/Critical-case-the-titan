@@ -53,7 +53,14 @@
       if (!el) return;
       var href = resolveSameDirFile(file);
       var mp = new URLSearchParams(window.location.search);
-      if (mp.get('multiplayer') === '1') href += '?multiplayer=1&team=' + encodeURIComponent(mp.get('team') || 'A') + '&room=' + encodeURIComponent(mp.get('room') || '') + '&player=' + encodeURIComponent(mp.get('player') || '');
+      if (mp.get('multiplayer') === '1' && window.parent !== window) href += '?multiplayer=1&team=' + encodeURIComponent(mp.get('team') || 'A') + '&room=' + encodeURIComponent(mp.get('room') || '') + '&player=' + encodeURIComponent(mp.get('player') || '');
+      else {
+        var sess = window.TitanMultiplayerRuntime && window.TitanMultiplayerRuntime.active && window.TitanMultiplayerRuntime.session;
+        var code = (sess && sess.code) || mp.get('room') || '';
+        var team = (sess && sess.team) || mp.get('team') || '';
+        var name = (sess && sess.name) || mp.get('name') || 'Crew Member';
+        if (code && team) href += '?room=' + encodeURIComponent(code) + '&team=' + encodeURIComponent(team) + '&name=' + encodeURIComponent(name);
+      }
       el.setAttribute('href', href);
       el.addEventListener('click', function (e) {
         e.preventDefault();
@@ -67,5 +74,6 @@
   })();
   </script>
 
+<script src="titan-multiplayer-runtime.js"></script>
 </body>
 </html>

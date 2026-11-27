@@ -4906,7 +4906,16 @@ const LadderUI = {
     function go(filename) {
       let target = resolveSameDirFile(filename);
       const mp = new URLSearchParams(window.location.search);
-      if (mp.get('multiplayer') === '1') target += '?multiplayer=1&team=' + encodeURIComponent(mp.get('team') || 'A') + '&room=' + encodeURIComponent(mp.get('room') || '') + '&player=' + encodeURIComponent(mp.get('player') || '');
+      if (mp.get('multiplayer') === '1' && window.parent !== window) {
+        target += '?multiplayer=1&team=' + encodeURIComponent(mp.get('team') || 'A') + '&room=' + encodeURIComponent(mp.get('room') || '') + '&player=' + encodeURIComponent(mp.get('player') || '');
+      } else {
+        const runtime = window.TitanMultiplayerRuntime;
+        const session = runtime && runtime.active && runtime.session;
+        const code = session?.code || mp.get('room') || '';
+        const team = session?.team || mp.get('team') || '';
+        const name = session?.name || mp.get('name') || '';
+        if (code && team) target += '?room=' + encodeURIComponent(code) + '&team=' + encodeURIComponent(team) + '&name=' + encodeURIComponent(name);
+      }
       try { window.location.assign(target); } catch (_) { window.location.href = target; }
     }
     if (dest === "main-deck") {
@@ -7507,11 +7516,12 @@ const SceneManager = {
           performance.now() - (window.__titanMpPoseLastAt || 0) > 75) {
         window.__titanMpPoseLastAt = performance.now();
         try {
-          window.parent.postMessage({
-            source: "TITAN_MAIN_DECK", type: "POSE",
-            pose: { x: pos.x, z: pos.z, yaw: this.walkYaw, area: "engine-room", moving: Math.abs(moveX) + Math.abs(moveZ) > 0.001 }
-          }, window.location.origin);
+          window.parent.postMessage({ source: "TITAN_MAIN_DECK", type: "POSE", pose: { x: pos.x, z: pos.z, yaw: this.walkYaw, area: "engine-room", moving: Math.abs(moveX) + Math.abs(moveZ) > 0.001 } }, window.location.origin);
         } catch (_) {}
+      } else if (window.TitanMultiplayerRuntime && window.TitanMultiplayerRuntime.active &&
+          performance.now() - (window.__titanMpPoseLastAt || 0) > 75) {
+        window.__titanMpPoseLastAt = performance.now();
+        window.TitanMultiplayerRuntime.setPose(pos.x, pos.z, this.walkYaw, 'engine-room', Math.abs(moveX) + Math.abs(moveZ) > 0.001);
       }
     }
 
@@ -10376,6 +10386,7 @@ if (document.readyState === "loading") {
 
 
 <script src="titan-ship-bus.js"></script>
+<script src="titan-multiplayer-runtime.js"></script>
 <script>
 /* Titan Main-Deck ↔ Engine-Room real-time link */
 (function () {
@@ -10388,9 +10399,11 @@ if (document.readyState === "loading") {
   // Render same-ship crew inside the original Engine Room scene. Their
   // authoritative local poses arrive through the multiplayer parent frame.
   const mpQuery = new URLSearchParams(window.location.search);
-  const mpEnabled = mpQuery.get('multiplayer') === '1' && window.parent !== window;
-  const mpTeam = mpQuery.get('team') === 'B' ? 'B' : 'A';
-  const mpPlayerId = mpQuery.get('player') || '';
+  const mpEmbedded = mpQuery.get('multiplayer') === '1' && window.parent !== window;
+  const mpDirect = !mpEmbedded && !!(window.TitanMultiplayerRuntime && window.TitanMultiplayerRuntime.active);
+  const mpEnabled = mpEmbedded || mpDirect;
+  const mpTeam = mpQuery.get('team') === 'B' ? 'B' : (window.TitanMultiplayerRuntime?.session?.team === 'B' ? 'B' : 'A');
+  let mpPlayerId = mpQuery.get('player') || window.TitanMultiplayerRuntime?.playerId || '';
   const mpCrewActors = new Map();
   let mpCrewSnapshot = null;
   function makeEngineCrewActor(player) {
@@ -10439,6 +10452,7 @@ if (document.readyState === "loading") {
     window.addEventListener('message', event => {
       if (event.origin !== window.location.origin || !event.data || event.data.source !== 'TITAN_MULTIPLAYER' || event.data.type !== 'STATE') return;
       mpCrewSnapshot = event.data.packet?.state || null;
+      mpPlayerId = event.data.packet?.playerId || window.TitanMultiplayerRuntime?.playerId || mpPlayerId;
       updateEngineCrew();
     });
     setInterval(() => {

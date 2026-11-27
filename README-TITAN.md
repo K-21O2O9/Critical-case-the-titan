@@ -22,7 +22,7 @@
 - `main-menu.html` is the expedition launch screen.
 - `character-creator.html` is the standalone character workshop.
 - `main-deck.html` is the in-game starting location.
-- `engine-room.html`, `projection.html`, and `storage.html` remain separate ship systems.
+- `map.html` is the active tactical map; `projection.html` is retained as its preserved source/reference. `engine-room.html` and `storage.html` remain separate ship areas.
 - `VOICE-CORE/` retains the original voice assistant resources.
 
 ## Notes
@@ -33,3 +33,8 @@ Keep all files and folders together. The project uses the local `three.min.js` b
 ## Multiplayer race
 
 Open `multiplayer.html` or choose **MULTIPLAYER RACE** from the main menu. The first screen asks whether you are hosting, joining a crew, or displaying the spectator view. Players must enter the host's room code, select Ship A or Ship B, create/save their character if needed, and then join. See `MULTIPLAYER-SETUP.md` for Netlify/Render deployment and testing instructions.
+
+
+## Multiplayer Map + Direct Entry update
+
+The current multiplayer map route is `map.html` (fast rendering enabled by default). `projection.html` remains preserved as the map source/reference. Players can join an existing multiplayer room directly from the Main Deck top-bar **JOIN ROOM** control or with `main-deck.html?room=ROOMCODE&team=A/B`; the room code is required to enter the same shared session. See `MAP-AND-DIRECT-ENTRY-UPDATE.md` and `DEPLOY-THIS-BUILD.md`.

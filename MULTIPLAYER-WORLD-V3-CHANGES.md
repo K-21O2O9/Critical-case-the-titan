@@ -52,3 +52,14 @@
 - Main Deck obstacle and deck-bound checks are server-enforced. Engine Room's detailed machinery collision is still locally simulated; the server checks its movement envelope but does not reproduce every machine obstacle. Storage remains a lightweight transition page and is not a second fully modelled walkable deck.
 - Engine systems expose server-synchronized bridge orders, a set of system flags and telemetry snapshots; full deterministic server-side modelling of every reactor/electrical/cooling/motor subsystem and reconciling competing local telemetry producers remains future hardening.
 - A real two/three-device acceptance test and then a 30-device venue load test are required before calling the deployment event-ready.
+
+
+## v4 follow-up — map.html and direct Main Deck entry
+
+- Added `map.html` as the active shared map page, retaining `projection.html` as the source/reference. Multiplayer world and chart-table map iframes now load `map.html` with fast rendering enabled by default.
+- Fast map mode preloads the local Three.js runtime, reduces expensive rendering settings, caps DPR, limits to about 30 FPS, and pauses when hidden. The map still sends its actual current obstacles and course geometry to the room server.
+- Added `titan-multiplayer-runtime.js` as the single direct-entry/session bridge on Main Deck, Engine Room and Storage pages. It uses one server socket per page, a stable device identity and the saved room/team; it never creates local fake players.
+- Added a Main Deck top-bar **JOIN ROOM** action to join an existing room without first visiting `multiplayer.html`. A room code and ship assignment are required; room-only links allow the player to select a ship, while room+team links auto-join.
+- Server accepts brand-new entrants during countdown and active gameplay, applies the current authoritative room state, auto-readies them, and preserves the 15-player-per-team limit and locked device-to-team assignment. Finished matches reject new entrants.
+- Navigation between Main Deck, Engine Room and Storage carries the room identity and server reconnect restores the same player.
+- Mock-server validation passed for a live-match direct join, shared room snapshot, auto-ready, same-device reconnect, team lock and duplicate-socket guard. This does not replace testing with the real `ws` dependency and live Render/Netlify devices.

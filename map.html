@@ -1,0 +1,4323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>THE TITAN – Shared Tactical Map</title>
+  <link rel="preload" href="three.min.js" as="script" fetchpriority="high">
+  <style>
+    :root {
+      --bg: #03080f;
+      --panel: rgba(6, 17, 30, 0.94);
+      --panel-sub: rgba(4, 24, 38, 0.78);
+      --border: rgba(0, 210, 240, 0.34);
+      --border-strong: rgba(0, 229, 255, 0.75);
+      --cyan: #00e5ff;
+      --cyan-dim: #00a4b8;
+      --emerald: #34d399;
+      --amber: #fbbf24;
+      --purple: #c084fc;
+      --pink: #f472b6;
+      --danger: #fb7185;
+      --text: #dcf6ff;
+      --muted: #7da6be;
+      --radius: 10px;
+    }
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      overscroll-behavior: none;
+    }
+    #c {
+      display: block;
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    #scan {
+      pointer-events: none;
+      position: absolute;
+      inset: 0;
+      z-index: 2;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 3px,
+        rgba(0, 220, 255, 0.015) 3px,
+        rgba(0, 220, 255, 0.015) 4px
+      );
+    }
+    #ui {
+      position: absolute;
+      inset: 0;
+      z-index: 10;
+      pointer-events: none;
+    }
+    #ui > * {
+      pointer-events: auto;
+    }
+
+    /* Top Bar */
+    #topbar {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: max(8px, env(safe-area-inset-top)) 12px 8px 12px;
+      gap: 8px;
+      background: linear-gradient(180deg, rgba(3, 10, 20, 0.96) 0%, transparent 100%);
+    }
+    .brand {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      color: var(--cyan);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .brand span {
+      opacity: 0.6;
+      font-weight: 500;
+      font-size: 10px;
+    }
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .mode-toggle {
+      display: flex;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .mode-toggle button {
+      padding: 6px 13px;
+      font-size: 11px;
+      font-weight: 600;
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      transition: background 0.18s, color 0.18s;
+    }
+    .mode-toggle button.active {
+      background: rgba(0, 185, 220, 0.28);
+      color: var(--cyan);
+    }
+    .drawer-btn {
+      display: none;
+      padding: 6px 9px;
+      font-size: 11px;
+      font-weight: 600;
+      border-radius: 7px;
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--cyan);
+      cursor: pointer;
+    }
+
+    /* Side Panels */
+    .side {
+      position: absolute;
+      top: 46px;
+      width: min(302px, calc(100vw - 16px));
+      max-height: calc(100vh - 82px);
+      overflow-y: auto;
+      overflow-x: hidden;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(0, 210, 240, 0.3) transparent;
+    }
+    .side::-webkit-scrollbar {
+      width: 4px;
+    }
+    .side::-webkit-scrollbar-thumb {
+      background: rgba(0, 210, 240, 0.3);
+      border-radius: 4px;
+    }
+    #left { left: 10px; }
+    #right { right: 10px; }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px 11px;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 6px;
+      gap: 6px;
+    }
+    .card h3 {
+      font-size: 9.5px;
+      font-weight: 700;
+      letter-spacing: 1.1px;
+      text-transform: uppercase;
+      color: var(--cyan-dim);
+      margin: 0;
+    }
+    .badge {
+      font-size: 9.5px;
+      font-weight: 600;
+      padding: 2px 6px;
+      border-radius: 5px;
+      background: rgba(0, 229, 255, 0.14);
+      color: var(--cyan);
+      border: 1px solid rgba(0, 229, 255, 0.28);
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+    .badge.locked {
+      background: rgba(52, 211, 153, 0.16);
+      color: var(--emerald);
+      border-color: rgba(52, 211, 153, 0.45);
+    }
+    .badge.warn {
+      background: rgba(251, 191, 36, 0.18);
+      color: var(--amber);
+      border-color: rgba(251, 191, 36, 0.5);
+    }
+    .badge.danger {
+      background: rgba(251, 113, 133, 0.22);
+      color: #fda4af;
+      border-color: rgba(251, 113, 133, 0.65);
+      animation: pulseBadge 0.8s infinite alternate;
+    }
+    .badge.refueling {
+      background: rgba(52, 211, 153, 0.2);
+      color: var(--emerald);
+      border-color: rgba(52, 211, 153, 0.55);
+      animation: pulseBadge 1.1s infinite alternate;
+    }
+    @keyframes pulseBadge {
+      from { opacity: 0.72; }
+      to { opacity: 1; }
+    }
+
+    .stat {
+      font-size: 13px;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+    .stat-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px 8px;
+      margin-top: 4px;
+    }
+    .stat-sub {
+      font-size: 10.5px;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
+    .stat-sub strong {
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    /* Progress Bars (Fuel & Engine Wear) */
+    .meter-row {
+      margin-top: 6px;
+    }
+    .meter-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 9.5px;
+      color: var(--muted);
+      margin-bottom: 2px;
+      font-variant-numeric: tabular-nums;
+    }
+    .meter-label span {
+      font-weight: 600;
+      color: var(--text);
+    }
+    .fuel-bar-wrap {
+      height: 5px;
+      width: 100%;
+      background: rgba(0, 40, 60, 0.7);
+      border-radius: 4px;
+      overflow: hidden;
+      border: 1px solid rgba(0, 200, 230, 0.18);
+    }
+    .fuel-bar-fill {
+      height: 100%;
+      width: 92%;
+      background: linear-gradient(90deg, #00e5ff, #34d399);
+      transition: width 0.25s ease;
+    }
+    .engine-bar-fill {
+      height: 100%;
+      width: 99%;
+      background: linear-gradient(90deg, #34d399, #38bdf8);
+      transition: width 0.25s ease, background 0.3s ease;
+    }
+
+    /* Radar Bathymetry / Hazard Alert Strip */
+    .radar-alert {
+      margin-top: 7px;
+      padding: 5px 8px;
+      border-radius: 6px;
+      font-size: 10px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      background: rgba(0, 48, 66, 0.55);
+      border: 1px solid rgba(0, 210, 240, 0.25);
+      color: var(--cyan);
+      font-variant-numeric: tabular-nums;
+    }
+    .radar-alert.shoal {
+      background: rgba(146, 64, 14, 0.42);
+      border-color: rgba(251, 191, 36, 0.65);
+      color: #fde68a;
+    }
+    .radar-alert.critical {
+      background: rgba(159, 18, 57, 0.52);
+      border-color: rgba(251, 113, 133, 0.8);
+      color: #fecdd3;
+    }
+
+    /* Buttons & Inputs */
+    .btn-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      margin-top: 7px;
+    }
+    .btn {
+      flex: 1;
+      min-width: 0;
+      padding: 7px 8px;
+      font-size: 11px;
+      font-weight: 550;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: rgba(0, 42, 60, 0.62);
+      color: var(--text);
+      cursor: pointer;
+      white-space: nowrap;
+      text-align: center;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      transition: background 0.15s, border-color 0.15s, transform 0.08s;
+    }
+    .btn:hover {
+      background: rgba(0, 75, 98, 0.8);
+      border-color: rgba(0, 229, 255, 0.55);
+    }
+    .btn:active {
+      transform: scale(0.98);
+    }
+    .btn.active, .btn.primary {
+      background: rgba(0, 150, 185, 0.38);
+      border-color: var(--cyan);
+      color: var(--cyan);
+    }
+    .btn.speed-btn {
+      background: rgba(0, 130, 165, 0.28);
+      border-color: rgba(0, 229, 255, 0.55);
+      color: var(--cyan);
+      font-weight: 650;
+    }
+    .btn.danger {
+      border-color: rgba(251, 113, 133, 0.55);
+      color: #fecdd3;
+      background: rgba(136, 19, 55, 0.48);
+    }
+    .btn.danger:hover {
+      background: rgba(175, 25, 65, 0.72);
+    }
+    .btn.danger.armed {
+      background: #be123c;
+      border-color: #fda4af;
+      color: #ffffff;
+      font-weight: 700;
+    }
+
+    /* Asset Library Grid */
+    .lib-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 5px;
+    }
+    .lib-grid .btn {
+      padding: 7px 6px;
+      font-size: 10.5px;
+      justify-content: flex-start;
+    }
+    .lib-icon {
+      width: 13px;
+      height: 13px;
+      flex-shrink: 0;
+      opacity: 0.92;
+    }
+
+    /* Placement Mode Banner */
+    .placement-mode-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      padding: 6px 8px;
+      margin-bottom: 7px;
+      border-radius: 7px;
+      background: rgba(6, 40, 52, 0.75);
+      border: 1px solid rgba(52, 211, 153, 0.38);
+      font-size: 10px;
+      color: #a7f3d0;
+    }
+    .placement-mode-bar button {
+      padding: 3px 7px;
+      font-size: 9.5px;
+      font-weight: 600;
+      border-radius: 5px;
+      border: 1px solid rgba(0, 229, 255, 0.45);
+      background: rgba(0, 60, 80, 0.7);
+      color: var(--cyan);
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    /* Pre-Placement Customizer Box */
+    .customizer {
+      margin-top: 8px;
+      padding: 8px 9px;
+      background: var(--panel-sub);
+      border: 1px solid rgba(0, 229, 255, 0.24);
+      border-radius: 8px;
+    }
+    .customizer-title {
+      font-size: 9.5px;
+      font-weight: 700;
+      letter-spacing: 0.9px;
+      text-transform: uppercase;
+      color: var(--cyan);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+    .ctrl-group {
+      margin-top: 6px;
+    }
+    .ctrl-label {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 10px;
+      color: var(--muted);
+      margin-bottom: 3px;
+    }
+    .ctrl-label span {
+      color: var(--text);
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .pill-row {
+      display: flex;
+      gap: 4px;
+    }
+    .pill {
+      flex: 1;
+      padding: 4px 4px;
+      font-size: 10px;
+      font-weight: 600;
+      border-radius: 5px;
+      border: 1px solid var(--border);
+      background: rgba(0, 30, 45, 0.65);
+      color: var(--muted);
+      cursor: pointer;
+      text-align: center;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .pill:hover {
+      color: var(--text);
+      border-color: rgba(0, 229, 255, 0.45);
+    }
+    .pill.active {
+      background: rgba(0, 175, 210, 0.34);
+      border-color: var(--cyan);
+      color: var(--cyan);
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 5px;
+      border-radius: 3px;
+      background: rgba(0, 140, 175, 0.32);
+      outline: none;
+      margin: 4px 0;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--cyan);
+      border: 2px solid #03121e;
+      cursor: pointer;
+    }
+    input[type="range"]::-moz-range-thumb {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--cyan);
+      border: 2px solid #03121e;
+      cursor: pointer;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 10.5px;
+      color: var(--muted);
+      margin-bottom: 3px;
+    }
+    .swatch {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    #editorPanel { display: none; }
+    body.editor #editorPanel { display: block; }
+    body.editor #livePanel { display: none; }
+
+    .hint {
+      font-size: 10px;
+      color: var(--muted);
+      line-height: 1.42;
+      margin-top: 6px;
+    }
+
+    #bottom {
+      position: absolute;
+      bottom: max(8px, env(safe-area-inset-bottom));
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 10px;
+      color: rgba(180, 225, 245, 0.82);
+      background: rgba(4, 12, 22, 0.9);
+      border: 1px solid rgba(0, 200, 230, 0.24);
+      padding: 4px 12px;
+      border-radius: 14px;
+      white-space: nowrap;
+      max-width: 94vw;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      pointer-events: none;
+    }
+
+    /* Non-blocking Holographic Toast */
+    #toast {
+      position: absolute;
+      top: 48px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-8px);
+      z-index: 40;
+      pointer-events: none;
+      background: rgba(4, 22, 36, 0.96);
+      border: 1px solid var(--cyan);
+      color: var(--cyan);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.4px;
+      padding: 6px 14px;
+      border-radius: 20px;
+      opacity: 0;
+      transition: opacity 0.22s ease, transform 0.22s ease;
+      max-width: 90vw;
+      text-align: center;
+    }
+    #toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    #err {
+      display: none;
+      position: absolute;
+      inset: 0;
+      z-index: 50;
+      background: #03080f;
+      color: #ffaaaa;
+      padding: 40px 24px;
+      font-size: 14px;
+      text-align: center;
+    }
+    #fileImport { display: none; }
+
+    @media (max-width: 760px) {
+      #topbar { padding: 6px 8px; }
+      .brand { font-size: 11px; }
+      .brand span { display: none; }
+      .drawer-btn { display: inline-flex; }
+      .side {
+        top: 42px;
+        width: min(286px, calc(100vw - 16px));
+        max-height: calc(100vh - 68px);
+        transition: transform 0.22s ease, opacity 0.22s ease;
+      }
+      #left { left: 8px; }
+      #right { right: 8px; }
+      .side.mobile-hidden {
+        opacity: 0;
+        pointer-events: none;
+        transform: translateY(-6px);
+      }
+      #bottom { bottom: 6px; font-size: 9px; }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="c"></canvas>
+  <div id="scan"></div>
+  <div id="toast"></div>
+  <div id="err"></div>
+  <input type="file" id="fileImport" accept=".json,application/json">
+
+  <div id="ui">
+    <div id="topbar">
+      <div class="brand">THE TITAN <span>TACTICAL HOLOGRAM</span></div>
+      <div class="top-actions">
+        <button class="drawer-btn" id="btnToggleLeft">Ship / Edit</button>
+        <button class="drawer-btn" id="btnToggleRight">Sea / View</button>
+        <div class="mode-toggle">
+          <button id="btnLive" class="active">Live</button>
+          <button id="btnEditor">Editor</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- LEFT SIDEBAR: Ship Telemetry & Map Editor -->
+    <div class="side" id="left">
+      <div class="card" id="statusCard">
+        <div class="card-header">
+          <h3>Ship Telemetry</h3>
+          <span class="badge" id="navStatusBadge">AUTO-NAV CLEAR</span>
+        </div>
+        <div class="stat" id="posVal">X 0.0   Z 0.0</div>
+        <div class="stat-grid">
+          <div class="stat-sub">Speed: <strong id="speedVal">12.0 kn</strong></div>
+          <div class="stat-sub">Heading: <strong id="headVal">090°</strong></div>
+          <div class="stat-sub">Depth: <strong id="depthVal">48.0 m</strong></div>
+          <div class="stat-sub">Current: <strong id="currVal">1.4 kn</strong></div>
+        </div>
+
+        <div class="meter-row">
+          <div class="meter-label">Fuel Reserve <span id="fuelPctLabel">92%</span></div>
+          <div class="fuel-bar-wrap" title="Propulsion Fuel Reserve">
+            <div class="fuel-bar-fill" id="fuelBar" style="width: 92%"></div>
+          </div>
+        </div>
+
+        <div class="meter-row">
+          <div class="meter-label">Engine Condition <span id="engineStatusLabel">99.6% · OPTIMAL</span></div>
+          <div class="fuel-bar-wrap" title="Propulsion Engine Light Wear & RPM">
+            <div class="engine-bar-fill" id="engineBar" style="width: 99.6%"></div>
+          </div>
+        </div>
+
+        <div class="radar-alert" id="radarContactBox">
+          <span id="radarContactText">SONAR: Deep Channel Clear</span>
+        </div>
+
+        <div class="btn-row">
+          <button class="btn speed-btn" id="btnShipSpeed" title="Cycle Ship Propulsion Throttle">
+            <svg class="lib-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            <span id="shipSpeedLabel">Throttle: 1.0x</span>
+          </button>
+          <button class="btn" id="btnFollow">Follow</button>
+          <button class="btn" id="btnPause">Pause</button>
+        </div>
+      </div>
+
+      <div class="card" id="editorPanel">
+        <div class="card-header">
+          <h3>Map Editor</h3>
+          <span class="badge locked" id="activeAssetBadge">SELECT / MOVE</span>
+        </div>
+
+        <div class="placement-mode-bar">
+          <span id="placementLockStatus">Rotation-Locked Drag Mode</span>
+          <button id="btnToggleEditorTilt" title="Toggle between locked top-down placement and 3D tilt">Unlock 3D Tilt</button>
+        </div>
+
+        <div class="lib-grid">
+          <button class="btn" data-tool="path">
+            <svg class="lib-icon" viewBox="0 0 24 24" fill="none" stroke="#00e5ff" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg>
+            Path Point
+          </button>
+          <button class="btn" data-tool="island">
+            <svg class="lib-icon" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2"><path d="M3 18l5-10 4 6 3-4 6 8H3z"/></svg>
+            Island
+          </button>
+          <button class="btn" data-tool="reef">
+            <svg class="lib-icon" viewBox="0 0 24 24" fill="none" stroke="#f97316" stroke-width="2"><path d="M4 19h16M6 19l2-7 3 4 2-6 3 5 2-4"/></svg>
+            Reef
+          </button>
+          <button class="btn" data-tool="rock">
+            <svg class="lib-icon" viewBox="0 0 24 24" fill="none" stroke="#fb923c" stroke-width="2"><polygon points="12 3 20 9 18 19 6 19 4 9 12 3"/></svg>
+            Rock
+          </button>
+          <button class="btn" data-tool="typhoon">
+            <svg class="lib-icon" viewBox="0 0 24 24" fill="none" stroke="#c084fc" stroke-width="2"><path d="M12 12m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0"/><path d="M12 3a9 9 0 0 1 9 9M12 21a9 9 0 0 1-9-9"/></svg>
+            Cyclone
+          </button>
+          <button class="btn" data-tool="fuel">
+            <svg class="lib-icon" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2"><rect x="4" y="4" width="10" height="16" rx="2"/><path d="M14 8h3l2 3v7a1 1 0 0 1-1 1h-1"/><line x1="7" y1="9" x2="11" y2="9"/></svg>
+            Fuel Station
+          </button>
+          <button class="btn" data-tool="storm" style="grid-column: span 2;">
+            <svg class="lib-icon" viewBox="0 0 24 24" fill="none" stroke="#f472b6" stroke-width="2"><path d="M3 12c4-5 6 5 10 0s5 3 8-1"/></svg>
+            Storm Track Point
+          </button>
+        </div>
+
+        <!-- Asset Configuration Box -->
+        <div class="customizer" id="assetCustomizer">
+          <div class="customizer-title">
+            <span id="customizerModeLabel">Object Properties</span>
+            <span id="customizerAssetName" style="color:var(--muted)">NONE</span>
+          </div>
+
+          <div class="ctrl-group" id="variantGroup">
+            <div class="ctrl-label">Model Variant <span id="variantLabel">Standard</span></div>
+            <div class="pill-row" id="variantPills">
+              <button class="pill active" data-variant="0">Model 1</button>
+              <button class="pill" data-variant="1">Model 2</button>
+              <button class="pill" data-variant="2">Model 3</button>
+            </div>
+          </div>
+
+          <div class="ctrl-group" id="sizeGroup">
+            <div class="ctrl-label">Asset Size <span id="sizeLabel">1.00x (M)</span></div>
+            <div class="pill-row" id="sizePills" style="margin-bottom:4px;">
+              <button class="pill" data-scale="0.65">S</button>
+              <button class="pill active" data-scale="1.0">M</button>
+              <button class="pill" data-scale="1.45">L</button>
+              <button class="pill" data-scale="1.95">XL</button>
+            </div>
+            <input type="range" id="scaleSlider" min="0.5" max="2.5" step="0.05" value="1.0">
+          </div>
+
+          <div class="ctrl-group" id="rotGroup">
+            <div class="ctrl-label">Object Heading <span id="rotLabel">0°</span></div>
+            <div style="display:flex; align-items:center; gap:6px;">
+              <input type="range" id="rotSlider" min="0" max="345" step="15" value="0" style="flex:1;">
+              <button class="pill" id="btnRotateStep" style="flex:0 0 auto; padding:4px 7px;">45°</button>
+            </div>
+          </div>
+
+          <div class="ctrl-group" style="display:flex; justify-content:space-between; align-items:center; margin-top:7px;">
+            <span style="font-size:10px; color:var(--muted);">Grid Snap (2.0u)</span>
+            <button class="pill" id="btnSnapGrid" style="flex:0 0 auto; padding:3px 9px;">OFF</button>
+          </div>
+        </div>
+
+        <h3 style="margin-top:9px; margin-bottom:5px;">Manipulation & Map Actions</h3>
+        <div class="lib-grid">
+          <button class="btn active" data-tool="select">Select / Move</button>
+          <button class="btn" data-tool="delete">Delete Item</button>
+        </div>
+
+        <div class="btn-row" style="margin-top:7px">
+          <button class="btn" id="btnClearPath">Clear Path</button>
+          <button class="btn" id="btnResetMap">Reset Default</button>
+        </div>
+        <div class="btn-row">
+          <button class="btn danger" id="btnDeleteAll" title="Delete all objects, paths, and storm tracks from the map">
+            <svg class="lib-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            <span id="deleteAllLabel">Delete Everything</span>
+          </button>
+        </div>
+        <div class="btn-row">
+          <button class="btn primary" id="btnExport">Export JSON</button>
+          <button class="btn" id="btnImport">Import JSON</button>
+        </div>
+        <p class="hint" id="toolHint">Click any object or waypoint to select and drag smoothly. Routes automatically navigate around islands and shallow water.</p>
+      </div>
+    </div>
+
+    <!-- RIGHT SIDEBAR: Ocean Dynamics, Cyclone Control & View -->
+    <div class="side" id="right">
+      <div class="card" id="oceanCard">
+        <div class="card-header">
+          <h3>Ocean, Tides & Currents</h3>
+          <span class="badge" id="tideBadge">HIGH TIDE +0.3m</span>
+        </div>
+        <div class="stat-grid" style="margin-bottom:6px;">
+          <div class="stat-sub">Sea State: <strong id="seaStateVal">Moderate</strong></div>
+          <div class="stat-sub">Flow Drift: <strong id="oceanDriftVal">1.8 kn E</strong></div>
+        </div>
+        <div class="ctrl-label">Tide & Swell Intensity <span id="seaIntensityLabel">1.0x</span></div>
+        <input type="range" id="seaIntensitySlider" min="0.3" max="2.2" step="0.1" value="1.0">
+        <div class="btn-row" style="margin-top:5px;">
+          <button class="btn active" id="btnCurrents">Current Flows</button>
+          <button class="btn active" id="btnShallows">Shallow Zones</button>
+        </div>
+      </div>
+
+      <div class="card" id="weatherCard">
+        <div class="card-header">
+          <h3>Cyclone & Storm Dynamics</h3>
+          <span class="badge" id="cycloneSpeedBadge">1.0x</span>
+        </div>
+        <div class="ctrl-label">Cyclone Speed <span id="cycloneSpeedLabel">Normal (1.0x)</span></div>
+        <input type="range" id="cycloneSpeedSlider" min="0" max="4" step="0.1" value="1.0">
+        <div class="pill-row" id="cyclonePresets" style="margin-top:4px;">
+          <button class="pill" data-cspeed="0.4">0.4x</button>
+          <button class="pill active" data-cspeed="1.0">1.0x</button>
+          <button class="pill" data-cspeed="2.0">2.0x</button>
+          <button class="pill" data-cspeed="3.5">3.5x</button>
+        </div>
+      </div>
+
+      <div class="card" id="livePanel">
+        <div class="card-header">
+          <h3>Tactical Legend</h3>
+        </div>
+        <div class="legend-item"><span class="swatch" style="background:#00e5ff"></span> The Titan (Auto-Avoidance)</div>
+        <div class="legend-item"><span class="swatch" style="background:#14b8a6"></span> Shallow Shoal (Radar Hazard)</div>
+        <div class="legend-item"><span class="swatch" style="background:#38bdf8"></span> Ocean Current Stream</div>
+        <div class="legend-item"><span class="swatch" style="background:#34d399"></span> Fuel & Maintenance Hub</div>
+        <div class="legend-item"><span class="swatch" style="background:#4ade80"></span> Islands & Atolls</div>
+        <div class="legend-item"><span class="swatch" style="background:#f97316"></span> Reefs & Sea Rocks</div>
+        <div class="legend-item"><span class="swatch" style="background:#c084fc"></span> Active 3D Cyclone</div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h3>Hologram Grid & View</h3>
+        </div>
+        <div class="btn-row" style="margin-top:2px;">
+          <button class="btn active" id="btnGrid">Tactical Grid</button>
+          <button class="btn active" id="btnRadar">Ship Radar</button>
+        </div>
+        <div class="btn-row">
+          <button class="btn" id="btnResetCam">Reset Camera</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="bottom">Drag to orbit · Scroll / pinch to zoom · Live waves, tides, currents & A* obstacle avoidance</div>
+  </div>
+
+  <!-- Primary Three.js CDN + Multi-CDN Fallback Loader -->
+  <script src="three.min.js"></script>
+  <script>
+  (function () {
+    'use strict';
+
+    function showError(msg) {
+      var el = document.getElementById('err');
+      if (el) {
+        el.style.display = 'block';
+        el.innerHTML = '<h2 style="color:#00e5ff;margin-bottom:12px">Unable to start</h2><p>' + msg + '</p>';
+      }
+    }
+
+    function ensureThreeLoaded(callback) {
+      if (typeof window.THREE !== 'undefined') {
+        callback();
+        return;
+      }
+      var fallbacks = [
+        'https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js',
+        'https://unpkg.com/three@0.128.0/build/three.min.js'
+      ];
+      var idx = 0;
+      function tryNext() {
+        if (typeof window.THREE !== 'undefined') {
+          callback();
+          return;
+        }
+        if (idx >= fallbacks.length) {
+          showError('Unable to load the 3D engine (Three.js). Please check your network connection and reload.');
+          return;
+        }
+        var s = document.createElement('script');
+        s.src = fallbacks[idx++];
+        s.onload = function () {
+          if (typeof window.THREE !== 'undefined') callback();
+          else tryNext();
+        };
+        s.onerror = tryNext;
+        document.head.appendChild(s);
+      }
+      tryNext();
+    }
+
+    function bootApplication() {
+      var toastTimer = null;
+      function showToast(msg) {
+        var t = document.getElementById('toast');
+        if (!t) return;
+        t.textContent = msg;
+        t.classList.add('show');
+        if (toastTimer) clearTimeout(toastTimer);
+        toastTimer = setTimeout(function () { t.classList.remove('show'); }, 2600);
+      }
+
+      function $(id) { return document.getElementById(id); }
+
+      if (window.innerWidth <= 760) {
+        $('left').classList.add('mobile-hidden');
+        $('right').classList.add('mobile-hidden');
+      }
+
+      // ── Scene, Camera & Cross-Browser WebGL Renderer ─────────
+      var canvas = $('c');
+      var mapParams = new URLSearchParams(window.location.search);
+      var fastMapMode = mapParams.get('quality') !== 'high' && mapParams.get('quality') !== 'ultra';
+      var mapIsEmbedded = window.parent !== window && (mapParams.get('embedded') === '1' || mapParams.get('multiplayer') === '1');
+      var mapRoomEmbedded = window.parent !== window && mapParams.get('multiplayer') === '1';
+      // Embedded maps initialise once, but stay idle until their owner actually shows them.
+      var mapRenderRequested = !mapIsEmbedded;
+      var mapViewportVisible = true;
+      var mapLastFrameAt = 0;
+      var scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x03080f);
+      scene.fog = new THREE.FogExp2(0x03080f, 0.0048);
+
+      var initW = Math.max(1, canvas.clientWidth || window.innerWidth || 800);
+      var initH = Math.max(1, canvas.clientHeight || window.innerHeight || 600);
+      var camera = new THREE.PerspectiveCamera(40, initW / initH, 0.2, 420);
+
+      var renderer = null;
+      var rendererConfigs = fastMapMode
+        ? [{ canvas: canvas, antialias: false, powerPreference: 'high-performance', alpha: false, stencil: false, depth: true }]
+        : [
+            { canvas: canvas, antialias: true, powerPreference: 'high-performance' },
+            { canvas: canvas, antialias: true },
+            { canvas: canvas, antialias: false }
+          ];
+      for (var rc = 0; rc < rendererConfigs.length; rc++) {
+        try {
+          renderer = new THREE.WebGLRenderer(rendererConfigs[rc]);
+          if (renderer) break;
+        } catch (err) {
+          renderer = null;
+        }
+      }
+      if (!renderer) {
+        showError('WebGL is disabled or unsupported in this browser. Please enable hardware acceleration and reload.');
+        return;
+      }
+
+      renderer.setSize(initW, initH);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, fastMapMode ? (window.innerWidth <= 760 ? 0.9 : 1.25) : 2));
+      renderer.localClippingEnabled = true;
+      if (fastMapMode) {
+        renderer.shadowMap.enabled = false;
+        if ('IntersectionObserver' in window) {
+          var mapVisibilityObserver = new IntersectionObserver(function (entries) {
+            if (entries && entries.length) mapViewportVisible = !!entries[0].isIntersecting && entries[0].intersectionRatio > 0;
+          }, { threshold: 0.01 });
+          mapVisibilityObserver.observe(canvas);
+        }
+      }
+      document.addEventListener('visibilitychange', function () { if (!document.hidden) lastT = performance.now(); });
+
+      canvas.addEventListener('webglcontextlost', function (e) {
+        e.preventDefault();
+        showToast('Graphics context paused — restoring...');
+      }, false);
+      canvas.addEventListener('webglcontextrestored', function () {
+        onResize();
+        showToast('Graphics context restored');
+      }, false);
+
+      // Soft Tactical Illumination
+      scene.add(new THREE.AmbientLight(0x2c5c7d, 1.08));
+      var keyLight = new THREE.DirectionalLight(0x88ecff, 0.9);
+      keyLight.position.set(28, 52, 32);
+      scene.add(keyLight);
+      var fillLight = new THREE.DirectionalLight(0x1e5c8a, 0.48);
+      fillLight.position.set(-28, 24, -24);
+      scene.add(fillLight);
+
+      // ── Holographic Command Table ────────────────────────────
+      var MAP_W = 82;
+      var MAP_D = 64;
+      var HALF_W = MAP_W / 2; // 41
+      var HALF_D = MAP_D / 2; // 32
+
+      var table = new THREE.Group();
+      scene.add(table);
+
+      var matTableFrame = new THREE.MeshLambertMaterial({ color: 0x07131f });
+      var tableMesh = new THREE.Mesh(new THREE.BoxGeometry(92, 1.4, 72), matTableFrame);
+      tableMesh.position.y = -0.7;
+      table.add(tableMesh);
+
+      var edgeGlow = new THREE.Mesh(
+        new THREE.BoxGeometry(93.4, 0.14, 73.4),
+        new THREE.MeshBasicMaterial({ color: 0x00e5ff, transparent: true, opacity: 0.34 })
+      );
+      edgeGlow.position.y = 0.05;
+      table.add(edgeGlow);
+
+      [[-41, -32], [41, -32], [-41, 32], [41, 32]].forEach(function (p) {
+        var leg = new THREE.Mesh(new THREE.BoxGeometry(2.2, 11, 2.2), matTableFrame);
+        leg.position.set(p[0], -6.5, p[1]);
+        table.add(leg);
+      });
+
+      var map = new THREE.Group();
+      map.position.y = 0.85;
+      table.add(map);
+
+      // Sub-seabed floor beneath the translucent waves
+      var seabedMesh = new THREE.Mesh(
+        new THREE.PlaneGeometry(MAP_W, MAP_D),
+        new THREE.MeshBasicMaterial({ color: 0x020d17 })
+      );
+      seabedMesh.rotation.x = -Math.PI / 2;
+      seabedMesh.position.y = -0.25;
+      map.add(seabedMesh);
+
+      // ── Dynamic 3D Wave & Bathymetric Ocean Surface ──────────
+      var OCEAN_SEG_X = 82;
+      var OCEAN_SEG_Z = 64;
+      var oceanGeo = new THREE.PlaneGeometry(MAP_W, MAP_D, OCEAN_SEG_X, OCEAN_SEG_Z);
+      oceanGeo.rotateX(-Math.PI / 2);
+
+      var oceanPosAttr = oceanGeo.attributes.position;
+      var oceanVertCount = oceanPosAttr.count;
+      var oceanBaseX = new Float32Array(oceanVertCount);
+      var oceanBaseZ = new Float32Array(oceanVertCount);
+      var oceanNormalizedDepth = new Float32Array(oceanVertCount); // 0 = dry/shore, 1 = deep ocean
+      var oceanColorArray = new Float32Array(oceanVertCount * 3);
+
+      for (var ov = 0; ov < oceanVertCount; ov++) {
+        oceanBaseX[ov] = oceanPosAttr.getX(ov);
+        oceanBaseZ[ov] = oceanPosAttr.getZ(ov);
+        oceanNormalizedDepth[ov] = 1.0;
+      }
+      oceanGeo.setAttribute('color', new THREE.BufferAttribute(oceanColorArray, 3));
+
+      var oceanMat = new THREE.MeshLambertMaterial({
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.92,
+        flatShading: false
+      });
+      var water = new THREE.Mesh(oceanGeo, oceanMat);
+      water.renderOrder = 1;
+      map.add(water);
+
+      // Subtle Wireframe Wave Crest Overlay for Holographic Sea Texture
+      var waveWireMat = new THREE.MeshBasicMaterial({
+        color: 0x00d8f0,
+        wireframe: true,
+        transparent: true,
+        opacity: 0.045,
+        depthWrite: false
+      });
+      var waveWireMesh = new THREE.Mesh(oceanGeo, waveWireMat);
+      waveWireMesh.position.y = 0.012;
+      waveWireMesh.renderOrder = 2;
+      map.add(waveWireMesh);
+
+      // ── Glitch-Free Power-of-Two Texture Tactical Grid ──────
+      var gridGroup = new THREE.Group();
+      gridGroup.position.y = 0.04;
+      map.add(gridGroup);
+
+      function buildGlitchFreeTacticalGrid() {
+        var texW = 1024;
+        var texH = 1024;
+        var gCanvas = document.createElement('canvas');
+        gCanvas.width = texW;
+        gCanvas.height = texH;
+        var ctx = gCanvas.getContext('2d');
+
+        ctx.clearRect(0, 0, texW, texH);
+
+        function mapXToPx(mx) { return ((mx + HALF_W) / MAP_W) * texW; }
+        function mapZToPx(mz) { return ((mz + HALF_D) / MAP_D) * texH; }
+
+        ctx.strokeStyle = 'rgba(0, 175, 215, 0.16)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        for (var x = -40; x <= 40; x += 2) {
+          if (Math.abs(x) % 10 === 0) continue;
+          var px = Math.round(mapXToPx(x)) + 0.5;
+          ctx.moveTo(px, 0);
+          ctx.lineTo(px, texH);
+        }
+        for (var z = -30; z <= 30; z += 2) {
+          if (Math.abs(z) % 10 === 0) continue;
+          var py = Math.round(mapZToPx(z)) + 0.5;
+          ctx.moveTo(0, py);
+          ctx.lineTo(texW, py);
+        }
+        ctx.stroke();
+
+        ctx.strokeStyle = 'rgba(0, 229, 255, 0.34)';
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        for (var mx = -40; mx <= 40; mx += 10) {
+          var mpx = Math.round(mapXToPx(mx)) + 0.5;
+          ctx.moveTo(mpx, 0);
+          ctx.lineTo(mpx, texH);
+        }
+        for (var mz = -30; mz <= 30; mz += 10) {
+          var mpy = Math.round(mapZToPx(mz)) + 0.5;
+          ctx.moveTo(0, mpy);
+          ctx.lineTo(texW, mpy);
+        }
+        ctx.stroke();
+
+        ctx.strokeStyle = 'rgba(130, 250, 255, 0.72)';
+        ctx.lineWidth = 1.8;
+        ctx.beginPath();
+        for (var cx = -40; cx <= 40; cx += 10) {
+          for (var cz = -30; cz <= 30; cz += 10) {
+            var ix = mapXToPx(cx);
+            var iy = mapZToPx(cz);
+            ctx.moveTo(ix - 6, iy);
+            ctx.lineTo(ix + 6, iy);
+            ctx.moveTo(ix, iy - 6);
+            ctx.lineTo(ix, iy + 6);
+          }
+        }
+        ctx.stroke();
+
+        ctx.strokeStyle = 'rgba(0, 229, 255, 0.78)';
+        ctx.lineWidth = 4;
+        ctx.strokeRect(2, 2, texW - 4, texH - 4);
+
+        var gridTex = new THREE.CanvasTexture(gCanvas);
+        gridTex.minFilter = THREE.LinearFilter;
+        gridTex.magFilter = THREE.LinearFilter;
+        gridTex.generateMipmaps = false;
+        gridTex.needsUpdate = true;
+
+        var gridTexMat = new THREE.MeshBasicMaterial({
+          map: gridTex,
+          transparent: true,
+          depthWrite: false,
+          polygonOffset: true,
+          polygonOffsetFactor: -1,
+          polygonOffsetUnits: -1
+        });
+
+        var gridPlane = new THREE.Mesh(new THREE.PlaneGeometry(MAP_W, MAP_D), gridTexMat);
+        gridPlane.rotation.x = -Math.PI / 2;
+        gridPlane.renderOrder = 3;
+        gridGroup.add(gridPlane);
+      }
+      buildGlitchFreeTacticalGrid();
+
+      var mapClipPlanes = [
+        new THREE.Plane(new THREE.Vector3(1, 0, 0), HALF_W),
+        new THREE.Plane(new THREE.Vector3(-1, 0, 0), HALF_W),
+        new THREE.Plane(new THREE.Vector3(0, 0, 1), HALF_D),
+        new THREE.Plane(new THREE.Vector3(0, 0, -1), HALF_D)
+      ];
+
+      // ── Shared Matte Tactical Materials ──────────────────────
+      var matLand = new THREE.MeshLambertMaterial({ color: 0x195738, emissive: 0x092919, flatShading: true });
+      var matLandPeak = new THREE.MeshLambertMaterial({ color: 0x26704b, emissive: 0x0e3823, flatShading: true });
+      var matReef = new THREE.MeshLambertMaterial({ color: 0x9e4f16, emissive: 0x3b1d06, flatShading: true });
+      var matRock = new THREE.MeshLambertMaterial({ color: 0x57331f, emissive: 0x261308, flatShading: true });
+      var matShip = new THREE.MeshLambertMaterial({ color: 0x00d8f0, emissive: 0x006c80 });
+      var matShipSuper = new THREE.MeshLambertMaterial({ color: 0xb8f4ff, emissive: 0x389cb8 });
+      var matFuelHull = new THREE.MeshLambertMaterial({ color: 0x0f3d4c, emissive: 0x06222b });
+      var matFuelTank = new THREE.MeshLambertMaterial({ color: 0x34d399, emissive: 0x057a52 });
+      var matFuelAmber = new THREE.MeshLambertMaterial({ color: 0xfbbf24, emissive: 0x92400e });
+      var matStorm = new THREE.LineBasicMaterial({ color: 0xf472b6, transparent: true, opacity: 0.65 });
+
+      // ── Core Application State ───────────────────────────────
+      var mode = 'live';
+      var tool = 'select';
+      var paused = false;
+      var follow = false;
+      var showGrid = true;
+      var showRadar = true;
+      var showCurrents = true;
+      var showShallows = true;
+
+      var progress = 0;
+      var fuelLevel = 92.0;
+      var engineHealth = 99.6; // Realistic light wear over runtime
+      var seaIntensity = 1.0;
+      var tidePhase = 0.35;    // Oscillates continuously between Low Tide and High Tide
+      var currentTideHeight = 0.0;
+
+      var editorRotationLocked = true;
+      var selectedEntity = null;
+      var dragging = null;
+      var ghostPreview = null;
+
+      var placementConfig = {
+        variant: 0,
+        scale: 1.0,
+        rotation: 0,
+        snap: false
+      };
+
+      var objects = [];
+      var pathPoints = [];        // User-placed navigation waypoints
+      var computedRoutePoints = []; // A* obstacle-avoiding points
+      var pathCurve = null;
+      var pathLine = null;
+      var directGhostLine = null;
+      var pathMarkers = [];
+
+      var stormPoints = [];
+      var stormCurve = null;
+      var stormLine = null;
+      var stormMarkers = [];
+      var stormProgress = 0;
+      var stormMesh = null;
+
+      var DEFAULT_PATH = [[-32, 18], [-22, 9], [-11, 1], [-1, -4], [10, -4], [20, 3], [32, 14]];
+
+      // ── Ship Builder with Navigation Lights, Mast Radar & Wake ──
+      function buildTitan() {
+        var g = new THREE.Group();
+        g.name = 'Titan';
+        var S = 0.095;
+        var L = 42 * S, B = 9.2 * S, H = 4.2 * S;
+        function box(w, h, d, mat, x, y, z) {
+          var m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+          m.position.set(x || 0, y || 0, z || 0);
+          return m;
+        }
+        g.add(box(L * 0.72, H, B, matShip, 0, H / 2, 0));
+        g.add(box(L * 0.18, H * 0.95, B * 0.92, matShip, L * 0.36, H * 0.475, 0));
+        g.add(box(L * 0.16, H * 0.95, B * 0.95, matShip, -L * 0.34, H * 0.475, 0));
+        var bowGeo = new THREE.ConeGeometry(B * 0.48, 6.5 * S, 4);
+        bowGeo.rotateZ(-Math.PI / 2);
+        bowGeo.rotateX(Math.PI / 4);
+        var bow = new THREE.Mesh(bowGeo, matShip);
+        bow.position.set(L * 0.48 + 1.2 * S, H * 0.45, 0);
+        bow.scale.set(1, 0.85, 1.05);
+        g.add(bow);
+        g.add(box(3.5 * S, H * 0.9, B * 0.88, matShip, -L * 0.48, H * 0.45, 0));
+        g.add(box(L * 0.95, 0.25 * S, B * 0.96, matShip, 0, H + 0.1 * S, 0));
+        g.add(box(11 * S, 3.2 * S, 7.5 * S, matShipSuper, -6 * S, H + 1.7 * S, 0));
+        g.add(box(6.5 * S, 2.4 * S, 8.8 * S, matShipSuper, -5.5 * S, H + 4.5 * S, 0));
+
+        // Funnel + Warm Engine Exhaust Beacon
+        var funnel = new THREE.Mesh(new THREE.CylinderGeometry(1.15 * S, 1.35 * S, 4.2 * S, 10), matShip);
+        funnel.position.set(-9.5 * S, H + 5.5 * S, 0);
+        g.add(funnel);
+
+        // Rotating Ship Mast Radar Bar
+        var mastRadar = new THREE.Mesh(
+          new THREE.BoxGeometry(0.35 * S, 0.25 * S, 4.2 * S),
+          new THREE.MeshBasicMaterial({ color: 0x00e5ff })
+        );
+        mastRadar.position.set(-5.2 * S, H + 6.4 * S, 0);
+        mastRadar.name = 'mastRadar';
+        g.add(mastRadar);
+
+        // Realistic Navigation Lights: Port (Red -Z), Starboard (Green +Z), Masthead (White)
+        var portLight = new THREE.Mesh(
+          new THREE.SphereGeometry(0.11, 8, 8),
+          new THREE.MeshBasicMaterial({ color: 0xff3b5c })
+        );
+        portLight.position.set(-4.5 * S, H + 4.9 * S, -4.7 * S);
+        portLight.name = 'portLight';
+        g.add(portLight);
+
+        var stbdLight = new THREE.Mesh(
+          new THREE.SphereGeometry(0.11, 8, 8),
+          new THREE.MeshBasicMaterial({ color: 0x22c55e })
+        );
+        stbdLight.position.set(-4.5 * S, H + 4.9 * S, 4.7 * S);
+        stbdLight.name = 'stbdLight';
+        g.add(stbdLight);
+
+        var mastLight = new THREE.Mesh(
+          new THREE.SphereGeometry(0.1, 8, 8),
+          new THREE.MeshBasicMaterial({ color: 0xffffff })
+        );
+        mastLight.position.set(-5.2 * S, H + 6.85 * S, 0);
+        mastLight.name = 'mastLight';
+        g.add(mastLight);
+
+        // Hull Tactical Halo Ring (turns amber/red when in shallow hazard)
+        var glow = new THREE.Mesh(
+          new THREE.RingGeometry(2.3, 2.95, 32),
+          new THREE.MeshBasicMaterial({ color: 0x00e5ff, transparent: true, opacity: 0.42, side: THREE.DoubleSide, depthWrite: false })
+        );
+        glow.rotation.x = -Math.PI / 2;
+        glow.position.y = 0.05;
+        glow.name = 'glow';
+        g.add(glow);
+
+        // Kelvin Bow V-Wake & Stern Foam Streak
+        var wakeGroup = new THREE.Group();
+        wakeGroup.name = 'wakeGroup';
+        var wakeLeft = new THREE.Mesh(
+          new THREE.PlaneGeometry(5.6, 0.28),
+          new THREE.MeshBasicMaterial({ color: 0xa5f3fc, transparent: true, opacity: 0.36, side: THREE.DoubleSide, depthWrite: false })
+        );
+        wakeLeft.rotation.x = -Math.PI / 2;
+        wakeLeft.rotation.z = 0.24;
+        wakeLeft.position.set(-2.6, 0.06, -1.05);
+        wakeGroup.add(wakeLeft);
+
+        var wakeRight = new THREE.Mesh(
+          new THREE.PlaneGeometry(5.6, 0.28),
+          new THREE.MeshBasicMaterial({ color: 0xa5f3fc, transparent: true, opacity: 0.36, side: THREE.DoubleSide, depthWrite: false })
+        );
+        wakeRight.rotation.x = -Math.PI / 2;
+        wakeRight.rotation.z = -0.24;
+        wakeRight.position.set(-2.6, 0.06, 1.05);
+        wakeGroup.add(wakeRight);
+
+        var sternWash = new THREE.Mesh(
+          new THREE.PlaneGeometry(6.5, 0.55),
+          new THREE.MeshBasicMaterial({ color: 0xe0f2fe, transparent: true, opacity: 0.32, side: THREE.DoubleSide, depthWrite: false })
+        );
+        sternWash.rotation.x = -Math.PI / 2;
+        sternWash.position.set(-4.8, 0.05, 0);
+        wakeGroup.add(sternWash);
+        g.add(wakeGroup);
+
+        return g;
+      }
+      var titan = buildTitan();
+      map.add(titan);
+
+      // Multiplayer world adapter: this map.html page is the shared world renderer.
+      // Networked vessels are independent instances of this page's original Titan mesh.
+      var mpEmbedded = mapIsEmbedded; // multiplayer iframe or embedded chart-table map
+      var mpRoomEmbedded = mapRoomEmbedded;
+      var mpNetworkShips = {};
+      var mpPlayerMarkers = new Map();
+      var mpFlyActive = false;
+      var mpFlyKeys = Object.create(null);
+      var mpFlyLastAt = 0;
+      function mpMakeShip(team) {
+        var group = buildTitan();
+        group.name = 'TITAN_MULTIPLAYER_SHIP_' + team;
+        group.traverse(function (obj) {
+          if (!obj.isMesh) return;
+          if (obj.material) {
+            obj.material = Array.isArray(obj.material) ? obj.material.map(function (m) { return m.clone(); }) : obj.material.clone();
+            var materials = Array.isArray(obj.material) ? obj.material : [obj.material];
+            materials.forEach(function (m) {
+              if (m.color) m.color.lerp(new THREE.Color(team === 'A' ? 0x148ca9 : 0xc18a37), 0.20);
+              if (m.emissive) m.emissive.setHex(team === 'A' ? 0x063c55 : 0x49300b);
+            });
+          }
+        });
+        // A real raycastable hull footprint; it follows this vessel's independent transform.
+        var hitbox = new THREE.Mesh(
+          new THREE.BoxGeometry(4.95, 1.15, 1.05),
+          new THREE.MeshBasicMaterial({ color: team === 'A' ? 0x31d8ff : 0xffc46b, transparent: true, opacity: 0.001, colorWrite: false, depthWrite: false })
+        );
+        hitbox.name = 'MP_HULL_HITBOX_' + team;
+        hitbox.position.y = 0.58;
+        hitbox.userData.multiplayerShipHitbox = true;
+        group.add(hitbox);
+        var crewGroup = new THREE.Group(); crewGroup.name = 'MP_CREW_' + team; group.add(crewGroup);
+        var ring = new THREE.Mesh(new THREE.RingGeometry(2.55, 2.72, 48), new THREE.MeshBasicMaterial({ color: team === 'A' ? 0x00d9ff : 0xffbb55, transparent: true, opacity: 0.65, side: THREE.DoubleSide }));
+        ring.rotation.x = -Math.PI / 2; ring.position.y = 0.10; group.add(ring);
+        map.add(group);
+        return { group: group, crew: crewGroup, hitbox: hitbox, ring: ring, team: team };
+      }
+      function mpUpdateWorld(packet) {
+        if (!mpEmbedded || !packet || !packet.state) return;
+        var snap = packet.state;
+        ['A', 'B'].forEach(function (team) {
+          if (!mpNetworkShips[team]) mpNetworkShips[team] = mpMakeShip(team);
+          var netShip = snap.ships && snap.ships[team];
+          var entry = mpNetworkShips[team];
+          if (netShip) {
+            entry.group.position.set(Number(netShip.x) || 0, 0.38, Number(netShip.z) || 0);
+            entry.group.rotation.y = -(Number(netShip.yaw) || 0);
+            if (entry.ring && entry.ring.material && entry.ring.material.color) {
+              entry.ring.material.color.setHex(netShip.grounded ? 0xff5548 : (team === 'A' ? 0x00d9ff : 0xffbb55));
+              entry.ring.material.opacity = netShip.grounded ? 0.95 : 0.65;
+            }
+            entry.group.visible = true;
+          }
+          var presentIds = new Set();
+          (snap.players || []).filter(function (p) { return p.team === team && p.connected; }).forEach(function (p) {
+            presentIds.add(p.id);
+            var dot = mpPlayerMarkers.get(p.id);
+            if (!dot) {
+              dot = new THREE.Mesh(new THREE.SphereGeometry(p.isHost ? 0.17 : 0.12, 10, 8), new THREE.MeshBasicMaterial({ color: p.isHost ? 0xffffff : (team === 'A' ? 0x55e4ff : 0xffd17a), emissive: team === 'A' ? 0x0d5e78 : 0x72450e }));
+              dot.userData.playerId = p.id;
+              mpPlayerMarkers.set(p.id, dot);
+              entry.crew.add(dot);
+            }
+            // Main Deck axes: ship length is local Z; projection Titan length is map X.
+            dot.position.set(-(Number(p.z) || 0) * 0.075, p.area === 'main-deck' ? 0.78 : 1.0, (Number(p.x) || 0) * 0.17);
+            dot.userData.playerName = p.name; dot.userData.area = p.area || 'main-deck';
+            dot.visible = true;
+          });
+          Array.from(mpPlayerMarkers.entries()).forEach(function (pair) {
+            var id = pair[0], dot = pair[1];
+            if (!presentIds.has(id) && dot.parent === entry.crew) { entry.crew.remove(dot); mpPlayerMarkers.delete(id); dot.geometry.dispose(); dot.material.dispose(); }
+          });
+        });
+      }
+      function mpUpdateFly(dt) {
+        if (!mpEmbedded || !mpFlyActive) return;
+        var step = 22 * Math.min(dt, 0.05);
+        var forward = (mpFlyKeys.KeyW || mpFlyKeys.ArrowUp ? 1 : 0) - (mpFlyKeys.KeyS || mpFlyKeys.ArrowDown ? 1 : 0);
+        var side = (mpFlyKeys.KeyD || mpFlyKeys.ArrowRight ? 1 : 0) - (mpFlyKeys.KeyA || mpFlyKeys.ArrowLeft ? 1 : 0);
+        var len = Math.hypot(forward, side) || 1;
+        var fx = -Math.sin(camState.theta), fz = -Math.cos(camState.theta);
+        var rx = Math.cos(camState.theta), rz = -Math.sin(camState.theta);
+        camState.goalTarget.x += (fx * forward / len + rx * side / len) * step;
+        camState.goalTarget.z += (fz * forward / len + rz * side / len) * step;
+        if (mpFlyKeys.Space) camState.goalRadius = Math.max(16, camState.goalRadius - step * 1.35);
+        if (mpFlyKeys.ShiftLeft || mpFlyKeys.ShiftRight) camState.goalRadius = Math.min(150, camState.goalRadius + step * 1.35);
+        if (mpFlyKeys.KeyQ) camState.goalPhi = Math.max(0.22, camState.goalPhi - dt * 0.55);
+        if (mpFlyKeys.KeyE) camState.goalPhi = Math.min(1.42, camState.goalPhi + dt * 0.55);
+        camState.goalTarget.x = Math.max(-58, Math.min(58, camState.goalTarget.x));
+        camState.goalTarget.z = Math.max(-48, Math.min(48, camState.goalTarget.z));
+      }
+      if (mpEmbedded) {
+        document.body.classList.add('mp-embedded');
+        $('left').style.display = 'none'; $('right').style.display = 'none'; $('topbar').style.display = 'none';
+        $('bottom').textContent = 'SHARED TITAN WORLD · map.html · BOTH SHIPS · LIVE CREW';
+        titan.visible = false; shipSonarGroup.visible = false;
+        camState.goalRadius = camState.radius = 70;
+        // Touch flight controls for hosts on phones/tablets; keyboard remains supported.
+        var mpFlyPad = document.createElement('div');
+        mpFlyPad.style.cssText = 'position:fixed;right:16px;bottom:34px;z-index:9999;display:none;grid-template-columns:repeat(3,48px);grid-template-rows:repeat(3,44px);gap:5px;padding:8px;border:1px solid #76dbe888;border-radius:14px;background:#061a2bda;backdrop-filter:blur(8px);touch-action:none;user-select:none;';
+        var mpFlyButtons = [
+          { label: '▲', key: 'KeyW', col: 2, row: 1 },
+          { label: '◀', key: 'KeyA', col: 1, row: 2 },
+          { label: '▼', key: 'KeyS', col: 2, row: 2 },
+          { label: '▶', key: 'KeyD', col: 3, row: 2 },
+          { label: '+', key: 'Space', col: 1, row: 3 },
+          { label: '−', key: 'ShiftLeft', col: 3, row: 3 }
+        ];
+        mpFlyButtons.forEach(function (item) {
+          var button = document.createElement('button');
+          button.type = 'button'; button.textContent = item.label;
+          button.setAttribute('aria-label', item.key === 'Space' ? 'Zoom in' : item.key === 'ShiftLeft' ? 'Zoom out' : 'Fly ' + item.key);
+          button.style.cssText = 'grid-column:' + item.col + ';grid-row:' + item.row + ';border:1px solid #67cddc;color:#f3ffff;background:#0c4054;border-radius:10px;font:700 17px system-ui;touch-action:none;';
+          var press = function (e) { e.preventDefault(); mpFlyKeys[item.key] = true; if (button.setPointerCapture && e.pointerId !== undefined) button.setPointerCapture(e.pointerId); };
+          var release = function (e) { if (e) e.preventDefault(); mpFlyKeys[item.key] = false; };
+          button.addEventListener('pointerdown', press);
+          ['pointerup', 'pointercancel', 'lostpointercapture', 'pointerleave'].forEach(function (name) { button.addEventListener(name, release); });
+          mpFlyPad.appendChild(button);
+        });
+        document.body.appendChild(mpFlyPad);
+        window.addEventListener('message', function (event) {
+          if (event.origin !== window.location.origin || !event.data || event.data.source !== 'TITAN_MULTIPLAYER') return;
+          if (event.data.type === 'STATE') mpUpdateWorld(event.data.packet);
+          if (event.data.type === 'ROOM_STATE') mpUpdateWorld({ state: event.data.state, playerId: event.data.playerId, role: event.data.role });
+          if (event.data.type === 'MAP_VISIBILITY') { mapRenderRequested = !!event.data.visible; if (mapRenderRequested) { lastT = performance.now(); onResize(); } }
+          if (event.data.type === 'FLY_MODE' && mpRoomEmbedded) {
+            mpFlyActive = !!event.data.enabled;
+            mpFlyKeys = Object.create(null);
+            mpFlyPad.style.display = mpFlyActive ? 'grid' : 'none';
+            if (mpFlyActive) { camState.goalRadius = Math.min(camState.goalRadius, 58); }
+          }
+          if (event.data.type === 'MAP_FOCUS') { camState.goalTarget.set(0, 1, 0); camState.goalRadius = 70; camState.goalPhi = 0.78; }
+        });
+        window.addEventListener('keydown', function (event) {
+          if (!mpFlyActive) return;
+          if (['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space','ShiftLeft','ShiftRight','KeyQ','KeyE'].includes(event.code)) { mpFlyKeys[event.code] = true; event.preventDefault(); }
+        });
+        window.addEventListener('keyup', function (event) { if (mpFlyActive) mpFlyKeys[event.code] = false; });
+        window.addEventListener('blur', function () { mpFlyKeys = Object.create(null); });
+        if (mpRoomEmbedded) window.parent.postMessage({ source: 'TITAN_MAP', type: 'MAP_READY' }, window.location.origin);
+      }
+
+      // Funnel Exhaust Particle Pool (Realistic Engine Load Smoke)
+      var exhaustParticles = [];
+      for (var ep = 0; ep < 16; ep++) {
+        var puff = new THREE.Mesh(
+          new THREE.SphereGeometry(0.18, 7, 6),
+          new THREE.MeshBasicMaterial({ color: 0x94a3b8, transparent: true, opacity: 0, depthWrite: false })
+        );
+        puff.userData = { age: ep / 16, maxAge: 1.4 + (ep % 4) * 0.2 };
+        map.add(puff);
+        exhaustParticles.push(puff);
+      }
+
+      // ── Ship-Mounted Tactical Radar / Sonar Rig ──────────────
+      var SONAR_MAX_R = 13.5;
+      var shipSonarGroup = new THREE.Group();
+      shipSonarGroup.position.set(0, 0.12, 0);
+      map.add(shipSonarGroup);
+
+      var sonarSweepPivot = new THREE.Group();
+      var sonarWave1 = null;
+      var sonarWave2 = null;
+
+      function buildShipSonar() {
+        var outerRing = new THREE.Mesh(
+          new THREE.RingGeometry(SONAR_MAX_R - 0.14, SONAR_MAX_R, 72),
+          new THREE.MeshBasicMaterial({
+            color: 0x00e5ff,
+            transparent: true,
+            opacity: 0.38,
+            side: THREE.DoubleSide,
+            depthWrite: false,
+            clippingPlanes: mapClipPlanes
+          })
+        );
+        outerRing.rotation.x = -Math.PI / 2;
+        outerRing.renderOrder = 4;
+        shipSonarGroup.add(outerRing);
+
+        var midR = SONAR_MAX_R * 0.52;
+        var innerRing = new THREE.Mesh(
+          new THREE.RingGeometry(midR - 0.08, midR, 64),
+          new THREE.MeshBasicMaterial({
+            color: 0x38bdf8,
+            transparent: true,
+            opacity: 0.24,
+            side: THREE.DoubleSide,
+            depthWrite: false,
+            clippingPlanes: mapClipPlanes
+          })
+        );
+        innerRing.rotation.x = -Math.PI / 2;
+        innerRing.renderOrder = 4;
+        shipSonarGroup.add(innerRing);
+
+        var tickVerts = [];
+        for (var deg = 0; deg < 360; deg += 10) {
+          var rad = (deg * Math.PI) / 180;
+          var tickLen = (deg % 30 === 0) ? 0.65 : 0.32;
+          var rIn = SONAR_MAX_R - tickLen;
+          var rOut = SONAR_MAX_R;
+          tickVerts.push(
+            Math.cos(rad) * rIn, 0.01, Math.sin(rad) * rIn,
+            Math.cos(rad) * rOut, 0.01, Math.sin(rad) * rOut
+          );
+        }
+        var tickGeo = new THREE.BufferGeometry();
+        tickGeo.setAttribute('position', new THREE.Float32BufferAttribute(tickVerts, 3));
+        var tickLines = new THREE.LineSegments(
+          tickGeo,
+          new THREE.LineBasicMaterial({
+            color: 0x00e5ff,
+            transparent: true,
+            opacity: 0.44,
+            clippingPlanes: mapClipPlanes
+          })
+        );
+        tickLines.renderOrder = 4;
+        shipSonarGroup.add(tickLines);
+
+        var sCanvas = document.createElement('canvas');
+        sCanvas.width = 512;
+        sCanvas.height = 512;
+        var sCtx = sCanvas.getContext('2d');
+        var half = 256;
+        var sweepArc = Math.PI * 0.44;
+        var steps = 64;
+        for (var i = 0; i < steps; i++) {
+          var t0 = i / steps;
+          var t1 = (i + 1.2) / steps;
+          var a0 = -t1 * sweepArc;
+          var a1 = -t0 * sweepArc;
+          var alpha = Math.pow(1 - t0, 2.1) * 0.34;
+          sCtx.fillStyle = 'rgba(0, 229, 255, ' + alpha.toFixed(4) + ')';
+          sCtx.beginPath();
+          sCtx.moveTo(half, half);
+          sCtx.arc(half, half, half - 4, a0, a1);
+          sCtx.closePath();
+          sCtx.fill();
+        }
+
+        var sweepTex = new THREE.CanvasTexture(sCanvas);
+        sweepTex.minFilter = THREE.LinearFilter;
+        sweepTex.magFilter = THREE.LinearFilter;
+        sweepTex.generateMipmaps = false;
+        sweepTex.needsUpdate = true;
+
+        var sweepDisc = new THREE.Mesh(
+          new THREE.CircleGeometry(SONAR_MAX_R, 64),
+          new THREE.MeshBasicMaterial({
+            map: sweepTex,
+            transparent: true,
+            depthWrite: false,
+            clippingPlanes: mapClipPlanes
+          })
+        );
+        sweepDisc.rotation.x = -Math.PI / 2;
+        sweepDisc.position.y = 0.015;
+        sweepDisc.renderOrder = 5;
+        sonarSweepPivot.add(sweepDisc);
+
+        var beamGeo = new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(0, 0.025, 0),
+          new THREE.Vector3(SONAR_MAX_R, 0.025, 0)
+        ]);
+        var beamLine = new THREE.Line(
+          beamGeo,
+          new THREE.LineBasicMaterial({
+            color: 0x7ef9ff,
+            transparent: true,
+            opacity: 0.85,
+            clippingPlanes: mapClipPlanes
+          })
+        );
+        beamLine.renderOrder = 5;
+        sonarSweepPivot.add(beamLine);
+
+        shipSonarGroup.add(sonarSweepPivot);
+
+        function makeWaveRing() {
+          var ring = new THREE.Mesh(
+            new THREE.RingGeometry(0.92, 1.0, 64),
+            new THREE.MeshBasicMaterial({
+              color: 0x00e5ff,
+              transparent: true,
+              opacity: 0.36,
+              side: THREE.DoubleSide,
+              depthWrite: false,
+              clippingPlanes: mapClipPlanes
+            })
+          );
+          ring.rotation.x = -Math.PI / 2;
+          ring.position.y = 0.02;
+          ring.renderOrder = 5;
+          shipSonarGroup.add(ring);
+          return ring;
+        }
+
+        sonarWave1 = makeWaveRing();
+        sonarWave2 = makeWaveRing();
+      }
+      buildShipSonar();
+
+      // Pool of Radar Echo Ping Markers when Sonar Sweeps Shallow Shoals / Hazards
+      var radarEchoPings = [];
+      for (var rp = 0; rp < 10; rp++) {
+        var echoMesh = new THREE.Mesh(
+          new THREE.RingGeometry(0.35, 0.72, 24),
+          new THREE.MeshBasicMaterial({
+            color: 0xfbbf24,
+            transparent: true,
+            opacity: 0,
+            side: THREE.DoubleSide,
+            depthWrite: false
+          })
+        );
+        echoMesh.rotation.x = -Math.PI / 2;
+        echoMesh.position.y = 0.16;
+        echoMesh.renderOrder = 6;
+        echoMesh.userData = { life: 0 };
+        map.add(echoMesh);
+        radarEchoPings.push(echoMesh);
+      }
+      var nextEchoIdx = 0;
+
+      function triggerRadarEcho(x, z, isDanger) {
+        // Avoid stacking pings at the exact same spot
+        for (var k = 0; k < radarEchoPings.length; k++) {
+          var existing = radarEchoPings[k];
+          if (existing.userData.life > 0.45 && Math.hypot(existing.position.x - x, existing.position.z - z) < 2.2) {
+            existing.userData.life = 1.0;
+            return;
+          }
+        }
+        var p = radarEchoPings[nextEchoIdx];
+        nextEchoIdx = (nextEchoIdx + 1) % radarEchoPings.length;
+        p.position.set(x, 0.16, z);
+        p.material.color.setHex(isDanger ? 0xfb7185 : 0xfbbf24);
+        p.userData.life = 1.0;
+        p.scale.setScalar(0.8);
+      }
+
+      // Refueling Tether Line
+      var fuelTetherGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
+      var fuelTether = new THREE.Line(
+        fuelTetherGeo,
+        new THREE.LineBasicMaterial({ color: 0x34d399, transparent: true, opacity: 0.85 })
+      );
+      fuelTether.visible = false;
+      map.add(fuelTether);
+
+      // Selection Highlight Ring
+      var selectionRing = new THREE.Mesh(
+        new THREE.RingGeometry(3.2, 3.7, 36),
+        new THREE.MeshBasicMaterial({
+          color: 0x00e5ff,
+          transparent: true,
+          opacity: 0.88,
+          side: THREE.DoubleSide,
+          depthWrite: false
+        })
+      );
+      selectionRing.rotation.x = -Math.PI / 2;
+      selectionRing.position.y = 0.16;
+      selectionRing.visible = false;
+      map.add(selectionRing);
+
+      // ── Ocean Currents & Environmental Physics Field ─────────
+      var currentStreamsGroup = new THREE.Group();
+      currentStreamsGroup.position.y = 0.09;
+      map.add(currentStreamsGroup);
+
+      var currentChevrons = [];
+
+      // Computes realistic local ocean current vector (vx, vz) in knots
+      function getCurrentAt(x, z) {
+        // Primary equatorial/trade-wind eastward current meandering with latitude
+        var baseVx = 1.35 + 0.55 * Math.sin(z * 0.11 + 0.4) + 0.25 * Math.cos(x * 0.08);
+        var baseVz = 0.48 * Math.cos(x * 0.09 - 0.3) - 0.25 * Math.sin(z * 0.12);
+
+        // Deflect currents around islands and add cyclonic swirl near active cyclones
+        for (var i = 0; i < objects.length; i++) {
+          var o = objects[i];
+          var ox = o.mesh.position.x;
+          var oz = o.mesh.position.z;
+          var s = o.mesh.userData.scale || 1.0;
+          var dx = x - ox;
+          var dz = z - oz;
+          var dist = Math.hypot(dx, dz);
+
+          if (o.type === 'island' && dist > 0.5 && dist < 11.5 * s) {
+            // Tangential deflection around landmass (Venturi strait acceleration)
+            var falloff = 1 - dist / (11.5 * s);
+            var tx = -dz / dist;
+            var tz = dx / dist;
+            var sign = (tx * baseVx + tz * baseVz) >= 0 ? 1 : -1;
+            baseVx += tx * sign * falloff * 1.15;
+            baseVz += tz * sign * falloff * 1.15;
+          } else if (o.type === 'typhoon' && dist > 0.3 && dist < 10.5 * s) {
+            // Strong counter-clockwise cyclonic vortex current
+            var swirl = (1 - dist / (10.5 * s)) * 2.6 * cycloneSpeedMult;
+            baseVx += (-dz / dist) * swirl - (dx / dist) * swirl * 0.2;
+            baseVz += (dx / dist) * swirl - (dz / dist) * swirl * 0.2;
+          }
+        }
+        return { vx: baseVx * seaIntensity, vz: baseVz * seaIntensity };
+      }
+
+      // Build animated flowing current stream chevrons across the map
+      function buildCurrentStreamVisuals() {
+        var lanes = [-25, -17, -9, -1, 7, 15, 23];
+        for (var l = 0; l < lanes.length; l++) {
+          for (var c = 0; c < 6; c++) {
+            var chevShape = new THREE.Shape();
+            chevShape.moveTo(0.65, 0);
+            chevShape.lineTo(-0.35, 0.38);
+            chevShape.lineTo(-0.12, 0);
+            chevShape.lineTo(-0.35, -0.38);
+            chevShape.closePath();
+
+            var chevGeo = new THREE.ShapeGeometry(chevShape);
+            chevGeo.rotateX(-Math.PI / 2);
+            var chevMat = new THREE.MeshBasicMaterial({
+              color: 0x38bdf8,
+              transparent: true,
+              opacity: 0.34,
+              side: THREE.DoubleSide,
+              depthWrite: false
+            });
+            var m = new THREE.Mesh(chevGeo, chevMat);
+            var startX = -38 + (c / 6) * 76 + (l % 2) * 5;
+            var startZ = lanes[l];
+            m.position.set(startX, 0.02, startZ);
+            m.userData = { baseZ: startZ, phase: c * 1.1 + l * 0.7 };
+            currentStreamsGroup.add(m);
+            currentChevrons.push(m);
+          }
+        }
+      }
+      buildCurrentStreamVisuals();
+
+      // ── Bathymetry, Shallow Water Zones & Obstacle Clearance ──
+      // Returns physical radii for any obstacle:
+      // solidR = physical land/rock/reef core
+      // shallowDangerR = extreme shallow shoal where ship grounds/takes damage
+      // shallowWarnR = outer shallow water boundary detected by radar
+      function getObstacleRadii(type, scale) {
+        var s = scale || 1.0;
+        if (type === 'island') {
+          return { solidR: 4.3 * s, shallowDangerR: 5.8 * s, shallowWarnR: 7.8 * s };
+        }
+        if (type === 'reef') {
+          return { solidR: 2.4 * s, shallowDangerR: 3.9 * s, shallowWarnR: 5.6 * s };
+        }
+        if (type === 'rock') {
+          return { solidR: 1.6 * s, shallowDangerR: 2.7 * s, shallowWarnR: 4.2 * s };
+        }
+        if (type === 'typhoon') {
+          return { solidR: 2.2 * s, shallowDangerR: 4.6 * s, shallowWarnR: 7.4 * s };
+        }
+        return { solidR: 0, shallowDangerR: 0, shallowWarnR: 0 };
+      }
+
+      // Evaluates exact water depth (in meters) at world coordinate (x, z)
+      function getWaterDepthAt(x, z) {
+        var baseDeepDepth = 52.0 + currentTideHeight * 4.5; // Tide modulates water depth by ±1.6m
+        var minDepth = baseDeepDepth;
+
+        for (var i = 0; i < objects.length; i++) {
+          var o = objects[i];
+          if (o.type !== 'island' && o.type !== 'reef' && o.type !== 'rock') continue;
+          var rInfo = getObstacleRadii(o.type, o.mesh.userData.scale || 1.0);
+          var dist = Math.hypot(x - o.mesh.position.x, z - o.mesh.position.z);
+          if (dist < rInfo.shallowWarnR + 2.5) {
+            // Smooth continental shelf slope from deep water (52m) up to shoreline (0m)
+            var t = Math.max(0, Math.min(1, (dist - rInfo.solidR * 0.88) / (rInfo.shallowWarnR + 2.5 - rInfo.solidR * 0.88)));
+            var shelfDepth = Math.pow(t, 1.55) * baseDeepDepth + currentTideHeight * 4.5;
+            if (shelfDepth < minDepth) minDepth = shelfDepth;
+          }
+        }
+        return Math.max(0.0, minDepth);
+      }
+
+      // Updates the ocean vertex depth values whenever obstacles move/change
+      function updateOceanBathymetryField() {
+        for (var ov = 0; ov < oceanVertCount; ov++) {
+          var wx = oceanBaseX[ov];
+          var wz = oceanBaseZ[ov];
+          var normD = 1.0;
+
+          for (var i = 0; i < objects.length; i++) {
+            var o = objects[i];
+            if (o.type !== 'island' && o.type !== 'reef' && o.type !== 'rock') continue;
+            var rInfo = getObstacleRadii(o.type, o.mesh.userData.scale || 1.0);
+            var dist = Math.hypot(wx - o.mesh.position.x, wz - o.mesh.position.z);
+            if (dist < rInfo.shallowWarnR + 2.0) {
+              var localNorm = Math.max(0, Math.min(1, (dist - rInfo.solidR * 0.82) / (rInfo.shallowWarnR + 2.0 - rInfo.solidR * 0.82)));
+              if (localNorm < normD) normD = localNorm;
+            }
+          }
+          oceanNormalizedDepth[ov] = normD;
+        }
+      }
+
+      // ── Custom Asset Catalog & 3D Asset Factories ────────────
+      var ASSET_CATALOG = {
+        island: { label: 'Island', variants: ['Archipelago', 'Volcanic Peak', 'Coastal Mesa'] },
+        reef: { label: 'Reef', variants: ['Coral Cluster', 'Barrier Arc', 'Shallow Shoal'] },
+        rock: { label: 'Rock', variants: ['Jagged Spires', 'Boulder Field', 'Twin Sea Arch'] },
+        typhoon: { label: 'Cyclone', variants: ['Tropical Cyclone', 'Super Typhoon', 'Squall Vortex'] },
+        fuel: { label: 'Fuel Station', variants: ['Offshore Rig', 'Fuel Barge', 'Deepwater Hub'] },
+        path: { label: 'Path Waypoint', variants: ['Standard Node', 'Hold / Caution', 'Express Node'] },
+        storm: { label: 'Storm Point', variants: ['Track Node', 'Intensify Cell', 'Dissipate Cell'] }
+      };
+
+      function ghostMat(hex) {
+        return new THREE.MeshBasicMaterial({ color: hex, transparent: true, opacity: 0.48, depthWrite: false });
+      }
+
+      function createIslandGeometryGroup(variant, seedX, seedZ, isGhost) {
+        var group = new THREE.Group();
+        var baseR = 4.6;
+        var landMat = isGhost ? ghostMat(0x4ade80) : matLand;
+        var peakMat = isGhost ? ghostMat(0x86efac) : matLandPeak;
+
+        function extrudedBlob(r, h, seed, lobes, mat) {
+          var detail = 22;
+          var shape = new THREE.Shape();
+          for (var i = 0; i <= detail; i++) {
+            var a = (i / detail) * Math.PI * 2;
+            var rad = r * (0.76 + 0.24 * Math.sin(a * lobes + seed) * Math.cos(a * 2.1 - seed));
+            var px = Math.cos(a) * rad, py = Math.sin(a) * rad;
+            if (i === 0) shape.moveTo(px, py); else shape.lineTo(px, py);
+          }
+          shape.closePath();
+          var geo = new THREE.ExtrudeGeometry(shape, {
+            depth: h, bevelEnabled: true, bevelThickness: h * 0.14, bevelSize: r * 0.07, bevelSegments: 2
+          });
+          geo.rotateX(-Math.PI / 2);
+          return new THREE.Mesh(geo, mat);
+        }
+
+        if (variant === 1) {
+          var base = extrudedBlob(baseR * 1.0, 1.0, seedX, 3.0, landMat);
+          base.position.y = 0.05;
+          group.add(base);
+
+          var cone = new THREE.Mesh(new THREE.CylinderGeometry(1.1, baseR * 0.72, 3.4, 9), peakMat);
+          cone.position.y = 2.1;
+          group.add(cone);
+
+          var crater = new THREE.Mesh(
+            new THREE.RingGeometry(0.45, 1.05, 12),
+            new THREE.MeshBasicMaterial({ color: 0xf97316, transparent: true, opacity: isGhost ? 0.3 : 0.65, side: THREE.DoubleSide })
+          );
+          crater.rotation.x = -Math.PI / 2;
+          crater.position.y = 3.82;
+          group.add(crater);
+        } else if (variant === 2) {
+          var tier1 = extrudedBlob(baseR * 1.05, 1.1, seedZ, 4.0, landMat);
+          tier1.position.y = 0.05;
+          group.add(tier1);
+
+          var tier2 = extrudedBlob(baseR * 0.65, 1.2, seedX + 1.5, 3.0, peakMat);
+          tier2.position.set(0.4, 1.15, -0.3);
+          group.add(tier2);
+
+          // Coastal Lighthouse Beacon
+          var beacon = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.14, 0.24, 1.25, 6),
+            new THREE.MeshBasicMaterial({ color: 0xfef08a, transparent: true, opacity: isGhost ? 0.35 : 0.9 })
+          );
+          beacon.position.set(0.4, 2.85, -0.3);
+          beacon.name = 'lighthouse';
+          group.add(beacon);
+        } else {
+          var main = extrudedBlob(baseR * 0.95, 1.8, seedX + seedZ, 3.1, landMat);
+          main.position.y = 0.05;
+          group.add(main);
+
+          var ridge = extrudedBlob(baseR * 0.46, 1.1, seedX, 2.5, peakMat);
+          ridge.position.set(-0.6, 1.8, 0.4);
+          group.add(ridge);
+
+          var sub1 = extrudedBlob(baseR * 0.36, 0.9, seedZ + 2, 3.0, landMat);
+          sub1.position.set(baseR * 0.82, 0.05, baseR * 0.48);
+          group.add(sub1);
+
+          var sub2 = extrudedBlob(baseR * 0.26, 0.7, seedX + 4, 3.0, landMat);
+          sub2.position.set(-baseR * 0.75, 0.05, -baseR * 0.55);
+          group.add(sub2);
+        }
+
+        // Inner Shallow Danger Contour & Outer Radar-Detected Shoal Boundary
+        var innerShoal = new THREE.Mesh(
+          new THREE.RingGeometry(5.35, 5.75, 36),
+          new THREE.MeshBasicMaterial({ color: 0xf59e0b, transparent: true, opacity: isGhost ? 0.32 : 0.22, side: THREE.DoubleSide, depthWrite: false })
+        );
+        innerShoal.rotation.x = -Math.PI / 2;
+        innerShoal.position.y = 0.11;
+        innerShoal.name = 'shallowInner';
+        group.add(innerShoal);
+
+        var outerShoal = new THREE.Mesh(
+          new THREE.RingGeometry(7.35, 7.65, 42),
+          new THREE.MeshBasicMaterial({ color: 0x14b8a6, transparent: true, opacity: isGhost ? 0.28 : 0.24, side: THREE.DoubleSide, depthWrite: false })
+        );
+        outerShoal.rotation.x = -Math.PI / 2;
+        outerShoal.position.y = 0.11;
+        outerShoal.name = 'shallowOuter';
+        group.add(outerShoal);
+
+        return group;
+      }
+
+      function createReefGeometryGroup(variant, isGhost) {
+        var group = new THREE.Group();
+        var rMat = isGhost ? ghostMat(0xf97316) : matReef;
+
+        if (variant === 1) {
+          for (var i = 0; i < 9; i++) {
+            var ang = -0.9 + (i / 8) * 1.8;
+            var rad = 2.4;
+            var h = 0.55 + Math.sin((i / 8) * Math.PI) * 0.85;
+            var spire = new THREE.Mesh(new THREE.ConeGeometry(0.42, h, 5), rMat);
+            spire.position.set(Math.cos(ang) * rad, h * 0.5 + 0.05, Math.sin(ang) * rad);
+            group.add(spire);
+          }
+        } else if (variant === 2) {
+          var bank1 = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.45, 1.3), rMat);
+          bank1.position.set(0, 0.26, -0.7);
+          bank1.rotation.y = 0.2;
+          group.add(bank1);
+
+          var bank2 = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.38, 1.1), rMat);
+          bank2.position.set(0.4, 0.22, 0.8);
+          bank2.rotation.y = -0.15;
+          group.add(bank2);
+
+          [-2.1, 2.1].forEach(function (bx) {
+            var buoy = new THREE.Mesh(
+              new THREE.OctahedronGeometry(0.28, 0),
+              new THREE.MeshBasicMaterial({ color: 0xfbbf24, transparent: true, opacity: isGhost ? 0.35 : 0.85 })
+            );
+            buoy.position.set(bx, 0.78, 0);
+            group.add(buoy);
+          });
+        } else {
+          var pts = [[0,0,1.1],[1.3,0.85,0.8],[-1.4,1.0,0.9],[0.85,-1.3,0.75],[-1.05,-1.1,0.85],[1.9,-0.3,0.6],[-1.8,0.2,0.65]];
+          pts.forEach(function (p) {
+            var cone = new THREE.Mesh(new THREE.ConeGeometry(0.48, p[2], 5), rMat);
+            cone.position.set(p[0], p[2] * 0.45 + 0.05, p[1]);
+            group.add(cone);
+          });
+        }
+
+        var innerShoal = new THREE.Mesh(
+          new THREE.RingGeometry(3.55, 3.85, 32),
+          new THREE.MeshBasicMaterial({ color: 0xf97316, transparent: true, opacity: isGhost ? 0.32 : 0.26, side: THREE.DoubleSide, depthWrite: false })
+        );
+        innerShoal.rotation.x = -Math.PI / 2;
+        innerShoal.position.y = 0.11;
+        innerShoal.name = 'shallowInner';
+        group.add(innerShoal);
+
+        var outerShoal = new THREE.Mesh(
+          new THREE.RingGeometry(5.15, 5.45, 36),
+          new THREE.MeshBasicMaterial({ color: 0x14b8a6, transparent: true, opacity: isGhost ? 0.28 : 0.22, side: THREE.DoubleSide, depthWrite: false })
+        );
+        outerShoal.rotation.x = -Math.PI / 2;
+        outerShoal.position.y = 0.11;
+        outerShoal.name = 'shallowOuter';
+        group.add(outerShoal);
+
+        return group;
+      }
+
+      function createRockGeometryGroup(variant, isGhost) {
+        var group = new THREE.Group();
+        var rkMat = isGhost ? ghostMat(0xfb923c) : matRock;
+
+        if (variant === 1) {
+          var offsets = [[0,0,0.95],[-1.05,0.55,0.65],[0.95,-0.5,0.72],[0.5,0.85,0.55],[-0.65,-0.75,0.6]];
+          offsets.forEach(function (o, idx) {
+            var b = new THREE.Mesh(new THREE.DodecahedronGeometry(o[2], 0), rkMat);
+            b.position.set(o[0], o[2] * 0.45 + 0.05, o[1]);
+            b.scale.set(1.1, 0.65, 0.95);
+            b.rotation.set(idx * 0.5, idx * 0.9, 0.2);
+            group.add(b);
+          });
+        } else if (variant === 2) {
+          var leftPillar = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.75, 2.4, 6), rkMat);
+          leftPillar.position.set(-1.05, 1.25, 0);
+          group.add(leftPillar);
+
+          var rightPillar = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.7, 2.2, 6), rkMat);
+          rightPillar.position.set(1.05, 1.15, 0);
+          group.add(rightPillar);
+
+          var span = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.52, 0.85), rkMat);
+          span.position.set(0, 2.3, 0);
+          group.add(span);
+        } else {
+          var mainSpire = new THREE.Mesh(new THREE.ConeGeometry(0.95, 2.3, 5), rkMat);
+          mainSpire.position.set(0, 1.2, 0);
+          group.add(mainSpire);
+
+          var sideSpire = new THREE.Mesh(new THREE.ConeGeometry(0.62, 1.55, 5), rkMat);
+          sideSpire.position.set(0.85, 0.8, 0.45);
+          sideSpire.rotation.z = -0.18;
+          group.add(sideSpire);
+        }
+
+        var innerShoal = new THREE.Mesh(
+          new THREE.RingGeometry(2.45, 2.75, 28),
+          new THREE.MeshBasicMaterial({ color: 0xfb923c, transparent: true, opacity: isGhost ? 0.3 : 0.24, side: THREE.DoubleSide, depthWrite: false })
+        );
+        innerShoal.rotation.x = -Math.PI / 2;
+        innerShoal.position.y = 0.11;
+        innerShoal.name = 'shallowInner';
+        group.add(innerShoal);
+
+        var outerShoal = new THREE.Mesh(
+          new THREE.RingGeometry(3.85, 4.15, 32),
+          new THREE.MeshBasicMaterial({ color: 0x14b8a6, transparent: true, opacity: isGhost ? 0.25 : 0.2, side: THREE.DoubleSide, depthWrite: false })
+        );
+        outerShoal.rotation.x = -Math.PI / 2;
+        outerShoal.position.y = 0.11;
+        outerShoal.name = 'shallowOuter';
+        group.add(outerShoal);
+
+        return group;
+      }
+
+      // ── Fixed & Upgraded 3D Volumetric Cyclone / Typhoon Builder ──
+      function createTyphoonGeometryGroup(variant, isGhost) {
+        var group = new THREE.Group();
+        var colMain = variant === 1 ? 0xf472b6 : (variant === 2 ? 0xa855f7 : 0xc084fc);
+        var colGlow = variant === 1 ? 0xfce7f3 : 0xf3e8ff;
+        var baseOpacity = isGhost ? 0.42 : 0.68;
+
+        // 1. Raycast Hit Volume (Ensures 100% reliable click/select/drag across browsers)
+        var hitVolume = new THREE.Mesh(
+          new THREE.CylinderGeometry(4.6, 4.6, 3.4, 16),
+          new THREE.MeshBasicMaterial({ color: colMain, transparent: true, opacity: 0.015, depthWrite: false })
+        );
+        hitVolume.position.y = 1.7;
+        group.add(hitVolume);
+
+        // 2. Central Eye Wall Funnel (3D Vertical Vortex)
+        var funnel = new THREE.Mesh(
+          new THREE.CylinderGeometry(2.3, 0.75, 3.2, 24, 1, true),
+          new THREE.MeshBasicMaterial({
+            color: colMain,
+            transparent: true,
+            opacity: baseOpacity * 0.65,
+            side: THREE.DoubleSide,
+            depthWrite: false
+          })
+        );
+        funnel.position.y = 1.65;
+        funnel.renderOrder = 6;
+        group.add(funnel);
+
+        var innerEye = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.95, 0.42, 3.3, 18, 1, true),
+          new THREE.MeshBasicMaterial({
+            color: colGlow,
+            transparent: true,
+            opacity: baseOpacity * 0.85,
+            side: THREE.DoubleSide,
+            depthWrite: false
+          })
+        );
+        innerEye.position.y = 1.7;
+        innerEye.renderOrder = 7;
+        group.add(innerEye);
+
+        // 3. Multi-Tiered 3D Spiral Cloud Bands (Elevated above ocean waves)
+        var tierCount = variant === 1 ? 5 : 4;
+        for (var i = 0; i < tierCount; i++) {
+          var radius = 1.15 + i * 0.88;
+          var tube = 0.14 + (tierCount - i) * 0.03;
+          var arcLen = Math.PI * (1.45 - i * 0.12);
+          var spiralArm = new THREE.Mesh(
+            new THREE.TorusGeometry(radius, tube, 8, 28, arcLen),
+            new THREE.MeshBasicMaterial({
+              color: i % 2 === 0 ? colMain : colGlow,
+              transparent: true,
+              opacity: Math.max(0.28, baseOpacity - i * 0.08),
+              depthWrite: false
+            })
+          );
+          spiralArm.rotation.x = Math.PI / 2;
+          spiralArm.rotation.z = i * 1.15;
+          spiralArm.position.y = 0.45 + i * 0.58;
+          spiralArm.renderOrder = 6;
+          group.add(spiralArm);
+
+          // Opposing spiral arm for symmetric hurricane structure
+          var spiralArm2 = spiralArm.clone();
+          spiralArm2.rotation.z = i * 1.15 + Math.PI;
+          group.add(spiralArm2);
+        }
+
+        // 4. Sea-Surface Gale Suction Ring
+        var galeRing = new THREE.Mesh(
+          new THREE.RingGeometry(4.2, 4.75, 36),
+          new THREE.MeshBasicMaterial({
+            color: colMain,
+            transparent: true,
+            opacity: isGhost ? 0.35 : 0.48,
+            side: THREE.DoubleSide,
+            depthWrite: false
+          })
+        );
+        galeRing.rotation.x = -Math.PI / 2;
+        galeRing.position.y = 0.22;
+        galeRing.renderOrder = 5;
+        group.add(galeRing);
+
+        // 5. Orbiting Squall Cloud Nodes
+        for (var p = 0; p < 8; p++) {
+          var ang = (p / 8) * Math.PI * 2;
+          var pr = 1.8 + (p % 3) * 0.95;
+          var squall = new THREE.Mesh(
+            new THREE.DodecahedronGeometry(0.28 + (p % 2) * 0.1, 0),
+            new THREE.MeshBasicMaterial({
+              color: colGlow,
+              transparent: true,
+              opacity: baseOpacity * 0.8,
+              depthWrite: false
+            })
+          );
+          squall.position.set(Math.cos(ang) * pr, 0.9 + (p % 4) * 0.55, Math.sin(ang) * pr);
+          squall.renderOrder = 7;
+          group.add(squall);
+        }
+
+        return group;
+      }
+
+      function createFuelStationGeometryGroup(variant, isGhost) {
+        var group = new THREE.Group();
+        var hullM = isGhost ? ghostMat(0x34d399) : matFuelHull;
+        var tankM = isGhost ? ghostMat(0x6ee7b7) : matFuelTank;
+        var ambM  = isGhost ? ghostMat(0xfbbf24) : matFuelAmber;
+
+        if (variant === 1) {
+          [-0.95, 0.95].forEach(function (zOff) {
+            var pontoon = new THREE.Mesh(new THREE.BoxGeometry(4.4, 0.55, 0.75), hullM);
+            pontoon.position.set(0, 0.32, zOff);
+            group.add(pontoon);
+          });
+          var deck = new THREE.Mesh(new THREE.BoxGeometry(4.0, 0.22, 2.4), hullM);
+          deck.position.set(0, 0.66, 0);
+          group.add(deck);
+
+          [-1.0, 0.2, 1.3].forEach(function (xOff) {
+            var sphere = new THREE.Mesh(new THREE.SphereGeometry(0.55, 12, 10), tankM);
+            sphere.position.set(xOff, 1.18, 0);
+            group.add(sphere);
+          });
+
+          var cranePost = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.14, 1.8, 6), ambM);
+          cranePost.position.set(-1.5, 1.54, 0.75);
+          group.add(cranePost);
+
+          var craneArm = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.1, 0.1), ambM);
+          craneArm.position.set(-0.7, 2.38, 0.75);
+          craneArm.rotation.z = 0.22;
+          group.add(craneArm);
+        } else if (variant === 2) {
+          var ringDeck = new THREE.Mesh(
+            new THREE.RingGeometry(1.35, 2.35, 8),
+            new THREE.MeshLambertMaterial({
+              color: 0x0f3d4c,
+              emissive: 0x059669,
+              transparent: isGhost,
+              opacity: isGhost ? 0.45 : 1.0,
+              side: THREE.DoubleSide
+            })
+          );
+          ringDeck.rotation.x = -Math.PI / 2;
+          ringDeck.position.y = 0.48;
+          group.add(ringDeck);
+
+          var spire = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.72, 2.8, 8), tankM);
+          spire.position.y = 1.44;
+          group.add(spire);
+
+          var crown = new THREE.Mesh(new THREE.OctahedronGeometry(0.45, 0), ambM);
+          crown.position.y = 3.18;
+          group.add(crown);
+        } else {
+          [[-1.2, -1.0], [1.2, -1.0], [-1.2, 1.0], [1.2, 1.0]].forEach(function (lp) {
+            var leg = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.2, 1.25, 6), hullM);
+            leg.position.set(lp[0], 0.66, lp[1]);
+            group.add(leg);
+          });
+          var mainDeck = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.28, 2.6), hullM);
+          mainDeck.position.set(0, 1.36, 0);
+          group.add(mainDeck);
+
+          [-0.55, 0.55].forEach(function (zTank) {
+            var tank = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.38, 1.5, 10), tankM);
+            tank.rotation.z = Math.PI / 2;
+            tank.position.set(-0.45, 1.86, zTank);
+            group.add(tank);
+          });
+
+          var heli = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.75, 0.12, 16), ambM);
+          heli.position.set(1.15, 1.56, 0);
+          group.add(heli);
+
+          var tower = new THREE.Mesh(new THREE.ConeGeometry(0.32, 2.1, 4), tankM);
+          tower.position.set(-0.85, 2.52, 0);
+          group.add(tower);
+        }
+
+        var dockRing = new THREE.Mesh(
+          new THREE.RingGeometry(4.2, 4.65, 36),
+          new THREE.MeshBasicMaterial({ color: 0x34d399, transparent: true, opacity: isGhost ? 0.35 : 0.28, side: THREE.DoubleSide, depthWrite: false })
+        );
+        dockRing.rotation.x = -Math.PI / 2;
+        dockRing.position.y = 0.12;
+        dockRing.name = 'dockRing';
+        group.add(dockRing);
+
+        return group;
+      }
+
+      // ── Ambient Living World (Patrol Ships, Buoys & Seabirds) ──
+      var ambientTraffic = [];
+      var ambientGroup = new THREE.Group();
+      map.add(ambientGroup);
+
+      function buildLivingMapDetails() {
+        // 2 Autonomous Coastal Patrol / Merchant Vessels cruising outer lanes
+        var lanes = [
+          { pts: [new THREE.Vector3(-36, 0.45, -26), new THREE.Vector3(-12, 0.45, -24), new THREE.Vector3(14, 0.45, -27), new THREE.Vector3(36, 0.45, -25)], speed: 0.011, prog: 0.1 },
+          { pts: [new THREE.Vector3(36, 0.45, 26), new THREE.Vector3(10, 0.45, 25), new THREE.Vector3(-16, 0.45, 27), new THREE.Vector3(-36, 0.45, 25)], speed: 0.009, prog: 0.55 }
+        ];
+
+        lanes.forEach(function (ln) {
+          var vessel = new THREE.Group();
+          var hull = new THREE.Mesh(
+            new THREE.BoxGeometry(1.65, 0.32, 0.48),
+            new THREE.MeshLambertMaterial({ color: 0x38bdf8, emissive: 0x0369a1 })
+          );
+          hull.position.y = 0.16;
+          vessel.add(hull);
+
+          var bridge = new THREE.Mesh(
+            new THREE.BoxGeometry(0.45, 0.28, 0.38),
+            new THREE.MeshBasicMaterial({ color: 0xe0f2fe })
+          );
+          bridge.position.set(-0.35, 0.4, 0);
+          vessel.add(bridge);
+
+          var strobe = new THREE.Mesh(
+            new THREE.SphereGeometry(0.08, 6, 6),
+            new THREE.MeshBasicMaterial({ color: 0xfbbf24 })
+          );
+          strobe.position.set(-0.35, 0.62, 0);
+          strobe.name = 'strobe';
+          vessel.add(strobe);
+
+          var curve = new THREE.CatmullRomCurve3(ln.pts, false, 'catmullrom', 0.4);
+          ambientGroup.add(vessel);
+          ambientTraffic.push({ mesh: vessel, curve: curve, progress: ln.prog, speed: ln.speed, dir: 1 });
+        });
+
+        // Bobbing Channel Buoys with Blinking Beacons
+        var buoyCoords = [[-26, 2], [-4, -10], [8, 16], [24, -4], [-18, -22]];
+        buoyCoords.forEach(function (bc, idx) {
+          var buoy = new THREE.Group();
+          var base = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.18, 0.28, 0.45, 8),
+            new THREE.MeshLambertMaterial({ color: idx % 2 === 0 ? 0xef4444 : 0x22c55e })
+          );
+          base.position.y = 0.22;
+          buoy.add(base);
+
+          var light = new THREE.Mesh(
+            new THREE.SphereGeometry(0.09, 6, 6),
+            new THREE.MeshBasicMaterial({ color: idx % 2 === 0 ? 0xfca5a5 : 0x86efac })
+          );
+          light.position.y = 0.52;
+          light.name = 'buoyLight';
+          buoy.add(light);
+
+          buoy.position.set(bc[0], 0.1, bc[1]);
+          buoy.userData = { isBuoy: true, phase: idx * 1.4 };
+          ambientGroup.add(buoy);
+        });
+      }
+      buildLivingMapDetails();
+
+      // ── Strict Map Boundary Clamping Helpers ─────────────────
+      function getAssetFootprintRadius(type, scale) {
+        var s = scale || 1.0;
+        if (type === 'island') return Math.min(13, 4.8 * s);
+        if (type === 'typhoon') return Math.min(13, 4.8 * s);
+        if (type === 'fuel') return Math.min(10, 4.2 * s);
+        if (type === 'reef') return Math.min(9, 3.4 * s);
+        if (type === 'rock') return Math.min(7, 2.2 * s);
+        return 0.9;
+      }
+
+      function clampToMapBounds(x, z, radius) {
+        var margin = Math.max(0.8, radius || 0.8);
+        var maxX = Math.max(2, HALF_W - margin);
+        var maxZ = Math.max(2, HALF_D - margin);
+        var cx = Math.max(-maxX, Math.min(maxX, x));
+        var cz = Math.max(-maxZ, Math.min(maxZ, z));
+        if (placementConfig.snap) {
+          cx = Math.round(cx / 2) * 2;
+          cz = Math.round(cz / 2) * 2;
+          cx = Math.max(-maxX, Math.min(maxX, cx));
+          cz = Math.max(-maxZ, Math.min(maxZ, cz));
+        }
+        return { x: cx, z: cz };
+      }
+
+      function isRawPointOnMap(pt) {
+        if (!pt) return false;
+        return Math.abs(pt.x) <= HALF_W + 1.5 && Math.abs(pt.z) <= HALF_D + 1.5;
+      }
+
+      // ── A* Obstacle-Avoiding Pathfinder (Islands, Reefs, Rocks & Shallow Water) ──
+      var NAV_STEP = 1.0;
+      var NAV_COLS = Math.floor(MAP_W / NAV_STEP) + 1; // 83
+      var NAV_ROWS = Math.floor(MAP_D / NAV_STEP) + 1; // 65
+
+      function worldToNavGrid(wx, wz) {
+        var gx = Math.round((wx + HALF_W) / NAV_STEP);
+        var gz = Math.round((wz + HALF_D) / NAV_STEP);
+        gx = Math.max(0, Math.min(NAV_COLS - 1, gx));
+        gz = Math.max(0, Math.min(NAV_ROWS - 1, gz));
+        return { gx: gx, gz: gz };
+      }
+
+      function navGridToWorld(gx, gz) {
+        return new THREE.Vector3(-HALF_W + gx * NAV_STEP, 0.5, -HALF_D + gz * NAV_STEP);
+      }
+
+      // Builds a 2D navigation cost map:
+      // -1 = Blocked (Island/Reef/Rock core or extreme shallow danger zone)
+      // >= 1.0 = Passable (higher cost near shallow outer buffer or active cyclones)
+      function buildNavigationCostGrid() {
+        var grid = new Float32Array(NAV_COLS * NAV_ROWS);
+        grid.fill(1.0);
+
+        for (var gz = 0; gz < NAV_ROWS; gz++) {
+          var wz = -HALF_D + gz * NAV_STEP;
+          for (var gx = 0; gx < NAV_COLS; gx++) {
+            var wx = -HALF_W + gx * NAV_STEP;
+            var idx = gz * NAV_COLS + gx;
+
+            // Keep slight clearance from outer table edge
+            if (Math.abs(wx) > HALF_W - 1.2 || Math.abs(wz) > HALF_D - 1.2) {
+              grid[idx] = 8.0;
+            }
+
+            for (var i = 0; i < objects.length; i++) {
+              var o = objects[i];
+              var s = o.mesh.userData.scale || 1.0;
+              var rInfo = getObstacleRadii(o.type, s);
+              if (rInfo.shallowWarnR <= 0) continue;
+
+              var dist = Math.hypot(wx - o.mesh.position.x, wz - o.mesh.position.z);
+              if (o.type === 'island' || o.type === 'reef' || o.type === 'rock') {
+                // Tide slightly shifts the shallow danger cutoff
+                var tideAdjust = -currentTideHeight * 0.45;
+                var dangerCutoff = rInfo.shallowDangerR + tideAdjust;
+                var warnCutoff = rInfo.shallowWarnR + tideAdjust;
+
+                if (dist <= dangerCutoff) {
+                  grid[idx] = -1; // Impassable shallow/land hazard
+                  break;
+                } else if (dist <= warnCutoff) {
+                  var penalty = 1.0 + Math.pow(1 - (dist - dangerCutoff) / Math.max(0.5, warnCutoff - dangerCutoff), 2) * 18.0;
+                  if (penalty > grid[idx]) grid[idx] = penalty;
+                }
+              } else if (o.type === 'typhoon') {
+                // Soft cyclone avoidance so ship routes around storm centers when open water exists
+                if (dist <= rInfo.shallowWarnR) {
+                  var stormPenalty = 1.0 + (1 - dist / rInfo.shallowWarnR) * 14.0;
+                  if (stormPenalty > grid[idx]) grid[idx] = stormPenalty;
+                }
+              }
+            }
+          }
+        }
+        return grid;
+      }
+
+      // Finds the nearest navigable deep-water cell if a user waypoint was placed inside an island/shoal
+      function findNearestSafeNavCell(gx, gz, grid) {
+        if (grid[gz * NAV_COLS + gx] > 0 && grid[gz * NAV_COLS + gx] < 6.0) {
+          return { gx: gx, gz: gz, snapped: false };
+        }
+        for (var rad = 1; rad <= 22; rad++) {
+          var bestCell = null;
+          var bestScore = Infinity;
+          for (var dz = -rad; dz <= rad; dz++) {
+            for (var dx = -rad; dx <= rad; dx++) {
+              if (Math.abs(dx) !== rad && Math.abs(dz) !== rad) continue;
+              var nx = gx + dx;
+              var nz = gz + dz;
+              if (nx < 1 || nx >= NAV_COLS - 1 || nz < 1 || nz >= NAV_ROWS - 1) continue;
+              var cost = grid[nz * NAV_COLS + nx];
+              if (cost > 0 && cost < 6.0) {
+                var score = Math.hypot(dx, dz) + cost * 0.35;
+                if (score < bestScore) {
+                  bestScore = score;
+                  bestCell = { gx: nx, gz: nz, snapped: true };
+                }
+              }
+            }
+          }
+          if (bestCell) return bestCell;
+        }
+        return { gx: gx, gz: gz, snapped: false };
+      }
+
+      // Line-of-sight check across the cost grid for Theta*-style string-pulling
+      function hasClearNavLine(ax, az, bx, bz, grid) {
+        var dist = Math.hypot(bx - ax, bz - az);
+        var steps = Math.ceil(dist * 2.5);
+        for (var s = 0; s <= steps; s++) {
+          var t = steps === 0 ? 0 : s / steps;
+          var x = ax + (bx - ax) * t;
+          var z = az + (bz - az) * t;
+          var g = worldToNavGrid(x, z);
+          var c = grid[g.gz * NAV_COLS + g.gx];
+          if (c < 0 || c > 4.5) return false;
+        }
+        return true;
+      }
+
+      // 8-Directional A* Search between two navigable grid cells
+      function runAStarSegment(startCell, endCell, grid) {
+        var total = NAV_COLS * NAV_ROWS;
+        var gScore = new Float32Array(total);
+        var fScore = new Float32Array(total);
+        var cameFrom = new Int32Array(total);
+        var closed = new Uint8Array(total);
+        var inOpen = new Uint8Array(total);
+
+        gScore.fill(1e9);
+        fScore.fill(1e9);
+        cameFrom.fill(-1);
+
+        var startIdx = startCell.gz * NAV_COLS + startCell.gx;
+        var endIdx = endCell.gz * NAV_COLS + endCell.gx;
+
+        gScore[startIdx] = 0;
+        fScore[startIdx] = Math.hypot(endCell.gx - startCell.gx, endCell.gz - startCell.gz);
+
+        var openList = [startIdx];
+        inOpen[startIdx] = 1;
+
+        var dirs = [
+          [1, 0, 1.0], [-1, 0, 1.0], [0, 1, 1.0], [0, -1, 1.0],
+          [1, 1, 1.414], [1, -1, 1.414], [-1, 1, 1.414], [-1, -1, 1.414]
+        ];
+
+        var iterations = 0;
+        var maxIterations = 9000;
+
+        while (openList.length > 0 && iterations++ < maxIterations) {
+          var bestPos = 0;
+          var current = openList[0];
+          var bestF = fScore[current];
+          for (var i = 1; i < openList.length; i++) {
+            var cand = openList[i];
+            if (fScore[cand] < bestF) {
+              bestF = fScore[cand];
+              current = cand;
+              bestPos = i;
+            }
+          }
+
+          if (current === endIdx) {
+            var rawPts = [];
+            var curr = current;
+            while (curr !== -1) {
+              var cgx = curr % NAV_COLS;
+              var cgz = Math.floor(curr / NAV_COLS);
+              rawPts.push(navGridToWorld(cgx, cgz));
+              curr = cameFrom[curr];
+            }
+            rawPts.reverse();
+
+            // String-pulling (Theta* line-of-sight smoothing) to eliminate grid stair-stepping
+            if (rawPts.length <= 2) return rawPts;
+            var smoothed = [rawPts[0]];
+            var anchor = 0;
+            while (anchor < rawPts.length - 1) {
+              var furthest = anchor + 1;
+              for (var probe = rawPts.length - 1; probe > anchor + 1; probe--) {
+                if (hasClearNavLine(rawPts[anchor].x, rawPts[anchor].z, rawPts[probe].x, rawPts[probe].z, grid)) {
+                  furthest = probe;
+                  break;
+                }
+              }
+              smoothed.push(rawPts[furthest]);
+              anchor = furthest;
+            }
+            return smoothed;
+          }
+
+          openList[bestPos] = openList[openList.length - 1];
+          openList.pop();
+          inOpen[current] = 0;
+          closed[current] = 1;
+
+          var cx = current % NAV_COLS;
+          var cz = Math.floor(current / NAV_COLS);
+
+          for (var d = 0; d < 8; d++) {
+            var nx = cx + dirs[d][0];
+            var nz = cz + dirs[d][1];
+            if (nx < 0 || nx >= NAV_COLS || nz < 0 || nz >= NAV_ROWS) continue;
+            var nIdx = nz * NAV_COLS + nx;
+            if (closed[nIdx]) continue;
+
+            var cellCost = grid[nIdx];
+            if (cellCost < 0) continue; // Blocked obstacle/shallow water
+
+            // Prevent diagonal corner cutting through adjacent blocked cells
+            if (dirs[d][0] !== 0 && dirs[d][1] !== 0) {
+              var c1 = grid[cz * NAV_COLS + nx];
+              var c2 = grid[nz * NAV_COLS + cx];
+              if (c1 < 0 || c2 < 0) continue;
+            }
+
+            var tentativeG = gScore[current] + dirs[d][2] * cellCost;
+            if (tentativeG < gScore[nIdx]) {
+              cameFrom[nIdx] = current;
+              gScore[nIdx] = tentativeG;
+              fScore[nIdx] = tentativeG + Math.hypot(endCell.gx - nx, endCell.gz - nz);
+              if (!inOpen[nIdx]) {
+                openList.push(nIdx);
+                inOpen[nIdx] = 1;
+              }
+            }
+          }
+        }
+
+        // Fallback if completely enclosed
+        return [navGridToWorld(startCell.gx, startCell.gz), navGridToWorld(endCell.gx, endCell.gz)];
+      }
+
+      // Computes the full obstacle-avoiding route across all user waypoints
+      function computeObstacleAvoidingRoute(userWps) {
+        if (userWps.length < 2) return userWps.slice();
+        var grid = buildNavigationCostGrid();
+        var fullRoute = [];
+        var detourCount = 0;
+
+        for (var i = 0; i < userWps.length - 1; i++) {
+          var rawA = worldToNavGrid(userWps[i].x, userWps[i].z);
+          var rawB = worldToNavGrid(userWps[i + 1].x, userWps[i + 1].z);
+          var safeA = findNearestSafeNavCell(rawA.gx, rawA.gz, grid);
+          var safeB = findNearestSafeNavCell(rawB.gx, rawB.gz, grid);
+
+          var seg = runAStarSegment(safeA, safeB, grid);
+          if (seg.length > 2) detourCount++;
+
+          for (var j = 0; j < seg.length; j++) {
+            if (i > 0 && j === 0) continue;
+            fullRoute.push(seg[j]);
+          }
+        }
+
+        // Post-spline push-out safety guard so Catmull-Rom tension never dips inside an island
+        for (var k = 0; k < fullRoute.length; k++) {
+          var pt = fullRoute[k];
+          for (var oi = 0; oi < objects.length; oi++) {
+            var ob = objects[oi];
+            if (ob.type !== 'island' && ob.type !== 'reef' && ob.type !== 'rock') continue;
+            var rInf = getObstacleRadii(ob.type, ob.mesh.userData.scale || 1.0);
+            var minSafe = rInf.shallowDangerR + 0.65;
+            var dx = pt.x - ob.mesh.position.x;
+            var dz = pt.z - ob.mesh.position.z;
+            var dist = Math.hypot(dx, dz);
+            if (dist < minSafe && dist > 0.001) {
+              pt.x = ob.mesh.position.x + (dx / dist) * minSafe;
+              pt.z = ob.mesh.position.z + (dz / dist) * minSafe;
+            }
+          }
+        }
+
+        var badge = $('navStatusBadge');
+        if (badge) {
+          if (detourCount > 0) {
+            badge.textContent = 'AUTO-DETOUR (' + detourCount + ')';
+            badge.className = 'badge locked';
+          } else {
+            badge.textContent = 'AUTO-NAV CLEAR';
+            badge.className = 'badge';
+          }
+        }
+
+        return fullRoute;
+      }
+
+      // ── Map Object Spawning, Path & Storm Builders ───────────
+      function spawnAsset(type, x, z, opts) {
+        opts = opts || {};
+        var variant = opts.variant || 0;
+        var scale = opts.scale || 1.0;
+        var rotation = opts.rotation || 0;
+        var radius = getAssetFootprintRadius(type, scale);
+        var pos = clampToMapBounds(x, z, radius);
+        var group;
+
+        if (type === 'island') {
+          group = createIslandGeometryGroup(variant, pos.x, pos.z, false);
+        } else if (type === 'reef') {
+          group = createReefGeometryGroup(variant, false);
+        } else if (type === 'rock') {
+          group = createRockGeometryGroup(variant, false);
+        } else if (type === 'typhoon' || type === 'cyclone') {
+          type = 'typhoon';
+          group = createTyphoonGeometryGroup(variant, false);
+        } else if (type === 'fuel') {
+          group = createFuelStationGeometryGroup(variant, false);
+        } else {
+          return null;
+        }
+
+        group.position.set(pos.x, 0, pos.z);
+        group.scale.setScalar(scale);
+        group.rotation.y = (rotation * Math.PI) / 180;
+        group.userData = {
+          type: type,
+          variant: variant,
+          scale: scale,
+          rotation: rotation
+        };
+
+        map.add(group);
+        objects.push({ type: type, mesh: group });
+        updateOceanBathymetryField();
+        return group;
+      }
+
+      function rebuildPath() {
+        if (pathLine) {
+          map.remove(pathLine);
+          if (pathLine.geometry) pathLine.geometry.dispose();
+          pathLine = null;
+        }
+        if (directGhostLine) {
+          map.remove(directGhostLine);
+          if (directGhostLine.geometry) directGhostLine.geometry.dispose();
+          directGhostLine = null;
+        }
+        pathMarkers.forEach(function (m) {
+          map.remove(m);
+          if (m.geometry) m.geometry.dispose();
+        });
+        pathMarkers = [];
+
+        if (pathPoints.length === 0) {
+          pathCurve = null;
+          computedRoutePoints = [];
+          return;
+        }
+
+        var navGrid = buildNavigationCostGrid();
+
+        pathPoints.forEach(function (p, i) {
+          var clamped = clampToMapBounds(p.x, p.z, 0.9);
+          // Snap user waypoint to nearest safe deep water if dropped onto land/shallow shoal
+          var gCell = worldToNavGrid(clamped.x, clamped.z);
+          var safeCell = findNearestSafeNavCell(gCell.gx, gCell.gz, navGrid);
+          if (safeCell.snapped) {
+            var safeWorld = navGridToWorld(safeCell.gx, safeCell.gz);
+            p.x = safeWorld.x;
+            p.z = safeWorld.z;
+          } else {
+            p.x = clamped.x;
+            p.z = clamped.z;
+          }
+
+          var v = p.variant || 0;
+          var col = i === 0 ? 0x4ade80 : (i === pathPoints.length - 1 ? 0xf97316 : (v === 1 ? 0xfbbf24 : (v === 2 ? 0xffffff : 0x00e5ff)));
+          var rad = 0.48 * (p.wpScale || 1.0);
+          var m = new THREE.Mesh(
+            new THREE.SphereGeometry(rad, 12, 10),
+            new THREE.MeshBasicMaterial({ color: col })
+          );
+          m.position.set(p.x, 0.55, p.z);
+          m.userData = { type: 'waypoint', index: i, kind: 'path' };
+          m.visible = (mode === 'editor');
+          map.add(m);
+          pathMarkers.push(m);
+        });
+
+        if (pathPoints.length < 2) {
+          pathCurve = null;
+          computedRoutePoints = pathPoints.slice();
+          return;
+        }
+
+        // Compute Obstacle-Avoiding A* Route around Islands, Reefs, Rocks & Shallow Water
+        computedRoutePoints = computeObstacleAvoidingRoute(pathPoints);
+        pathCurve = new THREE.CatmullRomCurve3(computedRoutePoints, false, 'catmullrom', 0.22);
+        pathLine = new THREE.Line(
+          new THREE.BufferGeometry().setFromPoints(pathCurve.getPoints(160)),
+          new THREE.LineBasicMaterial({ color: 0x00e5ff, transparent: true, opacity: 0.78 })
+        );
+        pathLine.renderOrder = 6;
+        map.add(pathLine);
+
+        // Show subtle reference line connecting raw user waypoints in Editor mode so detours are crystal clear
+        if (mode === 'editor' && computedRoutePoints.length > pathPoints.length) {
+          directGhostLine = new THREE.Line(
+            new THREE.BufferGeometry().setFromPoints(pathPoints),
+            new THREE.LineBasicMaterial({ color: 0xfbbf24, transparent: true, opacity: 0.3 })
+          );
+          directGhostLine.renderOrder = 5;
+          map.add(directGhostLine);
+        }
+      }
+
+      function rebuildStorm() {
+        if (stormLine) {
+          map.remove(stormLine);
+          if (stormLine.geometry) stormLine.geometry.dispose();
+          stormLine = null;
+        }
+        stormMarkers.forEach(function (m) {
+          map.remove(m);
+          if (m.geometry) m.geometry.dispose();
+        });
+        stormMarkers = [];
+        if (stormMesh) {
+          map.remove(stormMesh);
+          stormMesh = null;
+        }
+
+        if (stormPoints.length === 0) {
+          stormCurve = null;
+          return;
+        }
+
+        stormPoints.forEach(function (p, i) {
+          var clamped = clampToMapBounds(p.x, p.z, 0.9);
+          p.x = clamped.x;
+          p.z = clamped.z;
+
+          var rad = 0.42 * (p.wpScale || 1.0);
+          var m = new THREE.Mesh(
+            new THREE.SphereGeometry(rad, 10, 8),
+            new THREE.MeshBasicMaterial({ color: 0xf472b6 })
+          );
+          m.position.set(p.x, 0.5, p.z);
+          m.userData = { type: 'waypoint', index: i, kind: 'storm' };
+          m.visible = (mode === 'editor');
+          map.add(m);
+          stormMarkers.push(m);
+        });
+
+        if (stormPoints.length < 2) {
+          stormCurve = null;
+          return;
+        }
+
+        stormCurve = new THREE.CatmullRomCurve3(stormPoints, false, 'catmullrom', 0.35);
+        stormLine = new THREE.Line(
+          new THREE.BufferGeometry().setFromPoints(stormCurve.getPoints(90)),
+          matStorm
+        );
+        map.add(stormLine);
+
+        stormMesh = new THREE.Group();
+        var cloud = new THREE.Mesh(
+          new THREE.SphereGeometry(2.2, 14, 12),
+          new THREE.MeshBasicMaterial({ color: 0xf472b6, transparent: true, opacity: 0.36, depthWrite: false })
+        );
+        cloud.scale.set(1.45, 0.55, 1.15);
+        stormMesh.add(cloud);
+
+        var rain = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.15, 1.85, 2.5, 10),
+          new THREE.MeshBasicMaterial({ color: 0xf9a8d4, transparent: true, opacity: 0.25, depthWrite: false })
+        );
+        rain.position.y = -1.2;
+        stormMesh.add(rain);
+        map.add(stormMesh);
+      }
+
+      function clearSelection() {
+        selectedEntity = null;
+        selectionRing.visible = false;
+      }
+
+      function updateSelectionRing() {
+        if (!selectedEntity || mode !== 'editor') {
+          selectionRing.visible = false;
+          return;
+        }
+        selectionRing.visible = true;
+        if (selectedEntity.kind === 'asset' && selectedEntity.mesh) {
+          var r = getAssetFootprintRadius(selectedEntity.mesh.userData.type, selectedEntity.mesh.userData.scale) * 0.85;
+          selectionRing.scale.set(r / 3.4, r / 3.4, 1);
+          selectionRing.position.set(selectedEntity.mesh.position.x, 0.16, selectedEntity.mesh.position.z);
+        } else if (selectedEntity.kind === 'path' && pathPoints[selectedEntity.index]) {
+          var pp = pathPoints[selectedEntity.index];
+          selectionRing.scale.set(0.45, 0.45, 1);
+          selectionRing.position.set(pp.x, 0.16, pp.z);
+        } else if (selectedEntity.kind === 'storm' && stormPoints[selectedEntity.index]) {
+          var sp = stormPoints[selectedEntity.index];
+          selectionRing.scale.set(0.45, 0.45, 1);
+          selectionRing.position.set(sp.x, 0.16, sp.z);
+        } else {
+          clearSelection();
+        }
+      }
+
+      function deleteAllMapItems() {
+        objects.forEach(function (o) {
+          map.remove(o.mesh);
+        });
+        objects.length = 0;
+        updateOceanBathymetryField();
+
+        pathPoints = [];
+        rebuildPath();
+
+        stormPoints = [];
+        rebuildStorm();
+
+        clearSelection();
+        progress = 0;
+        stormProgress = 0;
+        titan.visible = false;
+        shipSonarGroup.visible = false;
+        fuelTether.visible = false;
+
+        $('posVal').textContent = 'NO ROUTE';
+        $('speedVal').textContent = '0.0 kn';
+        $('headVal').textContent = '---°';
+      }
+
+      function setDefaultMap() {
+        deleteAllMapItems();
+
+        spawnAsset('island', -22, -12, { variant: 0, scale: 1.35, rotation: 20 });
+        spawnAsset('island', 18, 14,   { variant: 1, scale: 1.15, rotation: 45 });
+        spawnAsset('island', -6, 18,   { variant: 2, scale: 0.95, rotation: 110 });
+        spawnAsset('island', 25, -18,  { variant: 0, scale: 1.0,  rotation: 210 });
+        spawnAsset('island', -28, 8,   { variant: 2, scale: 0.72, rotation: 15 });
+
+        spawnAsset('reef', -12, -5, { variant: 0, scale: 1.0, rotation: 0 });
+        spawnAsset('reef', 10, 10,  { variant: 1, scale: 1.05, rotation: 60 });
+        spawnAsset('reef', 2, 0,    { variant: 2, scale: 0.9, rotation: -25 });
+
+        spawnAsset('rock', 12, 4,    { variant: 0, scale: 1.05, rotation: 15 });
+        spawnAsset('rock', -15, 5,   { variant: 2, scale: 1.2, rotation: 40 });
+        spawnAsset('rock', 8, -8,    { variant: 1, scale: 0.95, rotation: 80 });
+        spawnAsset('rock', -4, -15,  { variant: 0, scale: 0.85, rotation: 130 });
+
+        spawnAsset('fuel', -16, 6,  { variant: 0, scale: 1.0, rotation: 30 });
+        spawnAsset('fuel', 14, -3,  { variant: 2, scale: 1.05, rotation: 0 });
+
+        // Prominent 3D Cyclone active on the map
+        spawnAsset('typhoon', -9, 11, { variant: 0, scale: 1.05, rotation: 0 });
+
+        pathPoints = DEFAULT_PATH.map(function (p) { return new THREE.Vector3(p[0], 0.5, p[1]); });
+        rebuildPath();
+        titan.visible = true;
+        shipSonarGroup.visible = showRadar;
+
+        stormPoints = [
+          new THREE.Vector3(-30, 0.5, -10),
+          new THREE.Vector3(-10, 0.5, -5),
+          new THREE.Vector3(10, 0.5, 5),
+          new THREE.Vector3(28, 0.5, 15)
+        ];
+        rebuildStorm();
+      }
+      setDefaultMap();
+
+      // Send the live projection's actual navigation geometry to the authoritative
+      // room server. No duplicate/hardcoded obstacle catalogue is maintained here.
+      function mpSendMapGeometry() {
+        if (!mpRoomEmbedded || !window.parent || window.parent === window) return;
+        var obstacles = objects.filter(function (o) {
+          return o && o.mesh && ['island', 'reef', 'rock', 'typhoon'].includes(o.type);
+        }).map(function (o) {
+          var scale = Number(o.mesh.userData.scale) || 1;
+          var radii = getObstacleRadii(o.type, scale);
+          return {
+            type: o.type,
+            x: Number(o.mesh.position.x) || 0,
+            z: Number(o.mesh.position.z) || 0,
+            scale: scale,
+            solidR: radii.solidR,
+            shallowDangerR: radii.shallowDangerR,
+            shallowWarnR: radii.shallowWarnR
+          };
+        });
+        var route = DEFAULT_PATH.map(function (point) { return [Number(point[0]), Number(point[1])]; });
+        window.parent.postMessage({
+          source: 'TITAN_MAP', type: 'MAP_GEOMETRY',
+          geometry: { source: 'map.html', bounds: { minX: -41, maxX: 41, minZ: -32, maxZ: 32 }, obstacles: obstacles, route: route }
+        }, window.location.origin);
+      }
+      if (mpEmbedded) mpSendMapGeometry();
+
+      // ── Ghost Preview Mesh for Pre-Placement Customization ───
+      function rebuildGhostPreview() {
+        if (ghostPreview) {
+          map.remove(ghostPreview);
+          ghostPreview = null;
+        }
+        if (mode !== 'editor') return;
+        if (['island', 'reef', 'rock', 'typhoon', 'fuel'].indexOf(tool) === -1) return;
+
+        if (tool === 'island') ghostPreview = createIslandGeometryGroup(placementConfig.variant, 1.2, 2.4, true);
+        else if (tool === 'reef') ghostPreview = createReefGeometryGroup(placementConfig.variant, true);
+        else if (tool === 'rock') ghostPreview = createRockGeometryGroup(placementConfig.variant, true);
+        else if (tool === 'typhoon') ghostPreview = createTyphoonGeometryGroup(placementConfig.variant, true);
+        else if (tool === 'fuel') ghostPreview = createFuelStationGeometryGroup(placementConfig.variant, true);
+
+        if (ghostPreview) {
+          ghostPreview.scale.setScalar(placementConfig.scale);
+          ghostPreview.rotation.y = (placementConfig.rotation * Math.PI) / 180;
+          ghostPreview.visible = false;
+          map.add(ghostPreview);
+        }
+      }
+
+      // ── Smooth Camera Rig (Orbit, Pan, Zoom & Rotation-Lock) ──
+      var camState = {
+        target: new THREE.Vector3(0, 1.0, 0),
+        goalTarget: new THREE.Vector3(0, 1.0, 0),
+        radius: 86,
+        goalRadius: 86,
+        theta: 0,
+        goalTheta: 0,
+        phi: 0.78,
+        goalPhi: 0.78
+      };
+
+      function applyCameraTransform(instant) {
+        var lerpFactor = instant ? 1.0 : 0.14;
+        camState.target.lerp(camState.goalTarget, lerpFactor);
+        camState.radius += (camState.goalRadius - camState.radius) * lerpFactor;
+        camState.theta  += (camState.goalTheta  - camState.theta)  * lerpFactor;
+        camState.phi    += (camState.goalPhi    - camState.phi)    * lerpFactor;
+
+        var sinPhi = Math.sin(camState.phi);
+        var cosPhi = Math.cos(camState.phi);
+        var sinTheta = Math.sin(camState.theta);
+        var cosTheta = Math.cos(camState.theta);
+
+        camera.position.set(
+          camState.target.x + camState.radius * sinPhi * sinTheta,
+          camState.target.y + camState.radius * cosPhi,
+          camState.target.z + camState.radius * sinPhi * cosTheta
+        );
+        camera.lookAt(camState.target);
+      }
+      applyCameraTransform(true);
+
+      function panCameraByScreenDelta(dxPx, dyPx) {
+        var rect = renderer.domElement.getBoundingClientRect();
+        var scale = (camState.radius * 0.85) / Math.max(rect.height, 300);
+        var forwardX = -Math.sin(camState.theta);
+        var forwardZ = -Math.cos(camState.theta);
+        var rightX = Math.cos(camState.theta);
+        var rightZ = -Math.sin(camState.theta);
+
+        camState.goalTarget.x -= (rightX * dxPx - forwardX * dyPx) * scale;
+        camState.goalTarget.z -= (rightZ * dxPx - forwardZ * dyPx) * scale;
+        camState.goalTarget.x = Math.max(-HALF_W, Math.min(HALF_W, camState.goalTarget.x));
+        camState.goalTarget.z = Math.max(-HALF_D, Math.min(HALF_D, camState.goalTarget.z));
+      }
+
+      function updateEditorLockUI() {
+        var statusEl = $('placementLockStatus');
+        var btnEl = $('btnToggleEditorTilt');
+        if (!statusEl || !btnEl) return;
+        if (editorRotationLocked) {
+          statusEl.textContent = 'Rotation-Locked Drag Mode';
+          btnEl.textContent = 'Unlock 3D Tilt';
+        } else {
+          statusEl.textContent = '3D Tilt Active (Objects Stay Aligned)';
+          btnEl.textContent = 'Lock Top View';
+        }
+      }
+
+      function engageEditorPlacementView() {
+        if (editorRotationLocked) {
+          camState.goalPhi = 0.34;
+          camState.goalTheta = 0;
+        }
+        updateEditorLockUI();
+      }
+
+      // ── Speed Multipliers, Timers & Raycaster ────────────────
+      var SHIP_SPEED_STEPS = [0.5, 1.0, 1.5, 2.0, 3.0];
+      var shipSpeedIdx = 1;
+      var shipSpeedMult = SHIP_SPEED_STEPS[shipSpeedIdx];
+      var cycloneSpeedMult = 1.0;
+
+      var lastT = performance.now();
+      var prevShipPos = null;
+
+      var resetArmed = false;
+      var resetArmTimer = null;
+      var deleteAllArmed = false;
+      var deleteAllTimer = null;
+
+      var raycaster = new THREE.Raycaster();
+      var pointer = new THREE.Vector2();
+      var mapPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -0.85);
+
+      // ── UI Mode & Tool Management ────────────────────────────
+      function setMode(m) {
+        mode = m;
+        document.body.classList.toggle('editor', m === 'editor');
+        $('btnLive').classList.toggle('active', m === 'live');
+        $('btnEditor').classList.toggle('active', m === 'editor');
+        pathMarkers.forEach(function (mk) { mk.visible = (m === 'editor'); });
+        stormMarkers.forEach(function (mk) { mk.visible = (m === 'editor'); });
+
+        if (m === 'editor') {
+          if (window.innerWidth <= 760) {
+            $('left').classList.remove('mobile-hidden');
+            $('right').classList.add('mobile-hidden');
+          }
+          if (follow) {
+            follow = false;
+            $('btnFollow').classList.remove('active');
+            $('btnFollow').textContent = 'Follow';
+          }
+          editorRotationLocked = true;
+          engageEditorPlacementView();
+          rebuildGhostPreview();
+          rebuildPath();
+          updateSelectionRing();
+          $('bottom').textContent = 'Editor (Rotation-Locked) · Tap or drag on map · Routes auto-avoid islands & shallow shoals';
+        } else {
+          clearSelection();
+          if (ghostPreview) {
+            map.remove(ghostPreview);
+            ghostPreview = null;
+          }
+          rebuildPath();
+          camState.goalPhi = 0.78;
+          $('bottom').textContent = 'Drag to orbit · Scroll / pinch to zoom · Live waves, tides, currents & A* obstacle avoidance';
+        }
+      }
+
+      function updateCustomizerUI() {
+        var safeTool = tool || 'select';
+        var activeType = (safeTool === 'select' && selectedEntity && selectedEntity.kind === 'asset' && selectedEntity.mesh && selectedEntity.mesh.userData)
+          ? selectedEntity.mesh.userData.type
+          : safeTool;
+        var cat = ASSET_CATALOG[activeType];
+        var customizer = $('assetCustomizer');
+        if (!customizer) return;
+
+        if (!cat) {
+          $('activeAssetBadge').textContent = safeTool.toUpperCase();
+          $('customizerModeLabel').textContent = 'Object Properties';
+          $('customizerAssetName').textContent = 'NONE SELECTED';
+          customizer.style.opacity = '0.65';
+          return;
+        }
+
+        customizer.style.opacity = '1';
+        $('activeAssetBadge').textContent = (safeTool === 'select' ? 'EDITING: ' : 'PLACE: ') + cat.label.toUpperCase();
+        $('customizerModeLabel').textContent = (safeTool === 'select' && selectedEntity) ? 'Selected Object' : 'Pre-Placement';
+        $('customizerAssetName').textContent = cat.label.toUpperCase();
+
+        var cfg = (safeTool === 'select' && selectedEntity && selectedEntity.kind === 'asset' && selectedEntity.mesh)
+          ? selectedEntity.mesh.userData
+          : placementConfig;
+
+        var variant = cfg.variant || 0;
+        var scale = cfg.scale || 1.0;
+        var rotation = cfg.rotation || 0;
+
+        var pills = $('variantPills').querySelectorAll('.pill');
+        pills.forEach(function (p, idx) {
+          p.textContent = cat.variants[idx] || ('Model ' + (idx + 1));
+          p.classList.toggle('active', idx === variant);
+        });
+        $('variantLabel').textContent = cat.variants[variant] || 'Standard';
+
+        var sizeTag = scale <= 0.75 ? 'S' : (scale <= 1.2 ? 'M' : (scale <= 1.7 ? 'L' : 'XL'));
+        $('sizeLabel').textContent = scale.toFixed(2) + 'x (' + sizeTag + ')';
+        $('scaleSlider').value = scale;
+        $('sizePills').querySelectorAll('.pill').forEach(function (p) {
+          var s = parseFloat(p.getAttribute('data-scale'));
+          p.classList.toggle('active', Math.abs(s - scale) < 0.06);
+        });
+
+        $('rotLabel').textContent = rotation + '°';
+        $('rotSlider').value = rotation;
+      }
+
+      function applyConfigChangeToSelected() {
+        if (tool !== 'select' || !selectedEntity || selectedEntity.kind !== 'asset' || !selectedEntity.mesh) return;
+        var oldMesh = selectedEntity.mesh;
+        var type = oldMesh.userData.type;
+        var x = oldMesh.position.x;
+        var z = oldMesh.position.z;
+        var idx = -1;
+        for (var i = 0; i < objects.length; i++) {
+          if (objects[i].mesh === oldMesh) { idx = i; break; }
+        }
+        map.remove(oldMesh);
+        if (idx !== -1) objects.splice(idx, 1);
+
+        var newMesh = spawnAsset(type, x, z, {
+          variant: placementConfig.variant,
+          scale: placementConfig.scale,
+          rotation: placementConfig.rotation
+        });
+        selectedEntity = { kind: 'asset', mesh: newMesh };
+        updateSelectionRing();
+        rebuildPath();
+      }
+
+      function setTool(t) {
+        tool = t;
+        placementConfig.variant = 0;
+        if (t !== 'select') clearSelection();
+
+        if (['island', 'reef', 'rock', 'typhoon', 'fuel', 'path', 'storm', 'select'].indexOf(t) !== -1) {
+          editorRotationLocked = true;
+          engageEditorPlacementView();
+        }
+
+        document.querySelectorAll('[data-tool]').forEach(function (b) {
+          b.classList.toggle('active', b.getAttribute('data-tool') === t);
+        });
+
+        var hints = {
+          select: 'Click any object or waypoint to select and drag smoothly. Ship path updates around obstacles in real time.',
+          path: 'Tap or click inside the map to add a waypoint. A* navigation automatically routes around islands and shallow water.',
+          island: 'Tap or click inside the map to place an island with surrounding radar-detected shallow water.',
+          reef: 'Tap or click inside the map to place a shallow coral reef hazard.',
+          rock: 'Tap or click inside the map to place a sea rock formation and shoal.',
+          typhoon: 'Tap or click inside the map to spawn a 3D rotating cyclone vortex.',
+          fuel: 'Tap or click inside the map to place an offshore Fuel & Engine Maintenance Station.',
+          storm: 'Tap or click inside the map to plot passing storm track nodes.',
+          delete: 'Tap or click any object or waypoint to delete it.'
+        };
+        $('toolHint').textContent = hints[t] || '';
+        updateCustomizerUI();
+        rebuildGhostPreview();
+      }
+
+      $('btnLive').onclick = function () { setMode('live'); };
+      $('btnEditor').onclick = function () { setMode('editor'); };
+      $('btnToggleLeft').onclick = function () {
+        $('left').classList.toggle('mobile-hidden');
+        if (!$('left').classList.contains('mobile-hidden')) {
+          $('right').classList.add('mobile-hidden');
+        }
+      };
+      $('btnToggleRight').onclick = function () {
+        $('right').classList.toggle('mobile-hidden');
+        if (!$('right').classList.contains('mobile-hidden')) {
+          $('left').classList.add('mobile-hidden');
+        }
+      };
+
+      $('btnToggleEditorTilt').onclick = function () {
+        editorRotationLocked = !editorRotationLocked;
+        if (editorRotationLocked) {
+          engageEditorPlacementView();
+          showToast('Rotation-Locked Placement Mode enabled');
+        } else {
+          camState.goalPhi = 0.78;
+          updateEditorLockUI();
+          showToast('3D Tilt unlocked — object drag still keeps rotation locked');
+        }
+      };
+
+      document.querySelectorAll('[data-tool]').forEach(function (b) {
+        b.onclick = function () { setTool(b.getAttribute('data-tool')); };
+      });
+
+      $('variantPills').querySelectorAll('.pill').forEach(function (p) {
+        p.onclick = function () {
+          placementConfig.variant = parseInt(p.getAttribute('data-variant'), 10) || 0;
+          applyConfigChangeToSelected();
+          updateCustomizerUI();
+          rebuildGhostPreview();
+        };
+      });
+
+      $('sizePills').querySelectorAll('.pill').forEach(function (p) {
+        p.onclick = function () {
+          placementConfig.scale = parseFloat(p.getAttribute('data-scale')) || 1.0;
+          applyConfigChangeToSelected();
+          updateCustomizerUI();
+          rebuildGhostPreview();
+        };
+      });
+
+      $('scaleSlider').oninput = function (e) {
+        placementConfig.scale = parseFloat(e.target.value) || 1.0;
+        applyConfigChangeToSelected();
+        updateCustomizerUI();
+        rebuildGhostPreview();
+      };
+
+      $('rotSlider').oninput = function (e) {
+        placementConfig.rotation = parseInt(e.target.value, 10) || 0;
+        applyConfigChangeToSelected();
+        updateCustomizerUI();
+        rebuildGhostPreview();
+      };
+
+      $('btnRotateStep').onclick = function () {
+        placementConfig.rotation = (placementConfig.rotation + 45) % 360;
+        applyConfigChangeToSelected();
+        updateCustomizerUI();
+        rebuildGhostPreview();
+      };
+
+      $('btnSnapGrid').onclick = function (e) {
+        placementConfig.snap = !placementConfig.snap;
+        e.target.classList.toggle('active', placementConfig.snap);
+        e.target.textContent = placementConfig.snap ? 'ON' : 'OFF';
+      };
+
+      // Ship Throttle Cycle Button
+      $('btnShipSpeed').onclick = function () {
+        shipSpeedIdx = (shipSpeedIdx + 1) % SHIP_SPEED_STEPS.length;
+        shipSpeedMult = SHIP_SPEED_STEPS[shipSpeedIdx];
+        $('shipSpeedLabel').textContent = 'Throttle: ' + shipSpeedMult.toFixed(1) + 'x';
+        showToast('Engine Throttle: ' + shipSpeedMult.toFixed(1) + 'x' + (shipSpeedMult >= 2.0 ? ' (High Load)' : ''));
+      };
+
+      // Ocean Sea Intensity & Toggles
+      $('seaIntensitySlider').oninput = function (e) {
+        seaIntensity = parseFloat(e.target.value) || 1.0;
+        $('seaIntensityLabel').textContent = seaIntensity.toFixed(1) + 'x';
+        var seaState = seaIntensity < 0.7 ? 'Calm' : (seaIntensity <= 1.2 ? 'Moderate' : (seaIntensity <= 1.7 ? 'Rough' : 'Heavy Swell'));
+        $('seaStateVal').textContent = seaState;
+      };
+
+      $('btnCurrents').onclick = function (e) {
+        showCurrents = !showCurrents;
+        currentStreamsGroup.visible = showCurrents;
+        e.target.classList.toggle('active', showCurrents);
+      };
+
+      $('btnShallows').onclick = function (e) {
+        showShallows = !showShallows;
+        e.target.classList.toggle('active', showShallows);
+        objects.forEach(function (o) {
+          var si = o.mesh.getObjectByName('shallowInner');
+          var so = o.mesh.getObjectByName('shallowOuter');
+          if (si) si.visible = showShallows;
+          if (so) so.visible = showShallows;
+        });
+      };
+
+      // Cyclone Speed Controls
+      function setCycloneSpeed(val) {
+        cycloneSpeedMult = Math.max(0, Math.min(4, val));
+        $('cycloneSpeedSlider').value = cycloneSpeedMult;
+        $('cycloneSpeedBadge').textContent = cycloneSpeedMult.toFixed(1) + 'x';
+        var desc = cycloneSpeedMult === 0 ? 'Paused' : (cycloneSpeedMult < 0.8 ? 'Calm' : (cycloneSpeedMult <= 1.3 ? 'Normal' : (cycloneSpeedMult <= 2.5 ? 'Gale' : 'Extreme')));
+        $('cycloneSpeedLabel').textContent = desc + ' (' + cycloneSpeedMult.toFixed(1) + 'x)';
+        $('cyclonePresets').querySelectorAll('.pill').forEach(function (p) {
+          var cs = parseFloat(p.getAttribute('data-cspeed'));
+          p.classList.toggle('active', Math.abs(cs - cycloneSpeedMult) < 0.08);
+        });
+      }
+      $('cycloneSpeedSlider').oninput = function (e) {
+        setCycloneSpeed(parseFloat(e.target.value));
+      };
+      $('cyclonePresets').querySelectorAll('.pill').forEach(function (p) {
+        p.onclick = function () {
+          setCycloneSpeed(parseFloat(p.getAttribute('data-cspeed')));
+        };
+      });
+
+      $('btnFollow').onclick = function (e) {
+        follow = !follow;
+        e.target.classList.toggle('active', follow);
+        e.target.textContent = follow ? 'Free Cam' : 'Follow';
+        if (follow && titan.visible) {
+          prevShipPos = titan.position.clone();
+          camState.goalTarget.set(titan.position.x, 1.0, titan.position.z);
+          camState.goalRadius = Math.min(camState.goalRadius, 52);
+          showToast('Tracking The Titan');
+        } else {
+          prevShipPos = null;
+        }
+      };
+
+      $('btnPause').onclick = function (e) {
+        paused = !paused;
+        e.target.classList.toggle('active', paused);
+        e.target.textContent = paused ? 'Resume' : 'Pause';
+      };
+
+      $('btnGrid').onclick = function (e) {
+        showGrid = !showGrid;
+        gridGroup.visible = showGrid;
+        e.target.classList.toggle('active', showGrid);
+      };
+
+      $('btnRadar').onclick = function (e) {
+        showRadar = !showRadar;
+        shipSonarGroup.visible = showRadar && titan.visible;
+        e.target.classList.toggle('active', showRadar);
+        showToast('Ship Radar & Bathymetry Scan: ' + (showRadar ? 'ON' : 'OFF'));
+      };
+
+      $('btnResetCam').onclick = function () {
+        follow = false;
+        $('btnFollow').classList.remove('active');
+        $('btnFollow').textContent = 'Follow';
+        prevShipPos = null;
+        camState.goalTarget.set(0, 1.0, 0);
+        camState.goalRadius = 86;
+        camState.goalTheta = 0;
+        camState.goalPhi = (mode === 'editor' && editorRotationLocked) ? 0.34 : 0.78;
+      };
+
+      $('btnClearPath').onclick = function () {
+        pathPoints = [];
+        rebuildPath();
+        titan.visible = false;
+        shipSonarGroup.visible = false;
+        fuelTether.visible = false;
+        $('posVal').textContent = 'NO ROUTE';
+        $('speedVal').textContent = '0.0 kn';
+        $('headVal').textContent = '---°';
+        showToast('Navigation path cleared');
+      };
+
+      $('btnDeleteAll').onclick = function (e) {
+        var btn = e.currentTarget;
+        var label = $('deleteAllLabel');
+        if (!deleteAllArmed) {
+          deleteAllArmed = true;
+          btn.classList.add('armed');
+          label.textContent = 'Confirm Delete All?';
+          if (deleteAllTimer) clearTimeout(deleteAllTimer);
+          deleteAllTimer = setTimeout(function () {
+            deleteAllArmed = false;
+            btn.classList.remove('armed');
+            label.textContent = 'Delete Everything';
+          }, 3500);
+        } else {
+          deleteAllArmed = false;
+          if (deleteAllTimer) clearTimeout(deleteAllTimer);
+          btn.classList.remove('armed');
+          label.textContent = 'Delete Everything';
+          deleteAllMapItems();
+          updateCustomizerUI();
+          showToast('All map objects, paths & storms deleted');
+        }
+      };
+
+      $('btnResetMap').onclick = function (e) {
+        var btn = e.currentTarget;
+        if (!resetArmed) {
+          resetArmed = true;
+          btn.classList.add('danger');
+          btn.textContent = 'Confirm Reset?';
+          if (resetArmTimer) clearTimeout(resetArmTimer);
+          resetArmTimer = setTimeout(function () {
+            resetArmed = false;
+            btn.classList.remove('danger');
+            btn.textContent = 'Reset Default';
+          }, 3000);
+        } else {
+          resetArmed = false;
+          if (resetArmTimer) clearTimeout(resetArmTimer);
+          btn.classList.remove('danger');
+          btn.textContent = 'Reset Default';
+          setDefaultMap();
+          fuelLevel = 92.0;
+          engineHealth = 99.6;
+          showToast('Default tactical map restored');
+        }
+      };
+
+      $('btnExport').onclick = function () {
+        var data = {
+          version: 5,
+          shipSpeedMult: shipSpeedMult,
+          cycloneSpeedMult: cycloneSpeedMult,
+          seaIntensity: seaIntensity,
+          path: pathPoints.map(function (p) { return { x: p.x, z: p.z, variant: p.variant || 0, scale: p.wpScale || 1.0 }; }),
+          storm: stormPoints.map(function (p) { return { x: p.x, z: p.z, variant: p.variant || 0, scale: p.wpScale || 1.0 }; }),
+          objects: objects.map(function (o) {
+            var p = o.mesh.position;
+            var ud = o.mesh.userData;
+            return {
+              type: o.type,
+              x: p.x,
+              z: p.z,
+              variant: ud.variant || 0,
+              scale: ud.scale || 1.0,
+              rotation: ud.rotation || 0
+            };
+          })
+        };
+        var blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'titan_tactical_map.json';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(a.href);
+        showToast('Exported titan_tactical_map.json');
+      };
+
+      $('btnImport').onclick = function () { $('fileImport').click(); };
+      $('fileImport').onchange = function (e) {
+        var file = e.target.files && e.target.files[0];
+        if (!file) return;
+        var reader = new FileReader();
+        reader.onload = function () {
+          try {
+            var data = JSON.parse(reader.result);
+            deleteAllMapItems();
+
+            (data.objects || []).forEach(function (o) {
+              spawnAsset(o.type, o.x, o.z, {
+                variant: o.variant || 0,
+                scale: o.scale || (o.r ? o.r / 5.0 : 1.0),
+                rotation: o.rotation || 0
+              });
+            });
+
+            pathPoints = (data.path || []).map(function (p) {
+              var rawX = Array.isArray(p) ? p[0] : p.x;
+              var rawZ = Array.isArray(p) ? p[1] : p.z;
+              var clamped = clampToMapBounds(rawX, rawZ, 0.9);
+              var v = new THREE.Vector3(clamped.x, 0.5, clamped.z);
+              v.variant = p.variant || 0;
+              v.wpScale = p.scale || 1.0;
+              return v;
+            });
+            rebuildPath();
+            titan.visible = pathPoints.length >= 2;
+            shipSonarGroup.visible = showRadar && titan.visible;
+
+            stormPoints = (data.storm || []).map(function (p) {
+              var rawX = Array.isArray(p) ? p[0] : p.x;
+              var rawZ = Array.isArray(p) ? p[1] : p.z;
+              var clamped = clampToMapBounds(rawX, rawZ, 0.9);
+              var v = new THREE.Vector3(clamped.x, 0.5, clamped.z);
+              v.variant = p.variant || 0;
+              v.wpScale = p.scale || 1.0;
+              return v;
+            });
+            rebuildStorm();
+
+            if (typeof data.cycloneSpeedMult === 'number') setCycloneSpeed(data.cycloneSpeedMult);
+            if (typeof data.shipSpeedMult === 'number') {
+              shipSpeedMult = data.shipSpeedMult;
+              $('shipSpeedLabel').textContent = 'Throttle: ' + shipSpeedMult.toFixed(1) + 'x';
+            }
+            if (typeof data.seaIntensity === 'number') {
+              seaIntensity = data.seaIntensity;
+              $('seaIntensitySlider').value = seaIntensity;
+              $('seaIntensityLabel').textContent = seaIntensity.toFixed(1) + 'x';
+            }
+            showToast('Tactical map imported successfully');
+          } catch (err) {
+            showToast('Error: Invalid map JSON file');
+          }
+        };
+        reader.readAsText(file);
+        e.target.value = '';
+      };
+
+      // ── Unified Raycasting, Boundary Enforcement & Cross-Browser Input ──
+      function intersectMapRaw(clientX, clientY) {
+        var rect = renderer.domElement.getBoundingClientRect();
+        if (!rect.width || !rect.height) return null;
+        pointer.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+        pointer.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+        raycaster.setFromCamera(pointer, camera);
+        var hit = new THREE.Vector3();
+        if (raycaster.ray.intersectPlane(mapPlane, hit)) {
+          return hit;
+        }
+        return null;
+      }
+
+      function pickObject(clientX, clientY) {
+        var rect = renderer.domElement.getBoundingClientRect();
+        if (!rect.width || !rect.height) return null;
+        pointer.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+        pointer.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+        raycaster.setFromCamera(pointer, camera);
+        var meshes = objects.map(function (o) { return o.mesh; }).concat(pathMarkers).concat(stormMarkers);
+        var hits = raycaster.intersectObjects(meshes, true);
+        if (!hits.length) return null;
+        var obj = hits[0].object;
+        while (obj && !(obj.userData && obj.userData.type) && obj.parent && obj.parent !== map) {
+          obj = obj.parent;
+        }
+        return (obj && obj.userData && obj.userData.type) ? obj : null;
+      }
+
+      var activePointers = {};
+      var lastPinchDist = 0;
+      var camGesture = null;
+
+      function getPinchDistance() {
+        var keys = Object.keys(activePointers);
+        if (keys.length < 2) return 0;
+        var p1 = activePointers[keys[0]];
+        var p2 = activePointers[keys[1]];
+        return Math.hypot(p2.x - p1.x, p2.y - p1.y);
+      }
+
+      function handleInputDown(id, clientX, clientY, isSecondaryOrShift) {
+        activePointers[id] = { x: clientX, y: clientY };
+        var ptrCount = Object.keys(activePointers).length;
+
+        if (ptrCount >= 2) {
+          dragging = null;
+          camGesture = 'pan';
+          lastPinchDist = getPinchDistance();
+          return;
+        }
+
+        if (mode === 'editor') {
+          var obj = pickObject(clientX, clientY);
+
+          if (tool === 'delete') {
+            if (obj) {
+              if (obj.userData.type === 'waypoint') {
+                if (obj.userData.kind === 'path') {
+                  pathPoints.splice(obj.userData.index, 1);
+                  rebuildPath();
+                  if (pathPoints.length < 2) {
+                    titan.visible = false;
+                    shipSonarGroup.visible = false;
+                    fuelTether.visible = false;
+                  }
+                } else {
+                  stormPoints.splice(obj.userData.index, 1);
+                  rebuildStorm();
+                }
+              } else {
+                for (var i = 0; i < objects.length; i++) {
+                  if (objects[i].mesh === obj) {
+                    map.remove(objects[i].mesh);
+                    objects.splice(i, 1);
+                    break;
+                  }
+                }
+                updateOceanBathymetryField();
+                rebuildPath(); // Re-evaluate obstacle avoidance
+              }
+              clearSelection();
+              updateCustomizerUI();
+            }
+            return;
+          }
+
+          if (tool === 'select') {
+            if (obj) {
+              if (obj.userData.type === 'waypoint') {
+                selectedEntity = { kind: obj.userData.kind, index: obj.userData.index };
+                dragging = { kind: obj.userData.kind, index: obj.userData.index, radius: 0.9 };
+              } else {
+                selectedEntity = { kind: 'asset', mesh: obj };
+                placementConfig.variant = obj.userData.variant || 0;
+                placementConfig.scale = obj.userData.scale || 1.0;
+                placementConfig.rotation = obj.userData.rotation || 0;
+                dragging = {
+                  kind: 'asset',
+                  mesh: obj,
+                  radius: getAssetFootprintRadius(obj.userData.type, obj.userData.scale)
+                };
+              }
+              updateSelectionRing();
+              updateCustomizerUI();
+              return;
+            } else {
+              clearSelection();
+              updateCustomizerUI();
+              camGesture = (editorRotationLocked || isSecondaryOrShift) ? 'pan' : 'orbit';
+              return;
+            }
+          }
+
+          var rawHit = intersectMapRaw(clientX, clientY);
+          if (!rawHit || !isRawPointOnMap(rawHit)) {
+            showToast('Placement must stay inside the map boundaries');
+            return;
+          }
+
+          if (tool === 'path') {
+            var pClamped = clampToMapBounds(rawHit.x, rawHit.z, 0.9);
+            var wp = new THREE.Vector3(pClamped.x, 0.5, pClamped.z);
+            wp.variant = placementConfig.variant;
+            wp.wpScale = placementConfig.scale;
+            pathPoints.push(wp);
+            rebuildPath();
+            if (pathPoints.length >= 2) {
+              titan.visible = true;
+              shipSonarGroup.visible = showRadar;
+            }
+            selectedEntity = { kind: 'path', index: pathPoints.length - 1 };
+            dragging = { kind: 'path', index: pathPoints.length - 1, radius: 0.9 };
+            updateSelectionRing();
+            return;
+          }
+
+          if (tool === 'storm') {
+            var sClamped = clampToMapBounds(rawHit.x, rawHit.z, 0.9);
+            var sp = new THREE.Vector3(sClamped.x, 0.5, sClamped.z);
+            sp.variant = placementConfig.variant;
+            sp.wpScale = placementConfig.scale;
+            stormPoints.push(sp);
+            rebuildStorm();
+            selectedEntity = { kind: 'storm', index: stormPoints.length - 1 };
+            dragging = { kind: 'storm', index: stormPoints.length - 1, radius: 0.9 };
+            updateSelectionRing();
+            return;
+          }
+
+          if (['island', 'reef', 'rock', 'typhoon', 'fuel'].indexOf(tool) !== -1) {
+            var placed = spawnAsset(tool, rawHit.x, rawHit.z, {
+              variant: placementConfig.variant,
+              scale: placementConfig.scale,
+              rotation: placementConfig.rotation
+            });
+            if (placed) {
+              selectedEntity = { kind: 'asset', mesh: placed };
+              dragging = {
+                kind: 'asset',
+                mesh: placed,
+                radius: getAssetFootprintRadius(tool, placementConfig.scale)
+              };
+              updateSelectionRing();
+              rebuildPath(); // Automatically route around newly placed obstacle!
+              if (tool === 'typhoon') showToast('Cyclone deployed');
+            }
+            return;
+          }
+        }
+
+        camGesture = isSecondaryOrShift ? 'pan' : 'orbit';
+      }
+
+      function handleInputMove(id, clientX, clientY) {
+        var prev = activePointers[id];
+        var dx = prev ? (clientX - prev.x) : 0;
+        var dy = prev ? (clientY - prev.y) : 0;
+        if (prev) {
+          activePointers[id] = { x: clientX, y: clientY };
+        }
+
+        var ptrCount = Object.keys(activePointers).length;
+
+        if (ptrCount >= 2) {
+          var newDist = getPinchDistance();
+          if (lastPinchDist > 0 && newDist > 0) {
+            var zoomScale = lastPinchDist / newDist;
+            camState.goalRadius = Math.max(18, Math.min(135, camState.goalRadius * zoomScale));
+          }
+          lastPinchDist = newDist;
+          panCameraByScreenDelta(dx * 0.5, dy * 0.5);
+          return;
+        }
+
+        if (dragging) {
+          var rawHit = intersectMapRaw(clientX, clientY);
+          if (!rawHit) return;
+          var clamped = clampToMapBounds(rawHit.x, rawHit.z, dragging.radius);
+
+          if (dragging.kind === 'path' && pathPoints[dragging.index]) {
+            pathPoints[dragging.index].x = clamped.x;
+            pathPoints[dragging.index].z = clamped.z;
+            rebuildPath();
+          } else if (dragging.kind === 'storm' && stormPoints[dragging.index]) {
+            stormPoints[dragging.index].x = clamped.x;
+            stormPoints[dragging.index].z = clamped.z;
+            rebuildStorm();
+          } else if (dragging.kind === 'asset' && dragging.mesh) {
+            dragging.mesh.position.x = clamped.x;
+            dragging.mesh.position.z = clamped.z;
+            updateOceanBathymetryField();
+            rebuildPath(); // Continuously bend route around dragged island/rock/reef!
+          }
+          updateSelectionRing();
+          return;
+        }
+
+        if (prev && camGesture) {
+          if (camGesture === 'orbit' && !(mode === 'editor' && editorRotationLocked)) {
+            camState.goalTheta -= dx * 0.0065;
+            camState.goalPhi = Math.max(0.12, Math.min(1.42, camState.goalPhi - dy * 0.0065));
+          } else if (camGesture === 'pan') {
+            panCameraByScreenDelta(dx, dy);
+          }
+          return;
+        }
+
+        if (mode === 'editor' && ghostPreview) {
+          var gpRaw = intersectMapRaw(clientX, clientY);
+          if (gpRaw && isRawPointOnMap(gpRaw)) {
+            var gRadius = getAssetFootprintRadius(tool, placementConfig.scale);
+            var gClamped = clampToMapBounds(gpRaw.x, gpRaw.z, gRadius);
+            ghostPreview.visible = true;
+            ghostPreview.position.set(gClamped.x, 0.05, gClamped.z);
+          } else {
+            ghostPreview.visible = false;
+          }
+        }
+      }
+
+      function handleInputEnd(id) {
+        delete activePointers[id];
+        if (Object.keys(activePointers).length < 2) {
+          lastPinchDist = 0;
+        }
+        if (Object.keys(activePointers).length === 0) {
+          dragging = null;
+          camGesture = null;
+        }
+      }
+
+      if (window.PointerEvent) {
+        renderer.domElement.addEventListener('pointerdown', function (e) {
+          if (renderer.domElement.setPointerCapture) {
+            try { renderer.domElement.setPointerCapture(e.pointerId); } catch (err) {}
+          }
+          handleInputDown(e.pointerId, e.clientX, e.clientY, e.button === 2 || e.shiftKey);
+        });
+        renderer.domElement.addEventListener('pointermove', function (e) {
+          handleInputMove(e.pointerId, e.clientX, e.clientY);
+        });
+        renderer.domElement.addEventListener('pointerup', function (e) { handleInputEnd(e.pointerId); });
+        renderer.domElement.addEventListener('pointercancel', function (e) { handleInputEnd(e.pointerId); });
+        renderer.domElement.addEventListener('pointerleave', function (e) {
+          handleInputEnd(e.pointerId);
+          if (ghostPreview) ghostPreview.visible = false;
+        });
+      } else {
+        renderer.domElement.addEventListener('mousedown', function (e) {
+          handleInputDown('mouse', e.clientX, e.clientY, e.button === 2 || e.shiftKey);
+        });
+        window.addEventListener('mousemove', function (e) {
+          handleInputMove('mouse', e.clientX, e.clientY);
+        });
+        window.addEventListener('mouseup', function () { handleInputEnd('mouse'); });
+
+        renderer.domElement.addEventListener('touchstart', function (e) {
+          e.preventDefault();
+          for (var i = 0; i < e.changedTouches.length; i++) {
+            var t = e.changedTouches[i];
+            handleInputDown('touch_' + t.identifier, t.clientX, t.clientY, false);
+          }
+        }, { passive: false });
+        renderer.domElement.addEventListener('touchmove', function (e) {
+          e.preventDefault();
+          for (var i = 0; i < e.changedTouches.length; i++) {
+            var t = e.changedTouches[i];
+            handleInputMove('touch_' + t.identifier, t.clientX, t.clientY);
+          }
+        }, { passive: false });
+        renderer.domElement.addEventListener('touchend', function (e) {
+          for (var i = 0; i < e.changedTouches.length; i++) {
+            handleInputEnd('touch_' + e.changedTouches[i].identifier);
+          }
+        });
+        renderer.domElement.addEventListener('touchcancel', function (e) {
+          for (var i = 0; i < e.changedTouches.length; i++) {
+            handleInputEnd('touch_' + e.changedTouches[i].identifier);
+          }
+        });
+      }
+
+      renderer.domElement.addEventListener('contextmenu', function (e) {
+        e.preventDefault();
+      });
+
+      renderer.domElement.addEventListener('wheel', function (e) {
+        e.preventDefault();
+        var delta = Math.sign(e.deltaY) * 4.5;
+        camState.goalRadius = Math.max(18, Math.min(135, camState.goalRadius + delta));
+      }, { passive: false });
+
+      // ── Ocean Wave Height Helper at (x, z, time) ─────────────
+      function sampleWaveElevation(x, z, tSec) {
+        var amp = 0.13 * seaIntensity;
+        var w1 = Math.sin(x * 0.28 + z * 0.16 + tSec * 2.1) * amp;
+        var w2 = Math.cos(x * 0.15 - z * 0.34 + tSec * 1.65) * amp * 0.75;
+        var w3 = Math.sin((x + z) * 0.52 - tSec * 2.9) * amp * 0.35;
+        return w1 + w2 + w3;
+      }
+
+      // ── Main Animation & Realistic Marine Physics Loop ───────
+      function animate(now) {
+        requestAnimationFrame(animate);
+        if (fastMapMode && now - mapLastFrameAt < 33) return;
+        mapLastFrameAt = now;
+        if (document.hidden || (fastMapMode && (!mapRenderRequested || !mapViewportVisible))) { lastT = now; return; }
+        var dt = Math.min((now - lastT) / 1000, 0.05);
+        lastT = now;
+        var tSec = now * 0.001;
+
+        // 1. Update Live Tidal Cycle (High / Rising / Low / Falling)
+        if (!paused) {
+          tidePhase += dt * 0.065;
+        }
+        currentTideHeight = Math.sin(tidePhase) * 0.35; // -0.35m to +0.35m
+        var tideDerivative = Math.cos(tidePhase);
+        var tideName = currentTideHeight > 0.18 ? 'HIGH TIDE' : (currentTideHeight < -0.18 ? 'LOW TIDE' : (tideDerivative >= 0 ? 'RISING TIDE' : 'FALLING TIDE'));
+        var tideSign = currentTideHeight >= 0 ? '+' : '';
+        $('tideBadge').textContent = tideName + ' ' + tideSign + currentTideHeight.toFixed(1) + 'm';
+
+        // 2. Animate 3D Ocean Surface Waves, Tides & Shallow-Water Bathymetric Colors
+        var tideColorShift = currentTideHeight * 0.25;
+        for (var ov = 0; ov < oceanVertCount; ov++) {
+          var wx = oceanBaseX[ov];
+          var wz = oceanBaseZ[ov];
+          var normD = oceanNormalizedDepth[ov];
+
+          // Shoaling effect: waves steepen slightly in shallow water near islands
+          var shoalWaveBoost = normD < 0.55 ? (1.0 + (0.55 - normD) * 0.6) : 1.0;
+          var wy = currentTideHeight * 0.22 + sampleWaveElevation(wx, wz, tSec) * shoalWaveBoost;
+          oceanPosAttr.setY(ov, wy);
+
+          // Bathymetric color gradient: Deep Navy -> Luminous Teal/Turquoise -> Amber Shoal Danger
+          var effDepth = Math.max(0, Math.min(1, normD + tideColorShift * 0.35));
+          var cIdx = ov * 3;
+          if (!showShallows || effDepth > 0.72) {
+            // Deep open ocean
+            var crest = Math.max(0, wy) * 0.14;
+            oceanColorArray[cIdx]     = 0.015 + crest * 0.4;
+            oceanColorArray[cIdx + 1] = 0.115 + crest;
+            oceanColorArray[cIdx + 2] = 0.185 + crest * 1.2;
+          } else if (effDepth > 0.28) {
+            // Outer Shallow Shelf (Radar-detectable turquoise-teal)
+            var tOuter = 1.0 - (effDepth - 0.28) / 0.44;
+            oceanColorArray[cIdx]     = 0.015 + tOuter * 0.05;
+            oceanColorArray[cIdx + 1] = 0.115 + tOuter * 0.34;
+            oceanColorArray[cIdx + 2] = 0.185 + tOuter * 0.26;
+          } else {
+            // Inner Dangerous Shoal (Bright turquoise-amber warning)
+            var tInner = 1.0 - effDepth / 0.28;
+            oceanColorArray[cIdx]     = 0.065 + tInner * 0.52;
+            oceanColorArray[cIdx + 1] = 0.455 - tInner * 0.08;
+            oceanColorArray[cIdx + 2] = 0.445 - tInner * 0.32;
+          }
+        }
+        oceanPosAttr.needsUpdate = true;
+        oceanGeo.attributes.color.needsUpdate = true;
+
+        // 3. Animate Flowing Ocean Current Streams
+        if (showCurrents) {
+          for (var ci = 0; ci < currentChevrons.length; ci++) {
+            var ch = currentChevrons[ci];
+            var cur = getCurrentAt(ch.position.x, ch.position.z);
+            if (!paused) {
+              ch.position.x += cur.vx * dt * 1.65;
+              ch.position.z += cur.vz * dt * 1.65;
+              if (ch.position.x > HALF_W - 2) {
+                ch.position.x = -HALF_W + 2;
+                ch.position.z = ch.userData.baseZ;
+              }
+              if (Math.abs(ch.position.z) > HALF_D - 2) {
+                ch.position.z = ch.userData.baseZ;
+              }
+            }
+            ch.position.y = currentTideHeight * 0.22 + sampleWaveElevation(ch.position.x, ch.position.z, tSec) + 0.06;
+            ch.rotation.y = -Math.atan2(cur.vz, cur.vx);
+            var speedRatio = Math.min(1.8, Math.hypot(cur.vx, cur.vz) / 1.5);
+            ch.material.opacity = (0.22 + 0.18 * Math.sin(tSec * 2.4 + ch.userData.phase)) * Math.min(1.3, speedRatio);
+          }
+        }
+
+        // 4. Advance Ship & Storm Progress
+        var localCurrent = { vx: 1.2, vz: 0 };
+        var localDepth = 48.0;
+        var inShallowDanger = false;
+        var inShallowWarn = false;
+
+        if (mode === 'live' && !paused) {
+          if (pathCurve && computedRoutePoints.length >= 2) {
+            var curAtShip = getCurrentAt(titan.position.x, titan.position.z);
+            var tanNow = pathCurve.getTangentAt(Math.max(0, Math.min(1, progress))).normalize();
+            // Current assistance / drag along ship's heading
+            var alongCurrent = curAtShip.vx * tanNow.x + curAtShip.vz * tanNow.z;
+            var currentFactor = Math.max(0.65, Math.min(1.4, 1.0 + alongCurrent * 0.14));
+            var wearFactor = 0.75 + (engineHealth / 100) * 0.25;
+            var shallowDrag = getWaterDepthAt(titan.position.x, titan.position.z) < 9.0 ? 0.55 : 1.0;
+
+            progress += dt * 0.0155 * shipSpeedMult * currentFactor * wearFactor * shallowDrag;
+            if (progress > 1) progress = 0;
+          }
+          if (stormCurve && stormPoints.length >= 2) {
+            stormProgress += dt * 0.012 * cycloneSpeedMult;
+            if (stormProgress > 1) stormProgress = 0;
+          }
+        }
+
+        // 5. Update Ship Position, Wave Pitch/Roll, Depth, Radar & Engine Wear
+        var isRefueling = false;
+        var activeFuelStation = null;
+
+        if (pathCurve && computedRoutePoints.length >= 2) {
+          titan.visible = true;
+          var t = Math.max(0, Math.min(1, progress));
+          var pos = pathCurve.getPointAt(t);
+          var tan = pathCurve.getTangentAt(t).normalize();
+
+          localCurrent = getCurrentAt(pos.x, pos.z);
+          localDepth = getWaterDepthAt(pos.x, pos.z);
+          inShallowDanger = localDepth < 7.5;
+          inShallowWarn = localDepth < 15.0;
+
+          var waveY = currentTideHeight * 0.22 + sampleWaveElevation(pos.x, pos.z, tSec);
+          titan.position.set(pos.x, 0.36 + waveY, pos.z);
+
+          shipSonarGroup.visible = showRadar;
+          shipSonarGroup.position.set(pos.x, 0.12 + waveY, pos.z);
+
+          // Align ship with route + subtle realistic current crabbing & wave pitch/roll
+          var up = new THREE.Vector3(0, 1, 0);
+          var forward = tan.clone();
+          var right = new THREE.Vector3().crossVectors(forward, up).normalize();
+          up.crossVectors(right, forward).normalize();
+
+          var m = new THREE.Matrix4();
+          m.makeBasis(forward, up, right);
+          titan.quaternion.setFromRotationMatrix(m);
+
+          var pitchAngle = Math.sin(tSec * 2.3 + pos.x * 0.3) * 0.045 * seaIntensity;
+          var rollAngle = Math.cos(tSec * 1.9 + pos.z * 0.3) * 0.065 * seaIntensity;
+          titan.rotateZ(pitchAngle);
+          titan.rotateX(rollAngle);
+
+          // Spin mast radar & blink nav lights
+          var mastRadar = titan.getObjectByName('mastRadar');
+          if (mastRadar) mastRadar.rotation.y += dt * 4.5;
+          var mastLight = titan.getObjectByName('mastLight');
+          if (mastLight) mastLight.visible = (Math.sin(tSec * 6.0) > -0.2);
+
+          // Hull glow ring reacts to shallow-water danger
+          var glow = titan.getObjectByName('glow');
+          if (glow) {
+            if (inShallowDanger) {
+              glow.material.color.setHex(0xfb7185);
+              glow.material.opacity = 0.55 + 0.3 * Math.sin(now * 0.015);
+            } else if (inShallowWarn) {
+              glow.material.color.setHex(0xfbbf24);
+              glow.material.opacity = 0.45 + 0.2 * Math.sin(now * 0.01);
+            } else {
+              glow.material.color.setHex(0x00e5ff);
+              glow.material.opacity = 0.3 + 0.16 * Math.sin(now * 0.004);
+            }
+            glow.scale.setScalar(1 + 0.08 * Math.sin(now * 0.003));
+          }
+
+          // Animate Kelvin Bow Wake & Funnel Exhaust
+          var wakeGroup = titan.getObjectByName('wakeGroup');
+          if (wakeGroup) {
+            var wakeScale = paused ? 0.2 : Math.min(1.6, 0.7 + shipSpeedMult * 0.35);
+            wakeGroup.scale.set(wakeScale, 1, 0.85 + Math.sin(tSec * 5) * 0.08);
+          }
+
+          // Funnel exhaust puffs
+          var sternWorldX = pos.x - tan.x * 0.9;
+          var sternWorldZ = pos.z - tan.z * 0.9;
+          for (var ep = 0; ep < exhaustParticles.length; ep++) {
+            var puff = exhaustParticles[ep];
+            puff.visible = true;
+            if (!paused) {
+              puff.userData.age += dt * (0.65 + shipSpeedMult * 0.45);
+              if (puff.userData.age >= puff.userData.maxAge) {
+                puff.userData.age = 0;
+                puff.position.set(sternWorldX, 1.35 + waveY, sternWorldZ);
+              } else {
+                puff.position.x += (-tan.x * 0.8 + localCurrent.vx * 0.4) * dt;
+                puff.position.z += (-tan.z * 0.8 + localCurrent.vz * 0.4) * dt;
+                puff.position.y += dt * 0.65;
+              }
+            }
+            var lifeRatio = puff.userData.age / puff.userData.maxAge;
+            puff.scale.setScalar(0.6 + lifeRatio * 1.8);
+            puff.material.opacity = Math.sin(lifeRatio * Math.PI) * (paused ? 0.08 : 0.24);
+          }
+
+          // Check proximity to any Fuel & Maintenance Station
+          for (var i = 0; i < objects.length; i++) {
+            if (objects[i].type === 'fuel') {
+              var fMesh = objects[i].mesh;
+              var dockRange = 5.4 * (fMesh.userData.scale || 1.0);
+              var dist = Math.hypot(pos.x - fMesh.position.x, pos.z - fMesh.position.z);
+              var dRing = fMesh.getObjectByName('dockRing');
+              if (dist <= dockRange) {
+                isRefueling = true;
+                activeFuelStation = fMesh;
+                if (dRing) dRing.material.opacity = 0.65 + 0.25 * Math.sin(now * 0.01);
+              } else if (dRing) {
+                dRing.material.opacity = 0.28;
+              }
+            }
+          }
+
+          // Fuel Consumption & Realistic Light Engine Wear
+          if (mode === 'live' && !paused) {
+            if (isRefueling) {
+              fuelLevel = Math.min(100, fuelLevel + dt * 14.0);
+              // Light maintenance overhaul while docked at Fuel Station
+              engineHealth = Math.min(100.0, engineHealth + dt * 1.4);
+            } else {
+              // Cubic propeller load law: higher throttle increases fuel burn & light engine wear
+              var throttleLoad = Math.pow(shipSpeedMult, 1.45);
+              fuelLevel = Math.max(10, fuelLevel - dt * 0.42 * throttleLoad);
+
+              var baseWearRate = 0.018 * throttleLoad; // Very gradual, realistic light wear
+              if (inShallowDanger) baseWearRate += 0.18; // Bottom/sediment ingestion strain
+              engineHealth = Math.max(62.0, engineHealth - dt * baseWearRate);
+            }
+          }
+
+          if (isRefueling && activeFuelStation) {
+            fuelTether.visible = true;
+            var posAttr = fuelTether.geometry.attributes.position;
+            posAttr.setXYZ(0, pos.x, 0.9 + waveY, pos.z);
+            posAttr.setXYZ(1, activeFuelStation.position.x, 1.5, activeFuelStation.position.z);
+            posAttr.needsUpdate = true;
+          } else {
+            fuelTether.visible = false;
+          }
+
+          // Telemetry HUD Updates
+          $('posVal').textContent = 'X ' + pos.x.toFixed(1) + '   Z ' + pos.z.toFixed(1);
+          var alongCur = localCurrent.vx * tan.x + localCurrent.vz * tan.z;
+          var baseKnots = 12.0 * shipSpeedMult + alongCur * 1.15 + Math.sin(t * 14) * 0.6;
+          if (inShallowDanger) baseKnots *= 0.58;
+          var spd = paused ? 0 : Math.max(1.5, baseKnots);
+          $('speedVal').textContent = spd.toFixed(1) + ' kn';
+
+          var hdg = (Math.atan2(tan.x, tan.z) * 180 / Math.PI + 360) % 360;
+          var hdgStr = String(Math.round(hdg));
+          while (hdgStr.length < 3) hdgStr = '0' + hdgStr;
+          $('headVal').textContent = hdgStr + '°';
+
+          $('depthVal').textContent = localDepth.toFixed(1) + ' m';
+          var curMag = Math.hypot(localCurrent.vx, localCurrent.vz);
+          $('currVal').textContent = curMag.toFixed(1) + ' kn';
+          $('oceanDriftVal').textContent = curMag.toFixed(1) + ' kn';
+
+          // Fuel & Engine Wear Meters
+          $('fuelBar').style.width = fuelLevel.toFixed(0) + '%';
+          $('fuelPctLabel').textContent = isRefueling ? ('REFUELING ' + fuelLevel.toFixed(0) + '%') : (fuelLevel.toFixed(0) + '%');
+
+          var engBar = $('engineBar');
+          var engLbl = $('engineStatusLabel');
+          engBar.style.width = engineHealth.toFixed(1) + '%';
+          if (isRefueling && engineHealth < 99.8) {
+            engLbl.textContent = engineHealth.toFixed(1) + '% · SERVICING';
+            engBar.style.background = 'linear-gradient(90deg, #34d399, #6ee7b7)';
+          } else if (engineHealth >= 95.0) {
+            engLbl.textContent = engineHealth.toFixed(1) + '% · OPTIMAL';
+            engBar.style.background = 'linear-gradient(90deg, #34d399, #38bdf8)';
+          } else if (engineHealth >= 82.0) {
+            engLbl.textContent = engineHealth.toFixed(1) + '% · LIGHT WEAR';
+            engBar.style.background = 'linear-gradient(90deg, #fbbf24, #38bdf8)';
+          } else {
+            engLbl.textContent = engineHealth.toFixed(1) + '% · SERVICE DUE';
+            engBar.style.background = 'linear-gradient(90deg, #fb7185, #fbbf24)';
+          }
+
+          if (follow) {
+            if (prevShipPos) {
+              camState.goalTarget.x += (pos.x - prevShipPos.x);
+              camState.goalTarget.z += (pos.z - prevShipPos.z);
+            }
+            camState.goalTarget.lerp(new THREE.Vector3(pos.x, 1.0, pos.z), 0.12);
+            prevShipPos = pos.clone();
+          } else {
+            prevShipPos = null;
+          }
+        } else {
+          titan.visible = false;
+          shipSonarGroup.visible = false;
+          fuelTether.visible = false;
+          prevShipPos = null;
+          exhaustParticles.forEach(function (p) { p.visible = false; });
+        }
+
+        // 6. Animate 3D Cyclones (Multi-Tier Vortex Spin & Wave Churn)
+        objects.forEach(function (o) {
+          var waveAtObj = currentTideHeight * 0.22 + sampleWaveElevation(o.mesh.position.x, o.mesh.position.z, tSec);
+          if (o.type === 'typhoon') {
+            var variantBoost = (o.mesh.userData.variant === 1) ? 1.35 : ((o.mesh.userData.variant === 2) ? 1.65 : 1.0);
+            o.mesh.rotation.y += dt * 1.45 * cycloneSpeedMult * variantBoost;
+            o.mesh.position.y = waveAtObj * 0.5;
+          } else if (o.type === 'fuel') {
+            o.mesh.position.y = waveAtObj * 0.75;
+          }
+        });
+
+        // 7. Move Storm Cell along Storm Track
+        if (stormCurve && stormMesh && stormPoints.length >= 2) {
+          var st = Math.max(0, Math.min(1, stormProgress));
+          var sp = stormCurve.getPointAt(st);
+          stormMesh.position.set(sp.x, 1.25, sp.z);
+          stormMesh.rotation.y += dt * 0.85 * cycloneSpeedMult;
+        }
+
+        // 8. Animate Ambient Living Traffic & Buoys
+        for (var at = 0; at < ambientTraffic.length; at++) {
+          var av = ambientTraffic[at];
+          if (!paused) {
+            av.progress += dt * av.speed * av.dir;
+            if (av.progress >= 1) { av.progress = 1; av.dir = -1; }
+            else if (av.progress <= 0) { av.progress = 0; av.dir = 1; }
+          }
+          var ap = av.curve.getPointAt(av.progress);
+          var atan = av.curve.getTangentAt(av.progress).multiplyScalar(av.dir);
+          var aw = currentTideHeight * 0.22 + sampleWaveElevation(ap.x, ap.z, tSec);
+          av.mesh.position.set(ap.x, 0.18 + aw, ap.z);
+          av.mesh.rotation.y = -Math.atan2(atan.z, atan.x);
+          var stb = av.mesh.getObjectByName('strobe');
+          if (stb) stb.visible = (Math.sin(tSec * 4.5 + at * 2.0) > 0);
+        }
+
+        ambientGroup.children.forEach(function (child) {
+          if (child.userData && child.userData.isBuoy) {
+            var bw = currentTideHeight * 0.22 + sampleWaveElevation(child.position.x, child.position.z, tSec);
+            child.position.y = 0.08 + bw;
+            child.rotation.z = Math.sin(tSec * 2.5 + child.userData.phase) * 0.14;
+            var bl = child.getObjectByName('buoyLight');
+            if (bl) bl.visible = (Math.sin(tSec * 3.5 + child.userData.phase) > 0.1);
+          }
+        });
+
+        // 9. Ship Radar Sweep & Active Shallow-Water / Hazard Detection
+        var detectedShoalDist = Infinity;
+        var detectedShoalBrg = 0;
+        var detectedCycloneDist = Infinity;
+
+        if (showRadar && shipSonarGroup.visible && titan.visible) {
+          sonarSweepPivot.rotation.y -= dt * 1.75;
+          var sweepAngle = ((-sonarSweepPivot.rotation.y) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
+
+          var w1 = (now * 0.00042) % 1;
+          var r1 = 1.6 + w1 * (SONAR_MAX_R - 1.6);
+          sonarWave1.scale.set(r1, r1, 1);
+          sonarWave1.material.opacity = Math.sin(w1 * Math.PI) * 0.36;
+
+          var w2 = (now * 0.00042 + 0.5) % 1;
+          var r2 = 1.6 + w2 * (SONAR_MAX_R - 1.6);
+          sonarWave2.scale.set(r2, r2, 1);
+          sonarWave2.material.opacity = Math.sin(w2 * Math.PI) * 0.36;
+
+          // Scan all obstacles and their surrounding shallow-water zones within radar range
+          for (var oi = 0; oi < objects.length; oi++) {
+            var ob = objects[oi];
+            var rInf = getObstacleRadii(ob.type, ob.mesh.userData.scale || 1.0);
+            if (rInf.shallowWarnR <= 0) continue;
+
+            var dx = ob.mesh.position.x - titan.position.x;
+            var dz = ob.mesh.position.z - titan.position.z;
+            var centerDist = Math.hypot(dx, dz);
+            var edgeDist = Math.max(0, centerDist - rInf.shallowWarnR);
+
+            if (edgeDist <= SONAR_MAX_R) {
+              var angToObj = (Math.atan2(dz, dx) + Math.PI * 2) % (Math.PI * 2);
+              var angDiff = Math.abs(((angToObj - sweepAngle + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
+
+              var sInner = ob.mesh.getObjectByName('shallowInner');
+              var sOuter = ob.mesh.getObjectByName('shallowOuter');
+
+              if (angDiff < 0.28) {
+                // Radar beam actively sweeping across this shallow shoal or cyclone!
+                if (sInner && showShallows) sInner.material.opacity = 0.72;
+                if (sOuter && showShallows) sOuter.material.opacity = 0.65;
+
+                // Place echo ping on the nearest edge of the shallow zone facing the ship
+                var dirX = centerDist > 0.01 ? dx / centerDist : 1;
+                var dirZ = centerDist > 0.01 ? dz / centerDist : 0;
+                var pingX = ob.mesh.position.x - dirX * Math.min(centerDist, rInf.shallowWarnR);
+                var pingZ = ob.mesh.position.z - dirZ * Math.min(centerDist, rInf.shallowWarnR);
+                triggerRadarEcho(pingX, pingZ, edgeDist < 3.5 || ob.type === 'typhoon');
+              } else {
+                if (sInner) sInner.material.opacity = Math.max(0.22, sInner.material.opacity - dt * 0.45);
+                if (sOuter) sOuter.material.opacity = Math.max(0.20, sOuter.material.opacity - dt * 0.45);
+              }
+
+              if (ob.type === 'typhoon') {
+                if (edgeDist < detectedCycloneDist) detectedCycloneDist = edgeDist;
+              } else {
+                if (edgeDist < detectedShoalDist) {
+                  detectedShoalDist = edgeDist;
+                  detectedShoalBrg = Math.round((Math.atan2(dx, dz) * 180 / Math.PI + 360) % 360);
+                }
+              }
+            }
+          }
+        }
+
+        // Update Radar Echo Ping Animations
+        for (var epIdx = 0; epIdx < radarEchoPings.length; epIdx++) {
+          var epMesh = radarEchoPings[epIdx];
+          if (epMesh.userData.life > 0) {
+            epMesh.userData.life -= dt * 0.85;
+            var life = Math.max(0, epMesh.userData.life);
+            epMesh.material.opacity = life * 0.85;
+            var sc = 0.7 + (1 - life) * 1.45;
+            epMesh.scale.setScalar(sc);
+          } else {
+            epMesh.material.opacity = 0;
+          }
+        }
+
+        // Update Live Radar / Bathymetry Contact Box
+        var radarBox = $('radarContactBox');
+        var radarTxt = $('radarContactText');
+        if (radarBox && radarTxt && titan.visible) {
+          if (inShallowDanger) {
+            radarBox.className = 'radar-alert critical';
+            radarTxt.textContent = 'CRITICAL: SHALLOW GROUNDING (' + localDepth.toFixed(1) + 'm)';
+          } else if (detectedCycloneDist <= SONAR_MAX_R) {
+            radarBox.className = 'radar-alert critical';
+            radarTxt.textContent = 'RADAR: CYCLONE VORTEX (' + detectedCycloneDist.toFixed(1) + ' nm)';
+          } else if (detectedShoalDist <= SONAR_MAX_R) {
+            radarBox.className = 'radar-alert shoal';
+            var brgStr = String(detectedShoalBrg);
+            while (brgStr.length < 3) brgStr = '0' + brgStr;
+            radarTxt.textContent = 'SONAR SHOAL: ' + detectedShoalDist.toFixed(1) + ' nm · BRG ' + brgStr + '°';
+          } else {
+            radarBox.className = 'radar-alert';
+            radarTxt.textContent = 'SONAR: Deep Channel Clear (' + localDepth.toFixed(0) + 'm)';
+          }
+        }
+
+        mpUpdateFly(dt);
+        applyCameraTransform(false);
+        renderer.render(scene, camera);
+      }
+
+      // ── Resize Handling ──────────────────────────────────────
+      function onResize() {
+        var w = Math.max(1, canvas.clientWidth || window.innerWidth || 800);
+        var h = Math.max(1, canvas.clientHeight || window.innerHeight || 600);
+        camera.aspect = w / h;
+        camera.updateProjectionMatrix();
+        renderer.setSize(w, h);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, fastMapMode ? (window.innerWidth <= 760 ? 0.9 : 1.25) : 2));
+      }
+      window.addEventListener('resize', onResize);
+      window.addEventListener('orientationchange', function () { setTimeout(onResize, 160); });
+      setTimeout(onResize, 50);
+
+      setCycloneSpeed(1.0);
+      setMode('live');
+      setTool('select');
+      requestAnimationFrame(animate);
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', function () { ensureThreeLoaded(bootApplication); });
+    } else {
+      ensureThreeLoaded(bootApplication);
+    }
+  })();
+  </script>
+
+</body>
+</html>

@@ -438,9 +438,11 @@ function resetRoom(room) {
   }
   room.dirty = true; broadcast(room);
 }
-function setPlayerPose(room, player, msg) {
+function setPlayerPose(room, player, msg, force = false) {
   const now = Date.now();
-  if (now - (player.lastMoveAt || 0) < 35) return;
+  // Ordinary movement is rate-limited. An interaction may force-commit its
+  // accompanying pose so the interaction snapshot cannot contain stale coords.
+  if (!force && now - (player.lastMoveAt || 0) < 35) return false;
   player.lastMoveAt = now;
   player.area = ['main-deck', 'engine-room', 'storage'].includes(msg.area) ? msg.area : (player.area || 'main-deck');
   const bounds = AREA_BOUNDS[player.area] || DECK_BOUNDS;
@@ -450,6 +452,12 @@ function setPlayerPose(room, player, msg) {
   player.yaw = clampNumber(msg.yaw, -Math.PI, Math.PI, player.yaw);
   player.movingUntil = msg.moving === false ? 0 : now + 450;
   room.dirty = true;
+  return true;
+}
+function commitActionPose(room, player, msg) {
+  if (room.status === 'racing' && player && msg && msg.pose && typeof msg.pose === 'object') {
+    setPlayerPose(room, player, msg.pose, true);
+  }
 }
 function applyShipSystems(room, team, patch) {
   const ship = room.ships[team];
@@ -570,14 +578,14 @@ wss.on('connection', ws => {
       const player = room.players.get(session.playerId);
       if (!player) return error(ws, 'Player session has expired. Rejoin the room.', 'PLAYER_NOT_FOUND');
       if (room.status !== 'racing') return;
-      setPlayerPose(room, player, msg);
+      setPlayerPose(room, player, msg, !!msg.transition);
       return;
     }
 
     if (msg.type === 'host:move' && session.role === 'host') {
       const hostActor = room.players.get(room.hostPlayerId);
       if (!hostActor) return error(ws, 'Host avatar not found.', 'HOST_PLAYER_NOT_FOUND');
-      setPlayerPose(room, hostActor, msg);
+      setPlayerPose(room, hostActor, msg, !!msg.transition);
       return;
     }
 
@@ -630,6 +638,7 @@ wss.on('connection', ws => {
       const player = room.players.get(session.playerId);
       if (!player || room.status !== 'racing') return error(ws, 'Ship controls are available after the game starts.', 'GAME_NOT_STARTED');
       const ship = room.ships[player.team];
+      commitActionPose(room, player, msg);
       ship.throttle = clampNumber(msg.throttle, 0, 100, ship.throttle);
       ship.rudder = clampNumber(msg.rudder, -35, 35, ship.rudder);
       ship.systems.engine.throttle = ship.throttle;
@@ -640,6 +649,8 @@ wss.on('connection', ws => {
     }
     if (msg.type === 'host:control' && session.role === 'host') {
       const team = msg.team === 'B' ? 'B' : 'A';
+      const hostActor = room.players.get(room.hostPlayerId);
+      commitActionPose(room, hostActor, msg);
       const ship = room.ships[team];
       ship.throttle = clampNumber(msg.throttle, 0, 100, ship.throttle);
       ship.rudder = clampNumber(msg.rudder, -35, 35, ship.rudder);
@@ -653,17 +664,21 @@ wss.on('connection', ws => {
       const player = session.role === 'player' ? room.players.get(session.playerId) : null;
       if (!player) return error(ws, 'Only a joined player can interact with a ship.', 'NOT_AUTHORIZED');
       if (!applyShipSystems(room, player.team, { action: 'interaction', target: msg.target, value: msg.value, playerId: player.id })) return error(ws, 'Unknown ship interaction.', 'INVALID_INTERACTION');
+      commitActionPose(room, player, msg.pose ? msg : null);
       broadcast(room); return;
     }
     if (msg.type === 'ship:system' && session.role === 'player') {
       const player = room.players.get(session.playerId);
       if (!player) return error(ws, 'Player session not found.', 'PLAYER_NOT_FOUND');
       if (!applyShipSystems(room, player.team, msg)) return error(ws, 'Unknown ship system action.', 'INVALID_SYSTEM_ACTION');
+      commitActionPose(room, player, msg.pose ? msg : null);
       broadcast(room); return;
     }
     if (msg.type === 'host:system' && session.role === 'host') {
+      const hostActor = room.players.get(room.hostPlayerId);
       const team = msg.team === 'B' ? 'B' : 'A';
       if (!applyShipSystems(room, team, msg)) return error(ws, 'Unknown ship system action.', 'INVALID_SYSTEM_ACTION');
+      commitActionPose(room, hostActor, msg.pose ? msg : null);
       broadcast(room); return;
     }
     if ((msg.type === 'ship:telemetry' && session.role === 'player') || (msg.type === 'host:telemetry' && session.role === 'host')) {
@@ -671,6 +686,8 @@ wss.on('connection', ws => {
       const team = session.role === 'host' ? 'A' : player?.team;
       if (!team) return error(ws, 'Player session not found.', 'PLAYER_NOT_FOUND');
       const ship = room.ships[team];
+      const poseActor = session.role === 'host' ? room.players.get(room.hostPlayerId) : player;
+      commitActionPose(room, poseActor, msg);
       const t = msg.telemetry && typeof msg.telemetry === 'object' ? msg.telemetry : {};
       const telemetry = ship.systems.telemetry || {};
       for (const key of ['shipSpeedKn', 'headingDeg', 'rpm', 'powerKw', 'elecPowerKw', 'temperatureC', 'fuelPercent', 'loadDemandKw']) {

@@ -57,7 +57,7 @@ test('walking and sprint state is carried through the server snapshot for remote
   assert.match(server, /movingUntil: p\.movingUntil \|\| 0, running: !!p\.running/);
   assert.match(server, /player\.running = msg\.moving === false \? false : !!msg\.running/);
   assert.match(engine, /actor\.running = actor\.moving && !!p\.running/);
-  assert.match(direct, /running: !!pose\.running/);
+  assert.match(direct, /setPose\(pose\.x, pose\.z, pose\.yaw, playerArea,[\s\S]*?!!pose\.running\)/);
 });
 
 test('server commits walking and running flags with the same authoritative player pose', () => {

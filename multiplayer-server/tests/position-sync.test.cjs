@@ -208,3 +208,55 @@ test('standalone area transition never reuses a pose cached for another area', (
   assert.match(runtime, /lastPose && lastPoseArea === playerArea/);
   assert.match(runtime, /lastPoseArea = playerArea/);
 });
+
+test('direct Main Deck POSE messages are forwarded immediately with running state', () => {
+  const runtime = read('titan-multiplayer-runtime.js');
+  const handleDeckMessage = extractFunction(runtime, 'handleDeckMessage');
+  const received = [];
+  const context = {
+    setPose(...args) { received.push(args); },
+    setArea() {},
+    send() {},
+    currentPosePayload() { return null; },
+    withCurrentPose(value) { return value; }
+  };
+  vm.createContext(context);
+  vm.runInContext(`${handleDeckMessage}\nthis.handleDeckMessage = handleDeckMessage;`, context);
+  context.handleDeckMessage({
+    type: 'POSE',
+    pose: { x: 2.4, z: -8.1, yaw: 1.2, area: 'main-deck', moving: true, running: true }
+  });
+  assert.deepEqual(received, [[2.4, -8.1, 1.2, 'main-deck', true, true]]);
+});
+
+test('direct movement publisher sends coordinates, rotation and locomotion state', () => {
+  const runtime = read('titan-multiplayer-runtime.js');
+  const setPose = extractFunction(runtime, 'setPose');
+  const sent = [];
+  let now = 200;
+  const context = {
+    playerArea: 'main-deck', lastPose: null, lastPoseArea: null, lastPoseSent: 0,
+    joined: true, socket: { readyState: 1 }, WebSocket: { OPEN: 1 },
+    performance: { now: () => now },
+    send(type, payload) { sent.push({ type, payload }); }
+  };
+  vm.createContext(context);
+  vm.runInContext(`${setPose}\nthis.setPose = setPose;`, context);
+  context.setPose(1.75, -9.25, -0.8, 'main-deck', true, true);
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].type, 'player:move');
+  assert.deepEqual(JSON.parse(JSON.stringify(sent[0].payload)), {
+    x: 1.75, z: -9.25, yaw: -0.8, area: 'main-deck', moving: true, running: true
+  });
+});
+
+test('joined player movement is not silently rejected outside the racing phase', () => {
+  const server = read('multiplayer-server/server.js');
+  const start = server.indexOf("if (msg.type === 'player:move' && session.role === 'player')");
+  const end = server.indexOf("if (msg.type === 'host:move'", start);
+  assert.notEqual(start, -1);
+  assert.ok(end > start);
+  const branch = server.slice(start, end);
+  assert.match(branch, /setPlayerPose\(room, player, msg, !!msg\.transition\)/);
+  assert.doesNotMatch(branch, /room\.status\s*!==\s*'racing'/);
+});

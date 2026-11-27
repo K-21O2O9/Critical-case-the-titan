@@ -20,6 +20,53 @@ const AREA_BOUNDS = {
   storage: { minX: -3.9, maxX: 3.9, minZ: -17.65, maxZ: 22.10 }
 };
 
+// Stable component IDs shared by engine-room.html, Main Deck and every room client.
+// Values are validated here so the room server remains the single authority.
+const ENGINE_COMPONENT_SCHEMA = Object.freeze({
+  mainPower: { type: 'boolean' }, motor1: { type: 'boolean' }, motor2: { type: 'boolean' },
+  starter: { type: 'boolean' }, aux: { type: 'boolean' }, generator: { type: 'boolean' },
+  clutch: { type: 'boolean' }, lubPump: { type: 'boolean' }, swPump: { type: 'boolean' },
+  autoReg: { type: 'boolean' },
+  lubCooler: { type: 'number', min: 0, max: 100 }, h2oCooler: { type: 'number', min: 0, max: 100 },
+  fuelFeed: { type: 'number', min: 0, max: 100 }, airIntake: { type: 'number', min: 0, max: 100 },
+  throttle: { type: 'number', min: 0, max: 100 }, targetRpm: { type: 'number', min: 0, max: 1200 }
+});
+
+function defaultEngineTelemetry() {
+  return {
+    mainPower: false, motor1: false, motor2: false, starter: false, aux: false,
+    generator: false, clutch: false, lubPump: false, swPump: false, autoReg: false,
+    lubCooler: 60, h2oCooler: 55, fuelFeed: 10, airIntake: 50, throttle: 30, targetRpm: 400,
+    shipSpeedKn: 0, headingDeg: 48, rpm: 0, powerKw: 0, elecPowerKw: 0, temperatureC: 42,
+    fuelPercent: 100, fuelRemainingKg: 5000, loadDemandKw: 120, voltage: 0, current: 0,
+    pressureBar: 1, torqueNm: 0, flowLmin: 0, fuelMassFlow: 0, omega: 0, mechPowerKw: 0,
+    busPowerKw: 0, volFlow: 0, density: 0.85, coolantLevel: 100, coolantQuality: 100,
+    filterDeltaP: 0.2, condition: 'normal', activeFaults: [], machineHeat: { electrics: 0, reactor: 0, regulator: 0, motors: 0 },
+    updatedAt: Date.now()
+  };
+}
+
+function applyEngineComponent(ship, componentId, value) {
+  const schema = ENGINE_COMPONENT_SCHEMA[componentId];
+  if (!schema || !ship || !ship.systems) return false;
+  if (schema.type === 'boolean') {
+    if (typeof value !== 'boolean') return false;
+  } else {
+    if (!Number.isFinite(Number(value))) return false;
+    value = clampNumber(value, schema.min, schema.max, schema.min);
+  }
+  const telemetry = ship.systems.telemetry || (ship.systems.telemetry = defaultEngineTelemetry());
+  telemetry[componentId] = value;
+  if (componentId === 'throttle') {
+    ship.throttle = value;
+    ship.systems.engine.throttle = value;
+    ship.systems.engine.running = value > 0;
+  }
+  telemetry.updatedAt = Date.now();
+  ship.systems.revision = (Number(ship.systems.revision) || 0) + 1;
+  return true;
+}
+
 // Mirrors main-deck.html's ship-local staticHitboxes. Coordinates are in its
 // local deck frame, so both ship instances use the same obstacle geometry but
 // never share player transforms or system state.
@@ -196,6 +243,9 @@ function makeShip(team) {
       power: { online: true, load: 0 },
       cooling: { online: true, temperature: 42 },
       reactor: { online: true, output: 0 },
+      // This is the authoritative engine-room component state. Every client,
+      // dashboard and late joiner receives the same complete initial snapshot.
+      telemetry: defaultEngineTelemetry(),
       doorOpen: false, hatchOpen: false, lastInteraction: null, revision: 0
     }
   };
@@ -777,6 +827,9 @@ wss.on('connection', ws => {
       ship.systems.engine.throttle = ship.throttle;
       ship.systems.engine.rudder = ship.rudder;
       ship.systems.engine.running = ship.throttle > 0;
+      ship.systems.telemetry = ship.systems.telemetry || defaultEngineTelemetry();
+      ship.systems.telemetry.throttle = ship.throttle;
+      ship.systems.telemetry.updatedAt = Date.now();
       ship.systems.revision++;
       room.dirty = true; broadcast(room); return;
     }
@@ -790,6 +843,9 @@ wss.on('connection', ws => {
       ship.systems.engine.throttle = ship.throttle;
       ship.systems.engine.rudder = ship.rudder;
       ship.systems.engine.running = ship.throttle > 0;
+      ship.systems.telemetry = ship.systems.telemetry || defaultEngineTelemetry();
+      ship.systems.telemetry.throttle = ship.throttle;
+      ship.systems.telemetry.updatedAt = Date.now();
       ship.systems.revision++;
       room.dirty = true; broadcast(room); return;
     }
@@ -814,6 +870,20 @@ wss.on('connection', ws => {
       commitActionPose(room, hostActor, msg.pose ? msg : null);
       broadcast(room); return;
     }
+    // Individual component writes are serialized by this WebSocket event loop.
+    // The last accepted write wins, increments the room revision and is
+    // immediately broadcast as the complete authoritative ship snapshot.
+    if ((msg.type === 'ship:component' && session.role === 'player') || (msg.type === 'host:component' && session.role === 'host')) {
+      const player = session.role === 'player' ? room.players.get(session.playerId) : room.players.get(room.hostPlayerId);
+      if (!player) return error(ws, 'Player session not found.', 'PLAYER_NOT_FOUND');
+      const team = session.role === 'host' ? (msg.team === 'B' ? 'B' : 'A') : player.team;
+      const ship = room.ships[team];
+      if (!applyEngineComponent(ship, cleanText(msg.componentId, 40), msg.value)) return error(ws, 'Unknown or invalid engine component value.', 'INVALID_COMPONENT');
+      commitActionPose(room, player, msg.pose ? msg : null);
+      room.dirty = true;
+      broadcast(room);
+      return;
+    }
     if ((msg.type === 'ship:telemetry' && session.role === 'player') || (msg.type === 'host:telemetry' && session.role === 'host')) {
       const player = session.role === 'player' ? room.players.get(session.playerId) : null;
       const team = session.role === 'host' ? 'A' : player?.team;
@@ -822,12 +892,29 @@ wss.on('connection', ws => {
       const poseActor = session.role === 'host' ? room.players.get(room.hostPlayerId) : player;
       commitActionPose(room, poseActor, msg);
       const t = msg.telemetry && typeof msg.telemetry === 'object' ? msg.telemetry : {};
-      const telemetry = ship.systems.telemetry || {};
-      for (const key of ['shipSpeedKn', 'headingDeg', 'rpm', 'powerKw', 'elecPowerKw', 'temperatureC', 'fuelPercent', 'loadDemandKw']) {
-        if (Number.isFinite(Number(t[key]))) telemetry[key] = clampNumber(t[key], key === 'headingDeg' ? 0 : 0, key === 'temperatureC' ? 180 : (key === 'fuelPercent' ? 100 : 100000), 0);
+      const telemetry = ship.systems.telemetry || (ship.systems.telemetry = defaultEngineTelemetry());
+      const metricRanges = {
+        shipSpeedKn: [0, 100], headingDeg: [0, 360], rpm: [0, 5000], powerKw: [0, 100000],
+        elecPowerKw: [0, 100000], temperatureC: [-20, 250], fuelPercent: [0, 100],
+        fuelRemainingKg: [0, 10000000], loadDemandKw: [0, 100000], voltage: [0, 1000],
+        current: [0, 100000], pressureBar: [0, 1000], torqueNm: [0, 1000000], flowLmin: [0, 100000],
+        fuelMassFlow: [0, 100000], omega: [0, 100000], mechPowerKw: [0, 100000],
+        busPowerKw: [0, 100000], volFlow: [0, 100000], density: [0, 100], coolantLevel: [0, 100],
+        coolantQuality: [0, 100], filterDeltaP: [0, 100]
+      };
+      for (const [key, range] of Object.entries(metricRanges)) {
+        if (Number.isFinite(Number(t[key]))) telemetry[key] = clampNumber(t[key], range[0], range[1], telemetry[key] || 0);
       }
-      for (const key of ['mainPower', 'motor1', 'motor2', 'starter', 'aux', 'generator', 'clutch', 'lubPump', 'swPump', 'autoReg']) {
-        if (typeof t[key] === 'boolean') telemetry[key] = t[key];
+      if (t.machineHeat && typeof t.machineHeat === 'object') {
+        const heat = telemetry.machineHeat || (telemetry.machineHeat = {});
+        for (const key of ['electrics', 'reactor', 'regulator', 'motors']) {
+          if (Number.isFinite(Number(t.machineHeat[key]))) heat[key] = clampNumber(t.machineHeat[key], 0, 250, 0);
+        }
+      }
+      if (['normal', 'warning', 'critical'].includes(String(t.condition))) telemetry.condition = String(t.condition);
+      if (Array.isArray(t.activeFaults)) {
+        const allowedFaults = new Set(['overheat_crit','overheat_warn','fuel_crit','fuel_warn','lub_pump_off','sw_pump_off','main_breaker_open','generator_offline','overspeed','no_bus_power','low_pressure','high_pressure','coolant_low','coolant_foul']);
+        telemetry.activeFaults = [...new Set(t.activeFaults.filter(value => typeof value === 'string' && allowedFaults.has(value)))].slice(0, 14);
       }
       telemetry.updatedAt = Date.now();
       ship.systems.telemetry = telemetry;

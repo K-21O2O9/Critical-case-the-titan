@@ -8,6 +8,7 @@ const rooms = new Map();
 const sockets = new Map();
 const MAX_PER_TEAM = 15;
 const PLAYER_RECONNECT_MS = 60_000;
+const PLAYER_VISIBILITY_GRACE_MS = 3_500;
 const EMPTY_ROOM_TTL_MS = 30 * 60_000;
 const DESTINATION_PROGRESS = 100;
 const MAP_BOUNDS = { minX: -38, maxX: 38, minZ: -27, maxZ: 27 };
@@ -163,10 +164,11 @@ function safeCharacter(input, fallbackName) {
 function getSnapshot(room) {
   const players = [...room.players.values()].map(p => ({
     id: p.id, name: p.name, team: p.team, ready: !!p.ready,
-    connected: p.isHost ? !!room.hostWs && room.hostWs.readyState === WebSocket.OPEN : !!p.ws && p.ws.readyState === WebSocket.OPEN,
+    // Keep reconnecting crew visible briefly while an HTML room is replaced.
+    connected: p.isHost ? !!room.hostWs && room.hostWs.readyState === WebSocket.OPEN : !!p.connected,
     isHost: !!p.isHost, x: p.x, z: p.z, yaw: p.yaw,
     movingUntil: p.movingUntil || 0, character: p.character,
-    area: p.area || 'main-deck'
+    area: p.area || 'main-deck', poses: p.poses || {}
   }));
   return {
     protocol: 'titan-world-v3', code: room.code, status: room.status,
@@ -199,7 +201,7 @@ function createHostActor(room) {
   room.hostPlayerId = id;
   room.players.set(id, {
     id, isHost: true, name: 'Captain', team: 'A', ready: true, connected: true,
-    x: 0.85, z: -14.35, yaw: 0, area: 'main-deck',
+    x: 0.85, z: -14.35, yaw: 0, area: 'main-deck', poses: { 'main-deck': { x: 0.85, z: -14.35, yaw: 0 } },
     character: safeCharacter({ name: 'Captain', outfitColor: '#237f93', accentColor: '#e2bd78' }, 'Captain'),
     ws: null, reconnectTimer: null, lastMoveAt: 0
   });
@@ -208,6 +210,48 @@ function crewPlayers(room) { return [...room.players.values()].filter(p => !p.is
 function clampNumber(value, min, max, fallback = 0) {
   const n = Number(value);
   return Number.isFinite(n) ? Math.max(min, Math.min(max, n)) : fallback;
+}
+
+function defaultAreaPose(area, team = 'A', slot = 0) {
+  if (area === 'main-deck') {
+    const columns = [-1.30, -0.65, 0, 0.65, 1.30];
+    const rows = [-14.95, -13.60, -12.25];
+    return { x: columns[slot % columns.length], z: rows[Math.floor(slot / columns.length)] || -10.90, yaw: 0 };
+  }
+  if (area === 'engine-room') {
+    const columns = [-2.2, -1.1, 0, 1.1, 2.2];
+    const rows = [1.8, 3.0, 4.2, -1.2, -2.4];
+    return { x: columns[slot % columns.length], z: rows[Math.floor(slot / columns.length)] || 0, yaw: 0 };
+  }
+  if (area === 'storage') {
+    const columns = [-1.3, -0.65, 0, 0.65, 1.3];
+    const rows = [-14.95, -13.6, -12.25];
+    return { x: columns[slot % columns.length], z: rows[Math.floor(slot / columns.length)] || -10.9, yaw: 0 };
+  }
+  return { x: 0, z: 0, yaw: 0 };
+}
+function saveActiveAreaPose(player) {
+  if (!player) return;
+  if (!player.poses || typeof player.poses !== 'object') player.poses = {};
+  const area = AREA_BOUNDS[player.area] ? player.area : 'main-deck';
+  player.poses[area] = { x: player.x, z: player.z, yaw: player.yaw };
+}
+function changePlayerArea(room, player, area) {
+  if (!player || !AREA_BOUNDS[area]) return false;
+  const currentArea = AREA_BOUNDS[player.area] ? player.area : 'main-deck';
+  if (!player.poses || typeof player.poses !== 'object') player.poses = {};
+  if (currentArea === area) { saveActiveAreaPose(player); return true; }
+  saveActiveAreaPose(player);
+  const nextPose = player.poses[area] || defaultAreaPose(area, player.team || 'A', room ? teamCount(room, player.team || 'A', player.id) : 0);
+  const bounds = AREA_BOUNDS[area];
+  player.area = area;
+  player.x = clampNumber(nextPose.x, bounds.minX, bounds.maxX, 0);
+  player.z = clampNumber(nextPose.z, bounds.minZ, bounds.maxZ, 0);
+  player.yaw = clampNumber(nextPose.yaw, -Math.PI, Math.PI, 0);
+  player.movingUntil = 0;
+  player.poses[area] = { x: player.x, z: player.z, yaw: player.yaw };
+  if (room) room.dirty = true;
+  return true;
 }
 
 function shipCenterBounds(room, ship) {
@@ -394,22 +438,35 @@ function addPlayer(room, ws, msg) {
     const n = teamCount(room, team);
     const spawnColumns = [-1.30, -0.65, 0, 0.65, 1.30];
     const spawnRows = [-14.95, -13.60, -12.25];
-    player = {
-      id: deviceId, isHost: false, name, team, ready: room.status !== 'lobby', connected: true,
+    const requestedArea = AREA_BOUNDS[msg.area] ? msg.area : 'main-deck';
+    const mainDeckPose = {
       x: spawnColumns[n % spawnColumns.length],
       z: spawnRows[Math.floor(n / spawnColumns.length)] || -10.90,
-      yaw: 0, area: 'main-deck', character: safeCharacter(msg.character, name), ws: null,
-      reconnectTimer: null, lastMoveAt: 0
+      yaw: 0
+    };
+    const initialPose = requestedArea === 'main-deck' ? mainDeckPose : defaultAreaPose(requestedArea, team, n);
+    player = {
+      id: deviceId, isHost: false, name, team, ready: room.status !== 'lobby', connected: true,
+      x: initialPose.x, z: initialPose.z, yaw: initialPose.yaw, area: requestedArea,
+      poses: { [requestedArea]: { ...initialPose }, ...(requestedArea === 'main-deck' ? {} : { 'main-deck': mainDeckPose }) },
+      character: safeCharacter(msg.character, name), ws: null,
+      reconnectTimer: null, visibilityTimer: null, reconnecting: false, lastMoveAt: 0
     };
     room.players.set(deviceId, player);
   } else {
+    const requestedArea = AREA_BOUNDS[msg.area] ? msg.area : (player.area || 'main-deck');
+    if (requestedArea !== player.area) changePlayerArea(room, player, requestedArea);
     player.name = name;
     player.team = team;
     player.character = safeCharacter(msg.character || player.character, name);
   }
+  if (player.visibilityTimer) clearTimeout(player.visibilityTimer);
+  if (player.reconnectTimer) clearTimeout(player.reconnectTimer);
+  player.visibilityTimer = null;
+  player.reconnectTimer = null;
+  player.reconnecting = false;
   player.ws = ws;
   player.connected = true;
-  player.reconnectTimer = null;
   attachToRoom(room, ws, 'player');
   sockets.get(ws).playerId = deviceId;
   room.dirty = true;
@@ -418,6 +475,10 @@ function addPlayer(room, ws, msg) {
 }
 function removeDisconnectedPlayer(room, player) {
   if (!room || !player || player.ws || player.connected) return;
+  if (player.visibilityTimer) clearTimeout(player.visibilityTimer);
+  if (player.reconnectTimer) clearTimeout(player.reconnectTimer);
+  player.visibilityTimer = null;
+  player.reconnectTimer = null;
   room.players.delete(player.id);
   room.dirty = true;
   broadcast(room);
@@ -444,13 +505,25 @@ function setPlayerPose(room, player, msg, force = false) {
   // accompanying pose so the interaction snapshot cannot contain stale coords.
   if (!force && now - (player.lastMoveAt || 0) < 35) return false;
   player.lastMoveAt = now;
-  player.area = ['main-deck', 'engine-room', 'storage'].includes(msg.area) ? msg.area : (player.area || 'main-deck');
+  const requestedArea = AREA_BOUNDS[msg.area] ? msg.area : (player.area || 'main-deck');
+  if (!player.poses || typeof player.poses !== 'object') player.poses = {};
+  if (requestedArea !== player.area) {
+    changePlayerArea(room, player, requestedArea);
+    // Older clients sent the source-room coordinates under the destination
+    // area during a transition. Do not reinterpret that pose in new geometry.
+    if (msg.transition) {
+      player.movingUntil = 0;
+      room.dirty = true;
+      return true;
+    }
+  }
   const bounds = AREA_BOUNDS[player.area] || DECK_BOUNDS;
   player.x = clampNumber(msg.x, bounds.minX, bounds.maxX, player.x);
   player.z = clampNumber(msg.z, bounds.minZ, bounds.maxZ, player.z);
   if (player.area === 'main-deck') resolveMainDeckCollisions(room, player);
   player.yaw = clampNumber(msg.yaw, -Math.PI, Math.PI, player.yaw);
   player.movingUntil = msg.moving === false ? 0 : now + 450;
+  saveActiveAreaPose(player);
   room.dirty = true;
   return true;
 }
@@ -561,6 +634,29 @@ wss.on('connection', ws => {
       session.roomCode = null;
       session.playerId = null;
       send(ws, 'left', {});
+      return;
+    }
+
+    if (msg.type === 'player:area' && session.role === 'player') {
+      const player = room.players.get(session.playerId);
+      if (!player) return error(ws, 'Player session has expired. Rejoin the room.', 'PLAYER_NOT_FOUND');
+      if (msg.pose && typeof msg.pose === 'object') {
+        const sourcePose = Object.assign({}, msg.pose, { area: player.area || 'main-deck' });
+        setPlayerPose(room, player, sourcePose, true);
+      }
+      if (!changePlayerArea(room, player, msg.area)) return error(ws, 'Unknown destination room.', 'INVALID_AREA');
+      broadcast(room);
+      return;
+    }
+    if (msg.type === 'host:area' && session.role === 'host') {
+      const hostActor = room.players.get(room.hostPlayerId);
+      if (!hostActor) return error(ws, 'Host avatar not found.', 'HOST_PLAYER_NOT_FOUND');
+      if (msg.pose && typeof msg.pose === 'object') {
+        const sourcePose = Object.assign({}, msg.pose, { area: hostActor.area || 'main-deck' });
+        setPlayerPose(room, hostActor, sourcePose, true);
+      }
+      if (!changePlayerArea(room, hostActor, msg.area)) return error(ws, 'Unknown destination room.', 'INVALID_AREA');
+      broadcast(room);
       return;
     }
 
@@ -745,8 +841,24 @@ wss.on('connection', ws => {
         const player = room.players.get(current.playerId);
         if (player && player.ws === ws) {
           player.ws = null;
-          player.connected = false;
-          player.reconnectTimer = setTimeout(() => removeDisconnectedPlayer(room, player), PLAYER_RECONNECT_MS);
+          // Retain the avatar during short document reloads and mobile network
+          // handoffs. A longer disconnect still expires normally below.
+          player.connected = true;
+          player.reconnecting = true;
+          if (player.visibilityTimer) clearTimeout(player.visibilityTimer);
+          player.visibilityTimer = setTimeout(() => {
+            if (player.ws || !player.reconnecting) return;
+            player.connected = false;
+            player.visibilityTimer = null;
+            room.dirty = true;
+            broadcast(room);
+          }, PLAYER_VISIBILITY_GRACE_MS);
+          if (player.reconnectTimer) clearTimeout(player.reconnectTimer);
+          player.reconnectTimer = setTimeout(() => {
+            player.connected = false;
+            player.reconnecting = false;
+            removeDisconnectedPlayer(room, player);
+          }, PLAYER_RECONNECT_MS);
           room.dirty = true;
           broadcast(room);
         }

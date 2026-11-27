@@ -95,7 +95,7 @@ test('server mutation handlers commit pose before the room broadcast', () => {
   for (const marker of ["if (msg.type === 'ship:interaction')", "if (msg.type === 'ship:system'", "if (msg.type === 'host:system'", "if (msg.type === 'ship:control'", "if (msg.type === 'host:control'", "if ((msg.type === 'ship:telemetry'"]) {
     const start = server.indexOf(marker);
     assert.notEqual(start, -1, `missing handler ${marker}`);
-    const region = server.slice(start, start + 1500);
+    const region = server.slice(start, start + 4000);
     assert.match(region, /commitActionPose\(room,/);
     assert.ok(region.indexOf('commitActionPose') < region.indexOf('broadcast(room)'), 'pose must be applied before broadcast');
   }

@@ -167,6 +167,11 @@ test('procedural male and female avatars instantiate their shared low-poly runti
     assert.equal(eyes, 2);
     assert.ok(meshCount >= 40);
     runtime.animateModel(model, 1, 1, 1, { moveForward: 1, moveStrafe: 0 });
+    assert.ok(model.userData.rig.legs.left.hip.rotation.x > 0, 'forward locomotion drives the forward stride');
+    assert.ok(model.userData.rig.legs.right.hip.rotation.x < 0, 'forward locomotion counter-swings the opposite leg');
+    runtime.animateModel(model, 1, 1, 1, { moveForward: -1, moveStrafe: 0 });
+    assert.ok(model.userData.rig.legs.left.hip.rotation.x < 0, 'backward locomotion reverses the stride');
+    assert.ok(model.userData.rig.legs.right.hip.rotation.x > 0, 'backward locomotion reverses both legs consistently');
     assert.equal(model.position.y, 0, 'animation must not mutate the network-owned root transform');
   }
 });

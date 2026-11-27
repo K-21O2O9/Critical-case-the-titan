@@ -49,3 +49,34 @@ TITAN continues to use `character-runtime.js` + `character-creator.html` as the 
 3. Map tab still shows `map.html` scene and fly mode for host only.
 4. Non-host players continue to use the same AREA_CHANGE path.
 5. Character workshop still saves via `character-runtime.js` and replicates with `host:character` / `player:character`.
+
+## V13.1 — Room-change customizer glitch + Engine Room link
+
+### Bug fixed: entering a room opened the character customisation menu
+
+**Cause:** In `engine-room.html`, `#engine-character-editor` had the HTML `hidden` attribute but also an **inline** `style="…display:flex…"`. Inline `display` overrides the browser’s default `hidden` behaviour, so the PLAYER AVATAR WORKSHOP overlay was visible every time the Engine Room loaded (including multiplayer room transfers).
+
+**Fix:**
+- Moved panel layout into a dedicated CSS block with `#engine-character-editor.character-editor-panel[hidden] { display: none !important; }`.
+- Force-hide the panel on script init; open/close handlers set/remove the `hidden` attribute explicitly.
+- Backdrop click closes the workshop.
+
+### Room transitions (multiplayer embed)
+
+When a page is loaded **inside** the multiplayer parent iframe (`?multiplayer=1` and `parent !== window`):
+
+- Main Deck, Engine Room and Storage **only** post `AREA_CHANGE` to the parent and **do not** call `location.assign`.
+- `multiplayer.html` remains the owner of `#game-deck-frame.src` and loads the correct room (`main-deck.html` / `engine-room.html` / `storage.html`).
+
+This removes double-navigation races that could reload the wrong surface or leave UI in a bad state.
+
+### Engine Room connectivity
+
+There is no separate `engine.html`. All hatches, ladders and multiplayer area routing use **`engine-room.html`**:
+
+- Main Deck hatch → `engine-room.html` / area `engine-room`
+- Storage link → `engine-room.html`
+- `gameFrameUrl(..., 'engine-room')` → `engine-room.html?multiplayer=1&…`
+- Server `AREA_BOUNDS['engine-room']` and `host:area` / `player:area` unchanged
+
+Offline / direct-tab play still navigates with full page loads as before.

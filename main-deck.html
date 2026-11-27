@@ -911,16 +911,19 @@ html, body {
     const mpNav = new URLSearchParams(window.location.search);
     const directRuntime = window.TitanMultiplayerRuntime && window.TitanMultiplayerRuntime.active && window.TitanMultiplayerRuntime.session;
     const embeddedRoom = mpNav.get('multiplayer') === '1' && window.parent !== window;
+    const area = filename === 'engine-room.html' ? 'engine-room' : (filename === 'storage.html' ? 'storage' : 'main-deck');
     if (embeddedRoom) {
-      const area = filename === 'engine-room.html' ? 'engine-room' : (filename === 'storage.html' ? 'storage' : 'main-deck');
+      // Parent multiplayer.html owns the iframe URL. Only signal the area change;
+      // do not self-navigate (avoids races and accidental menu/customizer loads).
       try {
         const pose = window.TitanDeckGame && typeof window.TitanDeckGame.getPose === 'function'
           ? Object.assign({}, window.TitanDeckGame.getPose(), { area: 'main-deck', moving: false }) : null;
         window.parent.postMessage({ source: 'TITAN_MAIN_DECK', type: 'AREA_CHANGE', area: area, pose: pose }, window.location.origin);
       } catch (_) {}
-      target += '?multiplayer=1&team=' + encodeURIComponent(mpNav.get('team') || 'A') + '&room=' + encodeURIComponent(mpNav.get('room') || '') + '&player=' + encodeURIComponent(mpNav.get('player') || '');
-    } else if (directRuntime) {
-      const area = filename === 'engine-room.html' ? 'engine-room' : (filename === 'storage.html' ? 'storage' : 'main-deck');
+      try { if (typeof showToast === 'function') showToast((label || filename) + ' · transferring…'); } catch (_) {}
+      return;
+    }
+    if (directRuntime) {
       try { window.TitanMultiplayerRuntime.setArea(area); } catch (_) {}
       const sess = directRuntime;
       target += '?room=' + encodeURIComponent(sess.code || '') + '&team=' + encodeURIComponent(sess.team || 'A') + '&name=' + encodeURIComponent(sess.name || 'Crew Member');
@@ -930,7 +933,6 @@ html, body {
         showToast((label || filename) + ' · loading…');
       }
     } catch (_) {}
-    // Prefer assign so history is preserved; fall back to href write
     try {
       window.location.assign(target);
     } catch (_) {

@@ -68,7 +68,9 @@
         var embedded = mp.get('multiplayer') === '1' && window.parent !== window;
         if (embedded) {
           try { window.parent.postMessage({ source: 'TITAN_MAIN_DECK', type: 'AREA_CHANGE', area: destinationArea, pose: null }, window.location.origin); } catch (_) {}
-        } else if (window.TitanMultiplayerRuntime && window.TitanMultiplayerRuntime.active && typeof window.TitanMultiplayerRuntime.setArea === 'function') {
+          return;
+        }
+        if (window.TitanMultiplayerRuntime && window.TitanMultiplayerRuntime.active && typeof window.TitanMultiplayerRuntime.setArea === 'function') {
           try { window.TitanMultiplayerRuntime.setArea(destinationArea); } catch (_) {}
         }
         try { window.location.assign(href); } catch (_) { window.location.href = href; }

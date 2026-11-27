@@ -2083,10 +2083,35 @@ body.layout-edit #layout-edit-bar { display: flex; }
       </div>
     </div>
   </div>
-  <div id="engine-character-editor" class="character-editor-panel" hidden style="position:fixed;inset:0;z-index:100200;background:rgba(0,0,0,.84);display:flex;align-items:center;justify-content:center;padding:2vh 2vw">
-    <div style="width:min(1500px,96vw);height:min(94vh,1000px);background:#071725;border:1px solid var(--border);border-radius:12px;overflow:hidden;display:flex;flex-direction:column">
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:#121218;color:#fff;font-size:.72rem;letter-spacing:.1em"><span>PLAYER AVATAR WORKSHOP</span><button type="button" id="engine-character-close" class="menu-btn ghost">CLOSE</button></div>
-      <iframe id="engine-character-frame" title="TITAN character customisation" src="character-creator.html?embedded=1" style="border:0;width:100%;height:100%;background:#071522"></iframe>
+  <style id="engine-character-editor-css">
+    #engine-character-editor.character-editor-panel {
+      position: fixed; inset: 0; z-index: 100200;
+      background: rgba(0,0,0,.84);
+      display: flex; align-items: center; justify-content: center;
+      padding: 2vh 2vw;
+    }
+    #engine-character-editor.character-editor-panel[hidden] {
+      display: none !important;
+    }
+    #engine-character-editor .engine-character-shell {
+      width: min(1500px, 96vw); height: min(94vh, 1000px);
+      background: #071725; border: 1px solid var(--border, #35586a);
+      border-radius: 12px; overflow: hidden;
+      display: flex; flex-direction: column;
+    }
+    #engine-character-editor .engine-character-head {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 8px 12px; background: #121218; color: #fff;
+      font-size: .72rem; letter-spacing: .1em;
+    }
+    #engine-character-editor iframe {
+      border: 0; width: 100%; height: 100%; background: #071522;
+    }
+  </style>
+  <div id="engine-character-editor" class="character-editor-panel" hidden>
+    <div class="engine-character-shell">
+      <div class="engine-character-head"><span>PLAYER AVATAR WORKSHOP</span><button type="button" id="engine-character-close" class="menu-btn ghost">CLOSE</button></div>
+      <iframe id="engine-character-frame" title="TITAN character customisation" src="character-creator.html?embedded=1"></iframe>
     </div>
   </div>
 
@@ -4970,26 +4995,26 @@ const LadderUI = {
     function go(filename) {
       let target = resolveSameDirFile(filename);
       const mp = new URLSearchParams(window.location.search);
-      if (mp.get('multiplayer') === '1' && window.parent !== window) {
-        target += '?multiplayer=1&team=' + encodeURIComponent(mp.get('team') || 'A') + '&room=' + encodeURIComponent(mp.get('room') || '') + '&player=' + encodeURIComponent(mp.get('player') || '');
-      } else {
-        const runtime = window.TitanMultiplayerRuntime;
-        const session = runtime && runtime.active && runtime.session;
-        const code = session?.code || mp.get('room') || '';
-        const team = session?.team || mp.get('team') || '';
-        const name = session?.name || mp.get('name') || '';
-        if (code && team) target += '?room=' + encodeURIComponent(code) + '&team=' + encodeURIComponent(team) + '&name=' + encodeURIComponent(name);
-      }
-      const destinationArea = filename === 'main-deck.html' ? 'main-deck' : (filename === 'storage.html' ? 'storage' : 'main-deck');
+      const embedded = mp.get('multiplayer') === '1' && window.parent !== window;
+      const destinationArea = filename === 'main-deck.html' ? 'main-deck' : (filename === 'storage.html' ? 'storage' : (filename === 'engine-room.html' ? 'engine-room' : 'main-deck'));
       const sourcePose = SceneManager && SceneManager.walkCam ? {
         x: SceneManager.walkCam.position.x, z: SceneManager.walkCam.position.z,
         yaw: Number(SceneManager.walkYaw) || 0, area: 'engine-room', moving: false
       } : null;
-      if (mp.get('multiplayer') === '1' && window.parent !== window) {
+      if (embedded) {
+        // Parent owns iframe navigation for multiplayer embeds.
         try { window.parent.postMessage({ source: 'TITAN_MAIN_DECK', type: 'AREA_CHANGE', area: destinationArea, pose: sourcePose }, window.location.origin); } catch (_) {}
-      } else if (window.TitanMultiplayerRuntime && window.TitanMultiplayerRuntime.active && typeof window.TitanMultiplayerRuntime.setArea === 'function') {
+        return;
+      }
+      if (window.TitanMultiplayerRuntime && window.TitanMultiplayerRuntime.active && typeof window.TitanMultiplayerRuntime.setArea === 'function') {
         try { window.TitanMultiplayerRuntime.setArea(destinationArea, sourcePose); } catch (_) {}
       }
+      const runtime = window.TitanMultiplayerRuntime;
+      const session = runtime && runtime.active && runtime.session;
+      const code = session?.code || mp.get('room') || '';
+      const team = session?.team || mp.get('team') || '';
+      const name = session?.name || mp.get('name') || '';
+      if (code && team) target += '?room=' + encodeURIComponent(code) + '&team=' + encodeURIComponent(team) + '&name=' + encodeURIComponent(name);
       try { window.location.assign(target); } catch (_) { window.location.href = target; }
     }
     if (dest === "main-deck") {
@@ -10610,13 +10635,27 @@ if (document.readyState === "loading") {
   }
   window.addEventListener('message', function(event) {
     if (event.origin !== window.location.origin || !event.data || event.data.source !== 'TITAN_CHARACTER_CREATOR') return;
-    if (event.data.type === 'CLOSE') { const panel=document.getElementById('engine-character-editor'); if(panel)panel.hidden=true; return; }
+    if (event.data.type === 'CLOSE') { const panel=document.getElementById('engine-character-editor'); if(panel){panel.hidden=true;panel.setAttribute('hidden','');} return; }
     if (event.data.type === 'SAVED') applyEngineCharacter(event.data.character);
   });
   const engineCharacterOpen = document.getElementById('engine-customize-character');
   const engineCharacterClose = document.getElementById('engine-character-close');
-  if (engineCharacterOpen) engineCharacterOpen.addEventListener('click', function(){ const panel=document.getElementById('engine-character-editor'); if(panel)panel.hidden=false; });
-  if (engineCharacterClose) engineCharacterClose.addEventListener('click', function(){ const panel=document.getElementById('engine-character-editor'); if(panel)panel.hidden=true; });
+  (function ensureCharacterEditorClosed() {
+    const panel = document.getElementById('engine-character-editor');
+    if (panel) { panel.hidden = true; panel.setAttribute('hidden', ''); }
+  })();
+  if (engineCharacterOpen) engineCharacterOpen.addEventListener('click', function(){
+    const panel = document.getElementById('engine-character-editor');
+    if (panel) { panel.hidden = false; panel.removeAttribute('hidden'); }
+  });
+  if (engineCharacterClose) engineCharacterClose.addEventListener('click', function(){
+    const panel = document.getElementById('engine-character-editor');
+    if (panel) { panel.hidden = true; panel.setAttribute('hidden', ''); }
+  });
+  const engineCharPanel = document.getElementById('engine-character-editor');
+  if (engineCharPanel) engineCharPanel.addEventListener('click', function(e){
+    if (e.target === engineCharPanel) { engineCharPanel.hidden = true; engineCharPanel.setAttribute('hidden', ''); }
+  });
   let mpCrewNeedsReconcile = true;
   let mpSelfPoseApplied = false;
   function disposeEngineAvatar(actor) {

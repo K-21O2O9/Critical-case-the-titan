@@ -650,10 +650,43 @@ html, body {
           <span class="eng-flag" data-k="main">MAIN</span>
           <span class="eng-flag" data-k="motor1">M1</span>
           <span class="eng-flag" data-k="motor2">M2</span>
+          <span class="eng-flag" data-k="starter">STARTER</span>
+          <span class="eng-flag" data-k="aux">AUX</span>
           <span class="eng-flag" data-k="gen">GEN</span>
           <span class="eng-flag" data-k="clutch">CLUTCH</span>
-          <span class="eng-flag" data-k="lub">LUB</span>
-          <span class="eng-flag" data-k="sw">SW</span>
+          <span class="eng-flag" data-k="lub">LUB PUMP</span>
+          <span class="eng-flag" data-k="sw">SW PUMP</span>
+          <span class="eng-flag" data-k="autoReg">AUTO REG</span>
+        </div>
+        <div class="eng-section-title">Plant setpoints</div>
+        <div class="eng-grid">
+          <div class="eng-stat"><label>Target RPM</label><div class="v"><span id="eng-target-rpm">400</span></div></div>
+          <div class="eng-stat"><label>Fuel feed</label><div class="v"><span id="eng-fuel-feed">10</span>%</div></div>
+          <div class="eng-stat"><label>Air intake</label><div class="v"><span id="eng-air-intake">50</span>%</div></div>
+          <div class="eng-stat"><label>Lub cooler</label><div class="v"><span id="eng-lub-cooler">60</span>%</div></div>
+          <div class="eng-stat"><label>H₂O cooler</label><div class="v"><span id="eng-h2o-cooler">55</span>%</div></div>
+        </div>
+        <div class="eng-section-title">Electrical / cooling readings</div>
+        <div class="eng-grid">
+          <div class="eng-stat"><label>Voltage</label><div class="v"><span id="eng-voltage">0</span> V</div></div>
+          <div class="eng-stat"><label>Current</label><div class="v"><span id="eng-current">0</span> A</div></div>
+          <div class="eng-stat"><label>Electrical power</label><div class="v"><span id="eng-elec-power">0</span> kW</div></div>
+          <div class="eng-stat"><label>Bus power</label><div class="v"><span id="eng-bus-power">0</span> kW</div></div>
+          <div class="eng-stat"><label>Pressure</label><div class="v"><span id="eng-pressure">1.0</span> bar</div></div>
+          <div class="eng-stat"><label>Flow</label><div class="v"><span id="eng-flow">0</span> L/min</div></div>
+          <div class="eng-stat"><label>Fuel flow</label><div class="v"><span id="eng-fuel-flow">0</span> kg/s</div></div>
+          <div class="eng-stat"><label>Fuel remaining</label><div class="v"><span id="eng-fuel-kg">5000</span> kg</div></div>
+          <div class="eng-stat"><label>Coolant level</label><div class="v"><span id="eng-coolant-level">100</span>%</div></div>
+          <div class="eng-stat"><label>Coolant quality</label><div class="v"><span id="eng-coolant-quality">100</span>%</div></div>
+          <div class="eng-stat"><label>Filter ΔP</label><div class="v"><span id="eng-filter-dp">0.2</span></div></div>
+        </div>
+        <div class="eng-section-title">Motor / flow calculations</div>
+        <div class="eng-grid">
+          <div class="eng-stat"><label>Fuel density</label><div class="v"><span id="eng-density">0.85</span> kg/L</div></div>
+          <div class="eng-stat"><label>Volume flow</label><div class="v"><span id="eng-vol-flow">0</span> L/s</div></div>
+          <div class="eng-stat"><label>Angular speed</label><div class="v"><span id="eng-omega">0</span> rad/s</div></div>
+          <div class="eng-stat"><label>Torque</label><div class="v"><span id="eng-torque">0</span> Nm</div></div>
+          <div class="eng-stat"><label>Mechanical power</label><div class="v"><span id="eng-mech-power">0</span> kW</div></div>
         </div>
         <div class="eng-section-title">Heat · Electrics / Reactor / Reg / Motors</div>
         <div class="eng-grid">
@@ -783,6 +816,7 @@ html, body {
       <section class="settings-extra">
         <h3>Display & camera</h3>
         <label class="settings-field">Field of view <span id="set-fov-value">70°</span><input type="range" id="set-fov" min="45" max="100" value="70"></label>
+        <button type="button" class="ui-btn" id="deck-fov-reset">Reset FOV (70°)</button>
         <label class="settings-field">Look sensitivity <span id="set-sensitivity-value">1.00×</span><input type="range" id="set-sensitivity" min="0.35" max="2.5" step="0.05" value="1"></label>
         <button type="button" class="ui-btn" id="deck-fullscreen-setting">Enter fullscreen</button>
       </section>
@@ -811,6 +845,7 @@ html, body {
           <div class="deck-bind-row"><span>Fullscreen</span><button type="button" data-bind-action="fullscreen">Default</button></div>
         </div>
         <p id="deck-bind-capture-status" class="muted" style="font-size:.68rem" aria-live="polite">Select a binding, release all controls, then press a controller button or move a stick.</p>
+        <button type="button" class="ui-btn" id="deck-bind-cancel" hidden>Cancel capture</button>
         <p id="deck-controller-live" class="muted" style="font-size:.66rem">Axes: — · Buttons: —</p>
         <button type="button" class="ui-btn" id="deck-bind-reset">Reset controller bindings</button>
       </section>
@@ -987,9 +1022,9 @@ html, body {
     const set = (id, v) => { const e = $(id); if (e) e.textContent = v; };
     set('eng-speed', (t.shipSpeedKn != null ? t.shipSpeedKn : 0).toFixed(1));
     set('eng-hdg', String(Math.round(t.headingDeg != null ? t.headingDeg : 0)).padStart(3, '0'));
-    set('eng-thr', Math.round(t.throttle != null ? t.throttle : 0));
+    set('eng-thr', Math.round(t.regulator && t.regulator.throttle != null ? t.regulator.throttle : (t.throttle != null ? t.throttle : 0)));
     set('eng-rpm', Math.round(t.rpm != null ? t.rpm : 0));
-    set('eng-pwr', (t.powerKw != null ? t.powerKw : (t.elecPowerKw || 0)).toFixed(0));
+    set('eng-pwr', (t.powerKw != null ? t.powerKw : (t.elecPowerKw != null ? t.elecPowerKw : 0)).toFixed(0));
     set('eng-temp', (t.temperatureC != null ? t.temperatureC : 0).toFixed(0));
     set('eng-fuel', (t.fuelPercent != null ? t.fuelPercent : 0).toFixed(0));
     set('eng-load', (t.loadDemandKw != null ? t.loadDemandKw : 0).toFixed(0));
@@ -997,14 +1032,38 @@ html, body {
     set('eng-heat-r', Math.round((t.machineHeat && t.machineHeat.reactor) || 0));
     set('eng-heat-g', Math.round((t.machineHeat && t.machineHeat.regulator) || 0));
     set('eng-heat-m', Math.round((t.machineHeat && t.machineHeat.motors) || 0));
+    set('eng-target-rpm', Math.round(t.motors && t.motors.targetRpm != null ? t.motors.targetRpm : (t.targetRpm != null ? t.targetRpm : 0)));
+    set('eng-fuel-feed', Math.round(t.reactor && t.reactor.fuelFeed != null ? t.reactor.fuelFeed : (t.fuelFeed != null ? t.fuelFeed : 0)));
+    set('eng-air-intake', Math.round(t.reactor && t.reactor.airIntake != null ? t.reactor.airIntake : (t.airIntake != null ? t.airIntake : 0)));
+    set('eng-lub-cooler', Math.round(t.cooling && t.cooling.lubCooler != null ? t.cooling.lubCooler : (t.lubCooler != null ? t.lubCooler : 0)));
+    set('eng-h2o-cooler', Math.round(t.cooling && t.cooling.h2oCooler != null ? t.cooling.h2oCooler : (t.h2oCooler != null ? t.h2oCooler : 0)));
+    set('eng-voltage', Math.round(Number(t.voltage) || 0));
+    set('eng-current', Math.round(Number(t.current) || 0));
+    set('eng-elec-power', Math.round(Number(t.elecPowerKw) || 0));
+    set('eng-bus-power', Math.round(t.busPowerKw != null ? Number(t.busPowerKw) : (Number(t.elecPowerKw) || 0)));
+    set('eng-pressure', (Number(t.pressureBar) || 0).toFixed(1));
+    set('eng-flow', (Number(t.flowLmin) || 0).toFixed(1));
+    set('eng-fuel-flow', (Number(t.fuelMassFlow) || 0).toFixed(2));
+    set('eng-fuel-kg', Math.round(Number(t.fuelRemainingKg) || 0));
+    set('eng-density', (Number(t.density) || 0).toFixed(2));
+    set('eng-vol-flow', (Number(t.volFlow) || 0).toFixed(2));
+    set('eng-omega', (Number(t.omega) || 0).toFixed(1));
+    set('eng-torque', Math.round(Number(t.torqueNm) || 0));
+    set('eng-mech-power', Math.round(Number(t.mechPowerKw) || 0));
+    set('eng-coolant-level', Math.round((t.cooling && t.cooling.coolantLevel) != null ? t.cooling.coolantLevel : (t.coolantLevel || 0)));
+    set('eng-coolant-quality', Math.round((t.cooling && t.cooling.coolantQuality) != null ? t.cooling.coolantQuality : (t.coolantQuality || 0)));
+    set('eng-filter-dp', (Number((t.cooling && t.cooling.filterDeltaP) != null ? t.cooling.filterDeltaP : t.filterDeltaP) || 0).toFixed(2));
     const flags = {
       main: t.electrics && t.electrics.main,
       motor1: t.electrics && t.electrics.motor1,
       motor2: t.electrics && t.electrics.motor2,
+      starter: t.electrics && t.electrics.starter,
+      aux: t.electrics && t.electrics.aux,
       gen: t.reactor && t.reactor.generator,
       clutch: t.motors && t.motors.clutch,
       lub: t.cooling && t.cooling.lubPump,
-      sw: t.cooling && t.cooling.swPump
+      sw: t.cooling && t.cooling.swPump,
+      autoReg: t.regulator && t.regulator.autoReg
     };
     document.querySelectorAll('#eng-flags .eng-flag').forEach((el) => {
       const k = el.getAttribute('data-k');
@@ -1013,8 +1072,9 @@ html, body {
     const link = $('eng-link-status');
     if (link) {
       if (t.connected) {
+        const faultCount = Array.isArray(t.activeFaults) ? t.activeFaults.length : 0;
         link.className = 'eng-link ok';
-        link.textContent = 'LINK · ENGINE ROOM ONLINE · ' + (t.condition || 'normal').toUpperCase();
+        link.textContent = 'LINK · ENGINE ROOM ONLINE · ' + (t.condition || 'normal').toUpperCase() + ' · ' + faultCount + ' ACTIVE FAULT' + (faultCount === 1 ? '' : 'S');
       } else {
         link.className = 'eng-link bad';
         link.textContent = 'LINK · WAITING FOR ENGINE ROOM';
@@ -4468,7 +4528,7 @@ html, body {
         let found=null;
         for(let bi=0;bi<(pad.buttons||[]).length;bi++){const b=pad.buttons[bi];if(b&&(b.pressed||b.value>.72)){found={type:'button',pad:pi,index:bi};break;}}
         if(!found)for(let ai=0;ai<(pad.axes||[]).length;ai++){const v=Number(pad.axes[ai])||0;if(Math.abs(v)>.78){found={type:'axis',pad:pi,index:ai,dir:v>0?1:-1};break;}}
-        if(found){const next=Object.assign({},cfg.bindings||{});next[deckBindingCapture]=found;shared.setControls({bindings:next,padProfile:'custom'});deckBindingReleaseGuard=found;deckBindingCapture=null;deckBindingCaptureReady=false;if($('deck-bind-capture-status'))$('deck-bind-capture-status').textContent='Binding saved.';syncDeckSettingsUI();break;}
+        if(found){const next=Object.assign({},cfg.bindings||{});next[deckBindingCapture]=found;shared.setControls({bindings:next,padProfile:'custom'});deckBindingReleaseGuard=found;deckBindingCapture=null;deckBindingCaptureReady=false;if($('deck-bind-capture-status'))$('deck-bind-capture-status').textContent='Binding saved.';if($('deck-bind-cancel'))$('deck-bind-cancel').hidden=true;syncDeckSettingsUI();break;}
       }
       return;
     }
@@ -4592,13 +4652,15 @@ html, body {
     $('character-editor-panel').addEventListener('click', e => { if(e.target === $('character-editor-panel')) $('character-editor-panel').hidden = true; });
     $('set-quality').addEventListener('change', e => { state.quality=e.target.value; applyQuality(); });
     $('set-fov').addEventListener('input', e => { const v=clamp(Number(e.target.value)||70,45,100); if(camera){camera.fov=v;camera.updateProjectionMatrix();} if(window.TitanSharedSettings)window.TitanSharedSettings.set('fov',v); $('set-fov-value').textContent=Math.round(v)+'°'; });
+    $('deck-fov-reset').addEventListener('click', () => { $('set-fov').value='70'; $('set-fov').dispatchEvent(new Event('input',{bubbles:true})); });
     $('set-sensitivity').addEventListener('input', e => { const v=clamp(Number(e.target.value)||1,.35,2.5); if(window.TitanSharedSettings)window.TitanSharedSettings.set('sensitivity',v); $('set-sensitivity-value').textContent=v.toFixed(2)+'×'; });
     $('set-controller-profile').addEventListener('change',e=>applyDeckPadProfile(e.target.value));
     $('set-move-stick').addEventListener('change',e=>{if(window.TitanSharedSettings)window.TitanSharedSettings.set('moveStick',e.target.value);});
     $('set-look-stick').addEventListener('change',e=>{if(window.TitanSharedSettings)window.TitanSharedSettings.set('lookStick',e.target.value);});
     $('set-controller-deadzone').addEventListener('input',e=>{const v=Number(e.target.value);if(window.TitanSharedSettings)window.TitanSharedSettings.set('stickDeadzone',v);$('set-deadzone-value').textContent=v.toFixed(2);});
-    document.querySelectorAll('[data-bind-action]').forEach(button=>button.addEventListener('click',()=>{deckBindingCapture=button.dataset.bindAction;deckBindingCaptureReady=false;document.querySelectorAll('[data-bind-action]').forEach(b=>b.classList.toggle('armed',b===button));if($('deck-bind-capture-status'))$('deck-bind-capture-status').textContent='Release all controller controls, then press a button or move a stick.';}));
-    $('deck-bind-reset').addEventListener('click',()=>{deckBindingCapture=null;deckBindingCaptureReady=false;deckBindingReleaseGuard=null;const bindings={};['interact','forward','back','left','right','lookLeft','lookRight','lookUp','lookDown','menuUp','menuDown','menuLeft','menuRight','menuConfirm','fullscreen'].forEach(k=>bindings[k]=null);if(window.TitanSharedSettings)window.TitanSharedSettings.setControls({bindings,padProfile:'standard',moveStick:'left',lookStick:'right',stickDeadzone:.30});if($('deck-bind-capture-status'))$('deck-bind-capture-status').textContent='Default controller bindings restored.';syncDeckSettingsUI();});
+    document.querySelectorAll('[data-bind-action]').forEach(button=>button.addEventListener('click',()=>{deckBindingCapture=button.dataset.bindAction;deckBindingCaptureReady=false;document.querySelectorAll('[data-bind-action]').forEach(b=>b.classList.toggle('armed',b===button));if($('deck-bind-capture-status'))$('deck-bind-capture-status').textContent='Release all controller controls, then press a button or move a stick.';$('deck-bind-cancel').hidden=false;}));
+    $('deck-bind-cancel').addEventListener('click',()=>{deckBindingCapture=null;deckBindingCaptureReady=false;document.querySelectorAll('[data-bind-action]').forEach(b=>b.classList.remove('armed'));$('deck-bind-cancel').hidden=true;if($('deck-bind-capture-status'))$('deck-bind-capture-status').textContent='Controller binding capture cancelled.';});
+    $('deck-bind-reset').addEventListener('click',()=>{deckBindingCapture=null;deckBindingCaptureReady=false;deckBindingReleaseGuard=null;$('deck-bind-cancel').hidden=true;const bindings={};['interact','forward','back','left','right','lookLeft','lookRight','lookUp','lookDown','menuUp','menuDown','menuLeft','menuRight','menuConfirm','fullscreen'].forEach(k=>bindings[k]=null);if(window.TitanSharedSettings)window.TitanSharedSettings.setControls({bindings,padProfile:'standard',moveStick:'left',lookStick:'right',stickDeadzone:.30});if($('deck-bind-capture-status'))$('deck-bind-capture-status').textContent='Default controller bindings restored.';syncDeckSettingsUI();});
     $('deck-layout-edit').addEventListener('click',()=>setDeckLayoutEditing(!deckLayoutEditing));
     $('deck-layout-save').addEventListener('click',saveDeckLayout);
     $('deck-layout-reset').addEventListener('click',resetDeckLayout);

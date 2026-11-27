@@ -489,13 +489,11 @@
     else if (action === 'setrudder') rudder = Math.max(-35, Math.min(35, Number(cmd.value) || 0));
     else if (action === 'allstop') { throttle = 0; rudder = 0; }
     if (['setthrottle', 'setrudder', 'allstop'].includes(action)) { send('ship:control', withCurrentPose({ throttle: throttle, rudder: rudder })); return; }
-    var systemAction = null;
-    if (action === 'setelectrics' && String(cmd.key) === 'main') systemAction = 'powerOnline';
-    else if (action === 'setcooling' && ['swPump', 'lubPump'].includes(String(cmd.key))) systemAction = 'coolingOnline';
-    else if (action === 'setreactor' && String(cmd.key) === 'generator') systemAction = 'reactorOnline';
-    if (systemAction) send('ship:system', withCurrentPose({ action: systemAction, value: !!cmd.value }));
+    if (cmd.componentId) {
+      send('ship:component', withCurrentPose({ componentId: String(cmd.componentId), value: cmd.value }));
+    }
   }
-  function handleEngineTelemetry(telemetry) { send('ship:telemetry', withCurrentPose({ telemetry: telemetry || {} })); }
+    function handleEngineTelemetry(telemetry) { send('ship:telemetry', withCurrentPose({ telemetry: telemetry || {} })); }
 
   window.TitanMultiplayerRuntime = {
     get active() { return directEntryRequested; },

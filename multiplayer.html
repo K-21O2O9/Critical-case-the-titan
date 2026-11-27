@@ -370,20 +370,19 @@ window.addEventListener('message',event=>{
   }
   if(d.source==='TITAN_SHIP_BUS'&&d.type==='COMMAND'){
     const action=String(d.payload?.action||'').toLowerCase();
-    const current=roomState?.ships?.[role==='host'?'A':selectedTeam]||{};
+    const team=role==='host'?'A':selectedTeam;
+    const current=roomState?.ships?.[team]||{};
     let throttle=Number(current.throttle)||0, rudder=Number(current.rudder)||0;
     if(action==='setthrottle')throttle=Number(d.payload.value)||0;
     if(action==='setrudder')rudder=Number(d.payload.value)||0;
     if(action==='allstop'){throttle=0;rudder=0;}
-    const team=role==='host'?'A':selectedTeam;
     if(['setthrottle','setrudder','allstop'].includes(action)){
       send(role==='host'?{type:'host:control',team,throttle,rudder,pose:playerPose?{...playerPose}:undefined}:{type:'ship:control',throttle,rudder,pose:playerPose?{...playerPose}:undefined});return;
     }
-    let systemAction=null, systemValue=d.payload?.value;
-    if(action==='setelectrics'&&String(d.payload?.key)==='main'){systemAction='powerOnline';}
-    else if(action==='setcooling'&&['swPump','lubPump'].includes(String(d.payload?.key))){systemAction='coolingOnline';}
-    else if(action==='setreactor'&&String(d.payload?.key)==='generator'){systemAction='reactorOnline';}
-    if(systemAction){send(role==='host'?{type:'host:system',team,action:systemAction,value:systemValue,pose:playerPose?{...playerPose}:undefined}:{type:'ship:system',action:systemAction,value:systemValue,pose:playerPose?{...playerPose}:undefined});return;}
+    const componentId=String(d.payload?.componentId||'');
+    if(componentId){
+      send(role==='host'?{type:'host:component',team,componentId,value:d.payload.value,pose:playerPose?{...playerPose}:undefined}:{type:'ship:component',componentId,value:d.payload.value,pose:playerPose?{...playerPose}:undefined});return;
+    }
   }
   if(d.source==='TITAN_ENGINE_ROOM'&&d.type==='TELEMETRY'){
     send({type:role==='host'?'host:telemetry':'ship:telemetry',telemetry:d.telemetry,pose:playerPose?{...playerPose}:undefined});return;

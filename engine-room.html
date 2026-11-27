@@ -8196,6 +8196,7 @@ const HologramUI = {
           input.min = a.min;
           input.max = a.max;
           input.value = a.value;
+          input.dataset.componentId = a.id;
           input.addEventListener("input", () => {
             const v = Number(input.value);
             row.querySelector(".holo-val").textContent = Math.round(v);
@@ -8276,6 +8277,21 @@ const HologramUI = {
     };
     const el = document.getElementById(map[id]);
     if (el) el.value = v;
+    const labelMap = {
+      lubCooler: 'val-lub-cooler', h2oCooler: 'val-h2o-cooler', fuelFeed: 'val-fuel-feed',
+      airIntake: 'val-air', throttle: 'val-throttle', targetRpm: 'val-target-rpm'
+    };
+    const label = document.getElementById(labelMap[id]);
+    if (label) label.textContent = Math.round(v) + (id === 'targetRpm' ? '' : '%');
+    document.querySelectorAll('input[type="range"][data-component-id="' + id + '"]').forEach(function (input) { input.value = v; });
+    const componentMeta = {
+      lubCooler: ['setCooling', 'lubCooler'], h2oCooler: ['setCooling', 'h2oCooler'],
+      fuelFeed: ['setReactor', 'fuelFeed'], airIntake: ['setReactor', 'airIntake'],
+      throttle: ['setRegulator', 'throttle'], targetRpm: ['setMotors', 'targetRpm']
+    }[id];
+    if (componentMeta && window.TitanEngineBus) {
+      window.TitanEngineBus.sendCommand(componentMeta[0], v, { key: componentMeta[1], componentId: id });
+    }
   }
 };
 
@@ -8613,18 +8629,25 @@ const InputManager = {
     });
 
     this.bindInteract();
-    this.bindSlider("slider-lub-cooler", (v) => { Game.state.cooling.lubCooler = v; });
-    this.bindSlider("slider-h2o-cooler", (v) => { Game.state.cooling.h2oCooler = v; });
-    this.bindSlider("slider-fuel", (v) => { Game.state.reactor.fuelFeed = v; });
-    this.bindSlider("slider-air", (v) => { Game.state.reactor.airIntake = v; });
-    this.bindSlider("slider-throttle", (v) => { Game.state.regulator.throttle = v; });
-    this.bindSlider("slider-rpm", (v) => { Game.state.motors.targetRpm = v; });
+    this.bindSlider("slider-lub-cooler", (v) => { Game.state.cooling.lubCooler = v; }, "lubCooler", "setCooling");
+    this.bindSlider("slider-h2o-cooler", (v) => { Game.state.cooling.h2oCooler = v; }, "h2oCooler", "setCooling");
+    this.bindSlider("slider-fuel", (v) => { Game.state.reactor.fuelFeed = v; }, "fuelFeed", "setReactor");
+    this.bindSlider("slider-air", (v) => { Game.state.reactor.airIntake = v; }, "airIntake", "setReactor");
+    this.bindSlider("slider-throttle", (v) => { Game.state.regulator.throttle = v; }, "throttle", "setRegulator");
+    this.bindSlider("slider-rpm", (v) => { Game.state.motors.targetRpm = v; }, "targetRpm", "setMotors");
   },
 
-  bindSlider(id, fn) {
+  bindSlider(id, fn, componentId, action) {
     const el = document.getElementById(id);
-    if (!el) return;
-    el.addEventListener("input", () => fn(Number(el.value)));
+    if (!el || el.dataset.titanBound === "1") return;
+    el.dataset.titanBound = "1";
+    el.addEventListener("input", () => {
+      const value = Number(el.value);
+      fn(value);
+      if (window.TitanEngineBus && componentId) {
+        window.TitanEngineBus.sendCommand(action, value, { key: componentId, componentId: componentId });
+      }
+    });
   },
 
   applySwitch(key, on) {
@@ -8640,7 +8663,19 @@ const InputManager = {
       "auto-reg": () => { Game.state.regulator.autoReg = on; },
       clutch: () => { Game.state.motors.clutch = on; }
     };
-    if (map[key]) map[key]();
+    if (map[key]) {
+      map[key]();
+      const componentIds = {
+        main: 'mainPower', motor1: 'motor1', motor2: 'motor2', starter: 'starter', aux: 'aux',
+        generator: 'generator', clutch: 'clutch', 'lub-pump': 'lubPump', 'sw-pump': 'swPump', 'auto-reg': 'autoReg'
+      };
+      const componentId = componentIds[key];
+      const action = key === 'main' || key === 'motor1' || key === 'motor2' || key === 'starter' || key === 'aux'
+        ? 'setElectrics'
+        : (key === 'lub-pump' || key === 'sw-pump' ? 'setCooling' : (key === 'generator' ? 'setReactor' : (key === 'clutch' ? 'setMotors' : 'setRegulator')));
+      const stateKey = key === 'main' ? 'main' : (key === 'lub-pump' ? 'lubPump' : (key === 'sw-pump' ? 'swPump' : (key === 'auto-reg' ? 'autoReg' : key)));
+      if (componentId && window.TitanEngineBus) window.TitanEngineBus.sendCommand(action, on, { key: stateKey, componentId: componentId });
+    }
     Game.log((on ? "ON: " : "OFF: ") + key);
   },
 
@@ -10707,10 +10742,18 @@ if (document.readyState === "loading") {
       fuelRemainingKg: st.fuelRemainingKg != null ? st.fuelRemainingKg : 5000,
       loadDemandKw: st.loadDemandKw != null ? st.loadDemandKw : 0,
       condition: st.condition || 'normal',
+      activeFaults: Array.isArray(st.activeFaults) ? st.activeFaults.slice(0, 14) : [],
       voltage: s.voltage || 0,
       current: s.current || 0,
       pressureBar: s.pressureBar != null ? s.pressureBar : 1,
       torqueNm: s.torqueNm || 0,
+      flowLmin: s.flowLmin || 0,
+      fuelMassFlow: s.fuelMassFlow || 0,
+      omega: s.omega || 0,
+      mechPowerKw: s.mechPowerKw || 0,
+      busPowerKw: s.busPowerKw || 0,
+      volFlow: s.volFlow || 0,
+      density: s.density || 0.85,
       electrics: {
         main: !!el.main, motor1: !!el.motor1, motor2: !!el.motor2,
         starter: !!el.starter, aux: !!el.aux
@@ -10718,7 +10761,10 @@ if (document.readyState === "loading") {
       cooling: {
         lubPump: !!cool.lubPump, swPump: !!cool.swPump,
         coolantLevel: cool.coolantLevel != null ? cool.coolantLevel : 100,
-        coolantQuality: cool.coolantQuality != null ? cool.coolantQuality : 100
+        coolantQuality: cool.coolantQuality != null ? cool.coolantQuality : 100,
+        filterDeltaP: cool.filterDeltaP != null ? cool.filterDeltaP : 0.2,
+        lubCooler: cool.lubCooler != null ? cool.lubCooler : 60,
+        h2oCooler: cool.h2oCooler != null ? cool.h2oCooler : 55
       },
       reactor: {
         fuelFeed: reac.fuelFeed != null ? reac.fuelFeed : 10,
@@ -10808,8 +10854,48 @@ if (document.readyState === "loading") {
       if (cmd.key != null) {
         st.regulator[cmd.key] = cmd.value;
         if (cmd.key === 'autoReg' && typeof cmd.value === 'boolean') syncSwitchUI('auto-reg', cmd.value);
+        else if (cmd.key === 'throttle') syncSliderUI('slider-throttle', 'val-throttle', cmd.value, '%');
+      }
+    } else if (action === 'applyTelemetrySnapshot') {
+      const t = cmd.telemetry && typeof cmd.telemetry === 'object' ? cmd.telemetry : {};
+      const sensorKeys = ['shipSpeedKn','headingDeg','rpm','powerKw','elecPowerKw','temperatureC','voltage','current','pressureBar','torqueNm','flowLmin','fuelMassFlow','omega','mechPowerKw','busPowerKw','volFlow','density'];
+      sensorKeys.forEach(key => { if (Number.isFinite(Number(t[key]))) st.sensors[key] = Number(t[key]); });
+      if (Number.isFinite(Number(t.fuelPercent))) st.fuelPercent = Number(t.fuelPercent);
+      if (Number.isFinite(Number(t.fuelRemainingKg))) st.fuelRemainingKg = Number(t.fuelRemainingKg);
+      if (Number.isFinite(Number(t.loadDemandKw))) st.loadDemandKw = Number(t.loadDemandKw);
+      if (['normal','warning','critical'].includes(String(t.condition))) st.condition = String(t.condition);
+      if (Array.isArray(t.activeFaults)) st.activeFaults = t.activeFaults.slice(0, 14);
+      if (t.coolantLevel != null && Number.isFinite(Number(t.coolantLevel))) st.cooling.coolantLevel = Number(t.coolantLevel);
+      if (t.coolantQuality != null && Number.isFinite(Number(t.coolantQuality))) st.cooling.coolantQuality = Number(t.coolantQuality);
+      if (t.filterDeltaP != null && Number.isFinite(Number(t.filterDeltaP))) st.cooling.filterDeltaP = Number(t.filterDeltaP);
+      if (t.machineHeat && typeof t.machineHeat === 'object') {
+        ['electrics','reactor','regulator','motors'].forEach(key => { if (Number.isFinite(Number(t.machineHeat[key]))) st.machineHeat[key] = Number(t.machineHeat[key]); });
       }
     }
+    if (action === 'setCooling' && cmd.key === 'lubCooler') syncSliderUI('slider-lub-cooler', 'val-lub-cooler', cmd.value, '%');
+    if (action === 'setCooling' && cmd.key === 'h2oCooler') syncSliderUI('slider-h2o-cooler', 'val-h2o-cooler', cmd.value, '%');
+    if (action === 'setReactor' && cmd.key === 'fuelFeed') syncSliderUI('slider-fuel', 'val-fuel-feed', cmd.value, '%');
+    if (action === 'setReactor' && cmd.key === 'airIntake') syncSliderUI('slider-air', 'val-air', cmd.value, '%');
+    if (action === 'setMotors' && cmd.key === 'targetRpm') syncSliderUI('slider-rpm', 'val-target-rpm', cmd.value, '');
+  }
+
+  function syncSliderUI(sliderId, labelId, value, suffix) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return;
+    const slider = document.getElementById(sliderId);
+    if (slider) slider.value = String(n);
+    const label = document.getElementById(labelId);
+    if (label) label.textContent = Math.round(n) + (suffix || '');
+    const componentId = ({
+      'slider-lub-cooler': 'lubCooler', 'slider-h2o-cooler': 'h2oCooler',
+      'slider-fuel': 'fuelFeed', 'slider-air': 'airIntake', 'slider-throttle': 'throttle', 'slider-rpm': 'targetRpm'
+    })[sliderId];
+    if (componentId) document.querySelectorAll('input[type="range"][data-component-id="' + componentId + '"]').forEach(function (input) {
+      input.value = String(n);
+      const row = input.closest ? input.closest('.holo-action') : null;
+      const holoValue = row && row.querySelector ? row.querySelector('.holo-val') : null;
+      if (holoValue) holoValue.textContent = String(Math.round(n));
+    });
   }
 
   function syncSwitchUI(dataSwitch, on) {

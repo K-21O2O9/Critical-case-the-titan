@@ -115,7 +115,7 @@
 const $=id=>document.getElementById(id);
 const DEFAULT_SERVER='wss://titan-multiplayer.onrender.com';
 const CHARACTER_KEY='titan-character-v1';
-let socket=null,role=null,roomCode='',roomState=null,selectedTeam='',playerId='',deviceId='',ready=false,playerPos={x:0,z:0},reconnectTimer=null,reconnectAttempts=0,gameView='deck',gameFrameLoaded={map:false,deck:false},hostFly=false,gameEntered=false;
+let socket=null,role=null,roomCode='',roomState=null,selectedTeam='',playerId='',deviceId='',ready=false,playerPos={x:0,z:0},playerPose=null,reconnectTimer=null,reconnectAttempts=0,gameView='deck',gameFrameLoaded={map:false,deck:false},hostFly=false,gameEntered=false;
 const serverSaved=localStorage.getItem('titan-mp-server')||DEFAULT_SERVER;
 ['host-server','join-server','spectator-server'].forEach(id=>$(id).value=serverSaved);
 function setStatus(id,message,type=''){const el=$(id);if(!el)return;el.textContent=message;el.className='status'+(type?' '+type:'');}
@@ -229,7 +229,7 @@ function renderState(s){
   $('player-crew-count').textContent=crew.length+' / 30 CREW';$('player-phase').textContent=String(s.status||'lobby').toUpperCase();
   $('player-manifest').innerHTML=playerManifest(players);
   const me=players.find(p=>p.id===playerId);
-  if(me){playerPos={x:Number(me.x)||0,z:Number(me.z)||0};ready=!!me.ready;$('player-team-badge').textContent='SHIP '+me.team;$('ready-button').textContent=ready?'CANCEL READY':'I\'M READY';$('ready-status').textContent=me.isHost?'Host avatar · Ship '+me.team:(ready?'You are marked ready.':'Get ready with your crew.');}
+  if(me){playerPos={x:Number(me.x)||0,z:Number(me.z)||0};if(!playerPose)playerPose={x:Number(me.x)||0,z:Number(me.z)||0,yaw:Number(me.yaw)||0,area:me.area||'main-deck',moving:false};ready=!!me.ready;$('player-team-badge').textContent='SHIP '+me.team;$('ready-button').textContent=ready?'CANCEL READY':'I\'M READY';$('ready-status').textContent=me.isHost?'Host avatar · Ship '+me.team:(ready?'You are marked ready.':'Get ready with your crew.');}
   $('spectator-phase').textContent=String(s.status||'lobby').toUpperCase();$('spectator-count').textContent=crew.length+' / 30 CREW';
   $('spectator-a').textContent='Crew '+a.length+'/15 · Ready '+a.filter(p=>p.ready).length+' · Progress '+Math.round(s.ships?.A?.progress||0)+'%';
   $('spectator-b').textContent='Crew '+b.length+'/15 · Ready '+b.filter(p=>p.ready).length+' · Progress '+Math.round(s.ships?.B?.progress||0)+'%';
@@ -311,13 +311,22 @@ window.addEventListener('message',event=>{
   const d=event.data;
   if(d.source==='TITAN_MAIN_DECK'){
     if(d.type==='DECK_READY'){sendStateToGameFrames();return;}
-    if(d.type==='POSE'&&d.pose){playerPos={x:Number(d.pose.x)||0,z:Number(d.pose.z)||0};send({type:role==='host'?'host:move':'player:move',...d.pose});return;}
-    if(d.type==='AREA_CHANGE'){send({type:role==='host'?'host:move':'player:move',x:playerPos.x,z:playerPos.z,yaw:0,area:d.area});return;}
-    if(d.type==='SHIP_CONTROL'){const team=role==='host'?'A':selectedTeam;send(role==='host'?{type:'host:control',team,throttle:d.throttle,rudder:d.rudder}:{type:'ship:control',throttle:d.throttle,rudder:d.rudder});return;}
+    if(d.type==='POSE'&&d.pose){playerPos={x:Number(d.pose.x)||0,z:Number(d.pose.z)||0};playerPose={x:Number(d.pose.x)||0,z:Number(d.pose.z)||0,yaw:Number(d.pose.yaw)||0,area:d.pose.area||'main-deck',moving:!!d.pose.moving};send({type:role==='host'?'host:move':'player:move',...d.pose});return;}
+    if(d.type==='AREA_CHANGE'){
+      const pose=d.pose&&Number.isFinite(Number(d.pose.x))&&Number.isFinite(Number(d.pose.z))?d.pose:playerPose;
+      if(pose){
+        playerPos={x:Number(pose.x)||0,z:Number(pose.z)||0};
+        playerPose={x:playerPos.x,z:playerPos.z,yaw:Number(pose.yaw)||0,area:d.area,moving:false};
+        send({type:role==='host'?'host:move':'player:move',...playerPose,transition:true});
+      }else send({type:role==='host'?'host:move':'player:move',area:d.area,transition:true});
+      return;
+    }
+    if(d.type==='SHIP_CONTROL'){const team=role==='host'?'A':selectedTeam;const pose=playerPose?{...playerPose}:undefined;send(role==='host'?{type:'host:control',team,throttle:d.throttle,rudder:d.rudder,pose}:{type:'ship:control',throttle:d.throttle,rudder:d.rudder,pose});return;}
     if(d.type==='INTERACTION'){
       const team=role==='host'?'A':selectedTeam;
-      if(d.action==='doorOpen'||d.action==='hatchOpen')send(role==='host'?{type:'host:system',team,action:d.action,value:d.value}:{type:'ship:system',action:d.action,value:d.value});
-      else send(role==='host'?{type:'host:system',team,action:'interaction',target:d.target,value:d.value}:{type:'ship:interaction',target:d.target,value:d.value});
+      const pose=d.pose&&Number.isFinite(Number(d.pose.x))&&Number.isFinite(Number(d.pose.z))?d.pose:playerPose;
+      if(d.action==='doorOpen'||d.action==='hatchOpen')send(role==='host'?{type:'host:system',team,action:d.action,value:d.value,pose}:{type:'ship:system',action:d.action,value:d.value,pose});
+      else send(role==='host'?{type:'host:system',team,action:'interaction',target:d.target,value:d.value,pose}:{type:'ship:interaction',target:d.target,value:d.value,pose});
     }
   }
   if(d.source==='TITAN_SHIP_BUS'&&d.type==='COMMAND'){
@@ -329,16 +338,16 @@ window.addEventListener('message',event=>{
     if(action==='allstop'){throttle=0;rudder=0;}
     const team=role==='host'?'A':selectedTeam;
     if(['setthrottle','setrudder','allstop'].includes(action)){
-      send(role==='host'?{type:'host:control',team,throttle,rudder}:{type:'ship:control',throttle,rudder});return;
+      send(role==='host'?{type:'host:control',team,throttle,rudder,pose:playerPose?{...playerPose}:undefined}:{type:'ship:control',throttle,rudder,pose:playerPose?{...playerPose}:undefined});return;
     }
     let systemAction=null, systemValue=d.payload?.value;
     if(action==='setelectrics'&&String(d.payload?.key)==='main'){systemAction='powerOnline';}
     else if(action==='setcooling'&&['swPump','lubPump'].includes(String(d.payload?.key))){systemAction='coolingOnline';}
     else if(action==='setreactor'&&String(d.payload?.key)==='generator'){systemAction='reactorOnline';}
-    if(systemAction){send(role==='host'?{type:'host:system',team,action:systemAction,value:systemValue}:{type:'ship:system',action:systemAction,value:systemValue});return;}
+    if(systemAction){send(role==='host'?{type:'host:system',team,action:systemAction,value:systemValue,pose:playerPose?{...playerPose}:undefined}:{type:'ship:system',action:systemAction,value:systemValue,pose:playerPose?{...playerPose}:undefined});return;}
   }
   if(d.source==='TITAN_ENGINE_ROOM'&&d.type==='TELEMETRY'){
-    send({type:role==='host'?'host:telemetry':'ship:telemetry',telemetry:d.telemetry});return;
+    send({type:role==='host'?'host:telemetry':'ship:telemetry',telemetry:d.telemetry,pose:playerPose?{...playerPose}:undefined});return;
   }
   if(d.source==='TITAN_MAP'&&d.type==='MAP_READY')sendStateToGameFrames();
   if(d.source==='TITAN_MAP'&&d.type==='MAP_GEOMETRY'&&role==='host'&&d.geometry){send({type:'host:map-geometry',geometry:d.geometry});}

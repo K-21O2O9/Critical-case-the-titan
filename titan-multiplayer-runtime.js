@@ -291,6 +291,18 @@
       return scene && ship ? { scene: scene, ship: ship } : null;
     } catch (_) { return null; }
   }
+  function currentPosePayload() {
+    if (playerArea === 'main-deck' && window.TitanDeckGame && typeof window.TitanDeckGame.getPose === 'function') {
+      var deckPose = window.TitanDeckGame.getPose();
+      return { x: deckPose.x, z: deckPose.z, yaw: deckPose.yaw, area: 'main-deck', moving: false };
+    }
+    return lastPose ? { x: lastPose.x, z: lastPose.z, yaw: lastPose.yaw, area: playerArea, moving: false } : null;
+  }
+  function withCurrentPose(payload) {
+    var pose = currentPosePayload();
+    if (pose) payload.pose = pose;
+    return payload;
+  }
   function removeActor(actor) {
     if (!actor) return;
     if (actor.anchor && actor.anchor.parent) actor.anchor.parent.remove(actor.anchor);
@@ -343,16 +355,9 @@
     if (self) {
       session.team = self.team;
       if (self.area) playerArea = self.area;
-      var deck = getDeck();
-      // Soft correction only on large desync. Main-deck owns local position authority.
-      // Blind snaps on every snapshot were a major source of the teleport-to-spawn bug.
-      if (deck && typeof window.TitanDeckGame.getPose === 'function' && window.TitanDeckGame.setMultiplayerPose) {
-        var pose = window.TitanDeckGame.getPose();
-        var dist = Math.hypot((Number(self.x) || 0) - pose.x, (Number(self.z) || 0) - pose.z);
-        if (dist > 4.5) {
-          window.TitanDeckGame.setMultiplayerPose(self.x, self.z, self.yaw);
-        }
-      }
+      // The Main Deck owns its locally predicted pose after the one-time join
+      // seed. Never pull it toward an old server snapshot here; position updates
+      // are sent separately and interactions include their current pose.
     }
     updateRemotePlayers();
     var hud = document.getElementById('titan-mp-hud');
@@ -360,10 +365,15 @@
   }
   function setArea(area) {
     if (['main-deck', 'engine-room', 'storage'].indexOf(area) === -1) return;
+    // Capture the live Main Deck pose before navigation unloads the page.
+    var deckPose = window.TitanDeckGame && typeof window.TitanDeckGame.getPose === 'function'
+      ? window.TitanDeckGame.getPose() : null;
+    if (deckPose && Number.isFinite(Number(deckPose.x)) && Number.isFinite(Number(deckPose.z))) {
+      lastPose = { x: Number(deckPose.x), z: Number(deckPose.z), yaw: Number(deckPose.yaw) || 0 };
+    }
     playerArea = area;
-    if (joined && socket && socket.readyState === WebSocket.OPEN) {
-      var pose = lastPose || { x: 0, z: -14.35, yaw: 0 };
-      send('player:move', { x: pose.x, z: pose.z, yaw: pose.yaw, area: playerArea, moving: false });
+    if (joined && socket && socket.readyState === WebSocket.OPEN && lastPose) {
+      send('player:move', { x: lastPose.x, z: lastPose.z, yaw: lastPose.yaw, area: playerArea, moving: false, transition: true });
     }
   }
   function setPose(x, z, yaw, area, moving) {
@@ -388,10 +398,10 @@
           lastPose = { x: pose.x, z: pose.z, yaw: pose.yaw };
           send('player:move', { x: pose.x, z: pose.z, yaw: pose.yaw, area: playerArea, moving: changed });
         }
-      } else if (now - lastHeartbeatAt > 1000) {
+      } else if (lastPose && now - lastHeartbeatAt > 1000) {
+        // Do not invent a spawn pose while another deck/page is still loading.
         lastHeartbeatAt = now;
-        var held = lastPose || { x: 0, z: -14.35, yaw: 0 };
-        send('player:move', { x: held.x, z: held.z, yaw: held.yaw, area: playerArea, moving: false });
+        send('player:move', { x: lastPose.x, z: lastPose.z, yaw: lastPose.yaw, area: playerArea, moving: false });
       }
     }
     var deck = getDeck();
@@ -430,8 +440,12 @@
     if (payload.type === 'POSE' || payload.type === 'DECK_READY') return;
     if (payload.type === 'AREA_CHANGE') { setArea(payload.area); return; }
     if (payload.type === 'INTERACTION') {
-      if (payload.action === 'doorOpen' || payload.action === 'hatchOpen') send('ship:system', { action: payload.action, value: !!payload.value });
-      else send('ship:interaction', { target: payload.target, value: payload.value });
+      var pose = payload.pose || currentPosePayload();
+      if (payload.action === 'doorOpen' || payload.action === 'hatchOpen') {
+        send('ship:system', { action: payload.action, value: !!payload.value, pose: pose });
+      } else {
+        send('ship:interaction', { target: payload.target, value: payload.value, pose: pose });
+      }
     }
   }
   function handleBusCommand(cmd) {
@@ -443,14 +457,14 @@
     if (action === 'setthrottle') throttle = Math.max(0, Math.min(100, Number(cmd.value) || 0));
     else if (action === 'setrudder') rudder = Math.max(-35, Math.min(35, Number(cmd.value) || 0));
     else if (action === 'allstop') { throttle = 0; rudder = 0; }
-    if (['setthrottle', 'setrudder', 'allstop'].includes(action)) { send('ship:control', { throttle: throttle, rudder: rudder }); return; }
+    if (['setthrottle', 'setrudder', 'allstop'].includes(action)) { send('ship:control', withCurrentPose({ throttle: throttle, rudder: rudder })); return; }
     var systemAction = null;
     if (action === 'setelectrics' && String(cmd.key) === 'main') systemAction = 'powerOnline';
     else if (action === 'setcooling' && ['swPump', 'lubPump'].includes(String(cmd.key))) systemAction = 'coolingOnline';
     else if (action === 'setreactor' && String(cmd.key) === 'generator') systemAction = 'reactorOnline';
-    if (systemAction) send('ship:system', { action: systemAction, value: !!cmd.value });
+    if (systemAction) send('ship:system', withCurrentPose({ action: systemAction, value: !!cmd.value }));
   }
-  function handleEngineTelemetry(telemetry) { send('ship:telemetry', { telemetry: telemetry || {} }); }
+  function handleEngineTelemetry(telemetry) { send('ship:telemetry', withCurrentPose({ telemetry: telemetry || {} })); }
 
   window.TitanMultiplayerRuntime = {
     get active() { return directEntryRequested; },

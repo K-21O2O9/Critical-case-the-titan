@@ -825,7 +825,11 @@ html, body {
     const embeddedRoom = mpNav.get('multiplayer') === '1' && window.parent !== window;
     if (embeddedRoom) {
       const area = filename === 'engine-room.html' ? 'engine-room' : (filename === 'storage.html' ? 'storage' : 'main-deck');
-      try { window.parent.postMessage({ source: 'TITAN_MAIN_DECK', type: 'AREA_CHANGE', area: area }, window.location.origin); } catch (_) {}
+      try {
+        const pose = window.TitanDeckGame && typeof window.TitanDeckGame.getPose === 'function'
+          ? Object.assign({}, window.TitanDeckGame.getPose(), { area: area, moving: false }) : null;
+        window.parent.postMessage({ source: 'TITAN_MAIN_DECK', type: 'AREA_CHANGE', area: area, pose: pose }, window.location.origin);
+      } catch (_) {}
       target += '?multiplayer=1&team=' + encodeURIComponent(mpNav.get('team') || 'A') + '&room=' + encodeURIComponent(mpNav.get('room') || '') + '&player=' + encodeURIComponent(mpNav.get('player') || '');
     } else if (directRuntime) {
       const area = filename === 'engine-room.html' ? 'engine-room' : (filename === 'storage.html' ? 'storage' : 'main-deck');
@@ -3772,11 +3776,23 @@ html, body {
   let mpLastInteractionAt = 0;
   let mpLastMapPose = 0;
   let mpHasAppliedInitialPose = false;
-  let mpLastSelfArea = 'main-deck';
   function mpPost(payload) {
-    if (!mpEnabled) return;
-    if (mpEmbedded) window.parent.postMessage(Object.assign({ source: 'TITAN_MAIN_DECK' }, payload), window.location.origin);
-    else if (mpDirect && window.TitanMultiplayerRuntime.handleDeckMessage) window.TitanMultiplayerRuntime.handleDeckMessage(payload);
+    if (!mpEnabled || !payload) return;
+    // Attach the exact current local pose to interactions. Movement packets are
+    // intentionally rate-limited, so an interaction can otherwise reach the
+    // server before the newest walking pose and trigger a stale-state broadcast.
+    const outgoing = Object.assign({}, payload);
+    if (outgoing.type === 'INTERACTION') {
+      outgoing.pose = {
+        x: state.playerLocal.x,
+        z: state.playerLocal.z,
+        yaw: state.yaw,
+        area: 'main-deck',
+        moving: false
+      };
+    }
+    if (mpEmbedded) window.parent.postMessage(Object.assign({ source: 'TITAN_MAIN_DECK' }, outgoing), window.location.origin);
+    else if (mpDirect && window.TitanMultiplayerRuntime.handleDeckMessage) window.TitanMultiplayerRuntime.handleDeckMessage(outgoing);
   }
   function mpDisposeActor(actor) {
     if (!actor) return;
@@ -3796,33 +3812,19 @@ html, body {
     const shipState = packet.state.ships && packet.state.ships[mpTeam];
     if (shipState) mpServerShip = shipState;
     const self = (packet.state.players || []).find(p => p.id === mpLocalPlayerId);
-    // CRITICAL FIX: Never force local player position on every network snapshot.
-    // Only apply server position on first join, large desync, or explicit respawn/area change.
-    // Blind overwrite was the primary cause of the "teleported to spawn" bug.
-    if (self && state.ready) {
-      const sx = Number(self.x) || 0;
-      const sz = Number(self.z) || 0;
-      const syaw = Number(self.yaw) || 0;
-      const dx = sx - state.playerLocal.x;
-      const dz = sz - state.playerLocal.z;
-      const dist = Math.hypot(dx, dz);
-      const isFirstPose = !mpHasAppliedInitialPose;
-      const largeDesync = dist > 4.5;
-      const areaChanged = self.area && self.area !== (mpLastSelfArea || 'main-deck');
-      if (isFirstPose || largeDesync || areaChanged || self.forceRespawn) {
-        state.playerLocal.x = Math.max(-3.9, Math.min(3.9, sx));
-        state.playerLocal.z = Math.max(-17.65, Math.min(22.1, sz));
-        state.yaw = syaw;
-        syncCameraToShip();
-        mpHasAppliedInitialPose = true;
-      }
-      mpLastSelfArea = self.area || 'main-deck';
-    } else if (self && !state.ready) {
-      // Pre-ready: seed position so first frame is correct
-      state.playerLocal.x = Math.max(-3.9, Math.min(3.9, Number(self.x) || 0));
-      state.playerLocal.z = Math.max(-17.65, Math.min(22.1, Number(self.z) || 0));
-      state.yaw = Number(self.yaw) || 0;
+    // A room snapshot is not a respawn command. Seed the local pose exactly
+    // once when this page joins/reconnects, then leave local movement untouched.
+    // In particular, never use distance-from-server as a reason to snap: an
+    // interaction can be broadcast before its latest throttled movement packet.
+    if (self && !mpHasAppliedInitialPose) {
+      const sx = Number(self.x);
+      const sz = Number(self.z);
+      const syaw = Number(self.yaw);
+      state.playerLocal.x = Math.max(-3.9, Math.min(3.9, Number.isFinite(sx) ? sx : 0));
+      state.playerLocal.z = Math.max(-17.65, Math.min(22.1, Number.isFinite(sz) ? sz : -14.35));
+      state.yaw = Number.isFinite(syaw) ? syaw : 0;
       mpHasAppliedInitialPose = true;
+      if (state.ready) syncCameraToShip();
     }
     const systems = shipState && shipState.systems;
     if (systems) {

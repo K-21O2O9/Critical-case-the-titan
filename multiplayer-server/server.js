@@ -826,7 +826,7 @@ wss.on('connection', ws => {
       for (const key of ['shipSpeedKn', 'headingDeg', 'rpm', 'powerKw', 'elecPowerKw', 'temperatureC', 'fuelPercent', 'loadDemandKw']) {
         if (Number.isFinite(Number(t[key]))) telemetry[key] = clampNumber(t[key], key === 'headingDeg' ? 0 : 0, key === 'temperatureC' ? 180 : (key === 'fuelPercent' ? 100 : 100000), 0);
       }
-      for (const key of ['mainPower', 'motor1', 'motor2', 'generator', 'clutch', 'lubPump', 'swPump']) {
+      for (const key of ['mainPower', 'motor1', 'motor2', 'starter', 'aux', 'generator', 'clutch', 'lubPump', 'swPump', 'autoReg']) {
         if (typeof t[key] === 'boolean') telemetry[key] = t[key];
       }
       telemetry.updatedAt = Date.now();

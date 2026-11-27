@@ -162,7 +162,12 @@ function handleMessage(m){
   if(m.type==='created'){
     reconnectAttempts=0;if(reconnectTimer){clearTimeout(reconnectTimer);reconnectTimer=null;}role='host';roomCode=m.code||m.state?.code||'';roomState=m.state||roomState;playerId=roomState?.hostPlayerId||roomState?.players?.find(p=>p.isHost)?.id||('host-'+roomCode);ensureHostCharacter();
     $('host-dashboard').classList.remove('hidden');$('room-code').textContent=roomCode||'------';
-    setStatus('host-status','Room created. Loading the authoritative projection so its live obstacles and route can be registered…','ok');ensureGameFrame('map');renderState(roomState);return;
+    setStatus('host-status','Room created. Host is registered and entering the shared session as Captain…','ok');ensureGameFrame('map');renderState(roomState);
+    // Critical fix: host automatically enters the playable game as a genuine session member
+    // using the existing host-{code} actor (no second identity, no bypass).
+    hostJoinEnabled=true;
+    try{ hostJoinGame(); }catch(_){ enterGameSession(true); }
+    return;
   }
   if(m.type==='host:claimed'){
     reconnectAttempts=0;if(reconnectTimer){clearTimeout(reconnectTimer);reconnectTimer=null;}role='host';roomCode=m.code||m.state?.code||'';roomState=m.state||roomState;playerId=roomState?.hostPlayerId||roomState?.players?.find(p=>p.isHost)?.id||('host-'+roomCode);ensureHostCharacter();

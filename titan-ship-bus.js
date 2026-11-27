@@ -62,9 +62,9 @@
       if (!this._mpEnabled || ev.origin !== window.location.origin || !ev.data || ev.data.source !== 'TITAN_MULTIPLAYER' || ev.data.type !== 'STATE') return;
       const ship = ev.data.packet && ev.data.packet.state && ev.data.packet.state.ships && ev.data.packet.state.ships[this._mpTeam];
       const systems = ship && ship.systems;
-      // Engine Room pages consume server-owned bridge orders. Only the command
-      // handler is invoked; it updates the local plant model without echoing a
-      // second command back to the room.
+      // Engine Room pages consume server-owned bridge orders and full component
+      // state from authoritative telemetry. Command handler updates the local
+      // plant model without echoing a second command back to the room.
       if (this.role === 'engine' && systems && this._cmdHandler) {
         const engine = systems.engine || {};
         if (Number.isFinite(Number(engine.throttle)) && this._mpAppliedThrottle !== Number(engine.throttle)) {
@@ -88,10 +88,67 @@
           this._mpAppliedReactor = systems.reactor.online;
           this._cmdHandler({ action: 'setReactor', key: 'generator', value: this._mpAppliedReactor, from: 'multiplayer-server' });
         }
+        // Full component-level synchronization from authoritative telemetry
+        const tel = systems.telemetry || {};
+        const applyBool = (key, action, subKey) => {
+          if (typeof tel[key] !== 'boolean') return;
+          const storeKey = '_mpApplied_' + key;
+          if (this[storeKey] === tel[key]) return;
+          this[storeKey] = tel[key];
+          this._cmdHandler({ action: action, key: subKey, value: tel[key], from: 'multiplayer-server' });
+        };
+        applyBool('mainPower', 'setElectrics', 'main');
+        applyBool('motor1', 'setElectrics', 'motor1');
+        applyBool('motor2', 'setElectrics', 'motor2');
+        applyBool('starter', 'setElectrics', 'starter');
+        applyBool('aux', 'setElectrics', 'aux');
+        applyBool('generator', 'setReactor', 'generator');
+        applyBool('clutch', 'setMotors', 'clutch');
+        applyBool('lubPump', 'setCooling', 'lubPump');
+        applyBool('swPump', 'setCooling', 'swPump');
+        applyBool('autoReg', 'setRegulator', 'autoReg');
       }
       const telemetry = systems && systems.telemetry;
       if (telemetry && typeof telemetry === 'object') {
-        Object.assign(this.telemetry, telemetry, { ts: Date.now(), connected: true, source: 'multiplayer-server' });
+        // Merge into structured telemetry shape used by main-deck dashboard
+        const structured = Object.assign({}, this.telemetry, {
+          ts: Date.now(), connected: true, source: 'multiplayer-server',
+          shipSpeedKn: telemetry.shipSpeedKn, headingDeg: telemetry.headingDeg,
+          rpm: telemetry.rpm, powerKw: telemetry.powerKw, elecPowerKw: telemetry.elecPowerKw,
+          temperatureC: telemetry.temperatureC, fuelPercent: telemetry.fuelPercent,
+          loadDemandKw: telemetry.loadDemandKw
+        });
+        if (typeof telemetry.mainPower === 'boolean' || typeof telemetry.motor1 === 'boolean' || typeof telemetry.motor2 === 'boolean' || typeof telemetry.starter === 'boolean' || typeof telemetry.aux === 'boolean') {
+          structured.electrics = Object.assign({}, structured.electrics || {}, {
+            main: typeof telemetry.mainPower === 'boolean' ? telemetry.mainPower : (structured.electrics && structured.electrics.main),
+            motor1: typeof telemetry.motor1 === 'boolean' ? telemetry.motor1 : (structured.electrics && structured.electrics.motor1),
+            motor2: typeof telemetry.motor2 === 'boolean' ? telemetry.motor2 : (structured.electrics && structured.electrics.motor2),
+            starter: typeof telemetry.starter === 'boolean' ? telemetry.starter : (structured.electrics && structured.electrics.starter),
+            aux: typeof telemetry.aux === 'boolean' ? telemetry.aux : (structured.electrics && structured.electrics.aux)
+          });
+        }
+        if (typeof telemetry.lubPump === 'boolean' || typeof telemetry.swPump === 'boolean') {
+          structured.cooling = Object.assign({}, structured.cooling || {}, {
+            lubPump: typeof telemetry.lubPump === 'boolean' ? telemetry.lubPump : (structured.cooling && structured.cooling.lubPump),
+            swPump: typeof telemetry.swPump === 'boolean' ? telemetry.swPump : (structured.cooling && structured.cooling.swPump)
+          });
+        }
+        if (typeof telemetry.generator === 'boolean') {
+          structured.reactor = Object.assign({}, structured.reactor || {}, {
+            generator: telemetry.generator
+          });
+        }
+        if (typeof telemetry.clutch === 'boolean') {
+          structured.motors = Object.assign({}, structured.motors || {}, {
+            clutch: telemetry.clutch
+          });
+        }
+        if (typeof telemetry.autoReg === 'boolean') {
+          structured.regulator = Object.assign({}, structured.regulator || {}, {
+            autoReg: telemetry.autoReg
+          });
+        }
+        Object.assign(this.telemetry, structured);
         this._emit('telemetry', this.telemetry); this._emit('status', { connected: true, role: 'multiplayer-server' });
       }
     };
@@ -207,7 +264,21 @@
     } catch (e) {}
     this._emit('telemetry', snap);
     if (this._mpEnabled && this.role === 'engine') {
-      const telemetry = { shipSpeedKn: snap.shipSpeedKn, headingDeg: snap.headingDeg, rpm: snap.rpm, powerKw: snap.powerKw, elecPowerKw: snap.elecPowerKw, temperatureC: snap.temperatureC, fuelPercent: snap.fuelPercent, loadDemandKw: snap.loadDemandKw, mainPower: !!(snap.electrics && snap.electrics.main), motor1: !!(snap.electrics && snap.electrics.motor1), motor2: !!(snap.electrics && snap.electrics.motor2), generator: !!(snap.reactor && snap.reactor.generator), clutch: !!(snap.motors && snap.motors.clutch), lubPump: !!(snap.cooling && snap.cooling.lubPump), swPump: !!(snap.cooling && snap.cooling.swPump) };
+      const telemetry = {
+        shipSpeedKn: snap.shipSpeedKn, headingDeg: snap.headingDeg, rpm: snap.rpm,
+        powerKw: snap.powerKw, elecPowerKw: snap.elecPowerKw, temperatureC: snap.temperatureC,
+        fuelPercent: snap.fuelPercent, loadDemandKw: snap.loadDemandKw,
+        mainPower: !!(snap.electrics && snap.electrics.main),
+        motor1: !!(snap.electrics && snap.electrics.motor1),
+        motor2: !!(snap.electrics && snap.electrics.motor2),
+        starter: !!(snap.electrics && snap.electrics.starter),
+        aux: !!(snap.electrics && snap.electrics.aux),
+        generator: !!(snap.reactor && snap.reactor.generator),
+        clutch: !!(snap.motors && snap.motors.clutch),
+        lubPump: !!(snap.cooling && snap.cooling.lubPump),
+        swPump: !!(snap.cooling && snap.cooling.swPump),
+        autoReg: !!(snap.regulator && snap.regulator.autoReg)
+      };
       try {
         if (this._mpEmbedded) window.parent.postMessage({ source: 'TITAN_ENGINE_ROOM', type: 'TELEMETRY', telemetry: telemetry }, window.location.origin);
         else window.TitanMultiplayerRuntime?.handleEngineTelemetry?.(telemetry);

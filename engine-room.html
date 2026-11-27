@@ -10785,14 +10785,42 @@ if (document.readyState === "loading") {
     } else if (action === 'setElectrics') {
       if (st.electrics && cmd.key && typeof cmd.value === 'boolean') {
         st.electrics[cmd.key] = cmd.value;
+        syncSwitchUI(cmd.key, cmd.value);
       }
     } else if (action === 'setCooling') {
-      if (st.cooling && cmd.key != null) st.cooling[cmd.key] = cmd.value;
+      if (st.cooling && cmd.key != null) {
+        st.cooling[cmd.key] = cmd.value;
+        const swKey = cmd.key === 'lubPump' ? 'lub-pump' : (cmd.key === 'swPump' ? 'sw-pump' : cmd.key);
+        if (typeof cmd.value === 'boolean') syncSwitchUI(swKey, cmd.value);
+      }
     } else if (action === 'setReactor') {
-      if (st.reactor && cmd.key != null) st.reactor[cmd.key] = cmd.value;
+      if (st.reactor && cmd.key != null) {
+        st.reactor[cmd.key] = cmd.value;
+        if (typeof cmd.value === 'boolean') syncSwitchUI(cmd.key, cmd.value);
+      }
     } else if (action === 'setMotors') {
-      if (st.motors && cmd.key != null) st.motors[cmd.key] = cmd.value;
+      if (st.motors && cmd.key != null) {
+        st.motors[cmd.key] = cmd.value;
+        if (typeof cmd.value === 'boolean') syncSwitchUI(cmd.key, cmd.value);
+      }
+    } else if (action === 'setRegulator') {
+      if (!st.regulator) st.regulator = { throttle: 0, autoReg: false };
+      if (cmd.key != null) {
+        st.regulator[cmd.key] = cmd.value;
+        if (cmd.key === 'autoReg' && typeof cmd.value === 'boolean') syncSwitchUI('auto-reg', cmd.value);
+      }
     }
+  }
+
+  function syncSwitchUI(dataSwitch, on) {
+    try {
+      const btn = document.querySelector('.switch[data-switch="' + dataSwitch + '"]');
+      if (!btn) return;
+      const pressed = !!on;
+      if (btn.getAttribute('aria-pressed') === String(pressed)) return;
+      btn.setAttribute('aria-pressed', pressed);
+      btn.textContent = pressed ? 'ON' : 'OFF';
+    } catch (_) {}
   }
 
   bus.setCommandHandler(applyCommand);

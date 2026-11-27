@@ -269,15 +269,20 @@ function copyText(value,statusId,success){const fallback=()=>{const input=docume
 function leaveRoom(){send({type:'player:leave'});closeSocket();role=null;$('player-lobby').classList.add('hidden');$('join-room').disabled=false;showJoinStatus('You left the room.');}
 
 // The shared game world is rendered by map.html and main-deck.html.
-function gameFrameUrl(kind){
+function gameFrameUrl(kind, area){
   const team=role==='host'?'A':(roomState?.players?.find(p=>p.id===playerId)?.team||selectedTeam||'A');
   if(kind==='map')return 'map.html?multiplayer=1&fast=1';
-  return 'main-deck.html?multiplayer=1&team='+encodeURIComponent(team)+'&room='+encodeURIComponent(roomCode)+'&player='+encodeURIComponent(playerId);
+  const a = area || (playerPose && playerPose.area) || 'main-deck';
+  let page = 'main-deck.html';
+  if(a==='engine-room') page = 'engine-room.html';
+  else if(a==='storage') page = 'storage.html';
+  return page+'?multiplayer=1&team='+encodeURIComponent(team)+'&room='+encodeURIComponent(roomCode)+'&player='+encodeURIComponent(playerId);
 }
 function ensureGameFrame(kind){
   const frame=$(kind==='map'?'game-map-frame':'game-deck-frame');
-  if(!frame.src || frame.src==='about:blank' || !gameFrameLoaded[kind]){
-    frame.src=gameFrameUrl(kind);gameFrameLoaded[kind]=true;
+  const desired = gameFrameUrl(kind, kind==='deck' ? (playerPose && playerPose.area) : null);
+  if(!frame.src || frame.src==='about:blank' || !gameFrameLoaded[kind] || (kind==='deck' && frame.getAttribute('src') !== desired && playerPose && playerPose.area)){
+    frame.src=desired;gameFrameLoaded[kind]=true;
     frame.onload=()=>{sendStateToGameFrames();if(kind==='map')sendMapVisibility(gameView==='map');};
   }
 }
@@ -292,7 +297,7 @@ function setGameView(view){
   $('view-map').classList.toggle('active',mapOn);$('view-deck').classList.toggle('active',!mapOn);
   if(mapOn){ensureGameFrame('map');$('game-map-frame').contentWindow?.focus();sendMapVisibility(true);if(hostFly)sendFlyMode(true);}
   else {sendMapVisibility(false);ensureGameFrame('deck');$('game-deck-frame').contentWindow?.focus();sendFlyMode(false);}
-  $('game-status').textContent=mapOn?'Live map.html tactical map · both ship transforms and crew are server-synchronised.':'Ship '+(role==='host'?'A':(selectedTeam||'—'))+' · Main Deck · ship-local hitboxes and collision boundaries active.';
+  $('game-status').textContent=mapOn?'Live map.html tactical map · both ship transforms and crew are server-synchronised.':'Ship '+(role==='host'?'A':(selectedTeam||'—'))+' · '+(playerPose&&playerPose.area?String(playerPose.area).replace(/-/g,' ').toUpperCase():'MAIN DECK')+' · ship-local hitboxes and collision boundaries active.';
   sendStateToGameFrames();
 }
 function enterGameSession(forceHostJoin=false){
@@ -352,7 +357,23 @@ window.addEventListener('message',event=>{
       const pose = savedPose ? {x:Number(savedPose.x)||0,z:Number(savedPose.z)||0,yaw:Number(savedPose.yaw)||0,area:currentArea,moving:false} : null;
       if(role==='host') send({type:'host:area',area:d.area,pose});
       else send({type:'player:area',area:d.area,pose});
-      if(d.area) playerPose = pose ? {...pose,area:d.area} : {...(playerPose||{x:0,z:0,yaw:0}),area:d.area,moving:false};
+      if(d.area) {
+        playerPose = pose ? {...pose,area:d.area} : {...(playerPose||{x:0,z:0,yaw:0}),area:d.area,moving:false};
+        // Host and players may freely enter any ship room. Reload the deck iframe
+        // to the destination page so the parent remains the WebSocket owner.
+        if(['main-deck','engine-room','storage'].includes(d.area) && gameEntered) {
+          const frame = $('game-deck-frame');
+          if(frame) {
+            const nextUrl = gameFrameUrl('deck', d.area);
+            if(frame.getAttribute('src') !== nextUrl) {
+              gameFrameLoaded.deck = true;
+              frame.src = nextUrl;
+              frame.onload = () => { sendStateToGameFrames(); };
+            }
+          }
+          if(gameView !== 'deck') setGameView('deck');
+        }
+      }
       return;
     }
     if(d.type==='SHIP_CONTROL'){const team=role==='host'?'A':selectedTeam;const pose=playerPose?{...playerPose}:undefined;send(role==='host'?{type:'host:control',team,throttle:d.throttle,rudder:d.rudder,pose}:{type:'ship:control',throttle:d.throttle,rudder:d.rudder,pose});return;}
@@ -366,7 +387,26 @@ window.addEventListener('message',event=>{
   if(d.source==='TITAN_ENGINE_ROOM'){
     if(d.type==='CHARACTER'&&d.character){send({type:role==='host'?'host:character':'player:character',character:d.character});return;}
     if(d.type==='POSE'&&d.pose){playerPose={...d.pose};send({type:role==='host'?'host:move':'player:move',...d.pose});return;}
-    if(d.type==='AREA_CHANGE'){if(role==='host')send({type:'host:area',area:d.area,pose:d.pose||playerPose});else send({type:'player:area',area:d.area,pose:d.pose||playerPose});return;}
+    if(d.type==='AREA_CHANGE'){
+      if(role==='host')send({type:'host:area',area:d.area,pose:d.pose||playerPose});
+      else send({type:'player:area',area:d.area,pose:d.pose||playerPose});
+      if(d.area){
+        playerPose = {...(playerPose||{x:0,z:0,yaw:0}), ...(d.pose||{}), area:d.area, moving:false};
+        if(['main-deck','engine-room','storage'].includes(d.area) && gameEntered){
+          const frame=$('game-deck-frame');
+          if(frame){
+            const nextUrl=gameFrameUrl('deck', d.area);
+            if(frame.getAttribute('src')!==nextUrl){
+              gameFrameLoaded.deck=true;
+              frame.src=nextUrl;
+              frame.onload=()=>{sendStateToGameFrames();};
+            }
+          }
+          if(gameView!=='deck') setGameView('deck');
+        }
+      }
+      return;
+    }
   }
   if(d.source==='TITAN_SHIP_BUS'&&d.type==='COMMAND'){
     const action=String(d.payload?.action||'').toLowerCase();

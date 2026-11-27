@@ -3769,6 +3769,9 @@ html, body {
   const mpEnabled = mpEmbedded || mpDirect;
   const mpTeam = mpQuery.get('team') === 'B' ? 'B' : (window.TitanMultiplayerRuntime?.session?.team === 'B' ? 'B' : 'A');
   const mpRemoteActors = new Map();
+  // The Main Deck mesh is built at ship-local Y=3.2. Avatar roots use that
+  // exact floor plane; the character visual rig animates independently inside.
+  const mpAvatarFloorY = 3.2;
   let mpPendingState = null;
   let mpLocalPlayerId = mpQuery.get('player') || window.TitanMultiplayerRuntime?.playerId || window.TitanMultiplayerRuntime?.session?.playerId || '';
   let mpLastPoseAt = 0;
@@ -3858,7 +3861,7 @@ html, body {
         ship.add(model);
         actor = {
           model,
-          target: new THREE.Vector3(Number(p.x) || 0, 0.06, Number(p.z) || 0),
+          target: new THREE.Vector3(Number(p.x) || 0, mpAvatarFloorY, Number(p.z) || 0),
           targetYaw: Number(p.yaw) || 0,
           moving: false,
           speed: (p.character && p.character.animationSpeed) || 1
@@ -3867,9 +3870,10 @@ html, body {
         model.rotation.y = actor.targetYaw;
         mpRemoteActors.set(p.id, actor);
       }
-      actor.target.set(Number(p.x) || 0, 0.06, Number(p.z) || 0);
+      actor.target.set(Number(p.x) || 0, mpAvatarFloorY, Number(p.z) || 0);
       actor.targetYaw = Number(p.yaw) || 0;
       actor.moving = Date.now() < (p.movingUntil || 0);
+      actor.running = actor.moving && !!p.running;
       actor.speed = (p.character && p.character.animationSpeed) || 1;
     });
     for (const [id, actor] of mpRemoteActors) {
@@ -3889,7 +3893,7 @@ html, body {
       while (dy < -Math.PI) dy += Math.PI * 2;
       actor.model.rotation.y += dy * lerpFactor;
       if (window.TitanCharacterRuntime && window.TitanCharacterRuntime.animateModel) {
-        window.TitanCharacterRuntime.animateModel(actor.model, state.time, actor.moving ? 1 : 0, actor.speed);
+        window.TitanCharacterRuntime.animateModel(actor.model, state.time, actor.moving ? 1 : 0, actor.speed * (actor.running ? 1.32 : 1));
       }
     }
   }
@@ -3905,7 +3909,8 @@ html, body {
     get camera() { return camera; },
     get ship() { return ship; },
     getPose() {
-      return { x: state.playerLocal.x, z: state.playerLocal.z, yaw: state.yaw, scale: SHIP_SCALE, deckY: 3.372 };
+      return { x: state.playerLocal.x, z: state.playerLocal.z, yaw: state.yaw, scale: SHIP_SCALE, deckY: 3.2,
+        moving: titanWalkAmount > .02, running: titanRunAmount > .02 };
     },
     setMultiplayerState: mpApplyState,
     setMultiplayerPose(x, z, yaw) {
@@ -4258,6 +4263,7 @@ html, body {
 
   let frameAccumulator = 0;
   let titanWalkAmount = 0;
+  let titanRunAmount = 0;
   const frameInterval = isTouch ? 1 / 45 : 1 / 60;
   function animate() {
     if (!state.ready || !renderer) return;
@@ -4269,6 +4275,7 @@ html, body {
     frameAccumulator = 0;
     state.time += dt;
     titanWalkAmount = 0;
+    titanRunAmount = 0;
 
     updateWater(dt, state.time);
     updateDoor(dt);
@@ -4296,6 +4303,7 @@ html, body {
 
       const inputMag = Math.min(1, Math.hypot(mx, mz));
       titanWalkAmount = inputMag;
+      titanRunAmount = (keys.ShiftLeft || keys.ShiftRight) ? inputMag : 0;
       if (inputMag > 0.001) {
         const len = Math.hypot(mx, mz);
         const speed = ((keys.ShiftLeft || keys.ShiftRight ? 5.8 : 4.0) / SHIP_SCALE) * dt;
@@ -4317,12 +4325,8 @@ html, body {
     checkProximity();
     if (mpEnabled && performance.now() - mpLastPoseAt > 75) {
       mpLastPoseAt = performance.now();
-      mpPost({ type: 'POSE', pose: { x: state.playerLocal.x, z: state.playerLocal.z, yaw: state.yaw, area: 'main-deck', moving: titanWalkAmount > .02 } });
+      mpPost({ type: 'POSE', pose: { x: state.playerLocal.x, z: state.playerLocal.z, yaw: state.yaw, area: 'main-deck', moving: titanWalkAmount > .02, running: titanRunAmount > .02 } });
     }
-    for (const actor of mpRemoteActors.values()) {
-      if (window.TitanCharacterRuntime) window.TitanCharacterRuntime.animateModel(actor.model, state.time, actor.moving ? 1 : 0, actor.speed || 1);
-    }
-
     renderer.render(scene, camera);
     if (cssRenderer) cssRenderer.render(camera);
   }

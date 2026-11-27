@@ -334,12 +334,13 @@
         anchor.name = 'TITAN_REMOTE_PLAYER_' + p.id;
         anchor.add(model);
         deck.ship.add(anchor);
-        actor = { anchor: anchor, model: model, target: new window.THREE.Vector3(), moving: false, speed: Number(p.character && p.character.animationSpeed) || 1 };
+        actor = { anchor: anchor, model: model, target: new window.THREE.Vector3(), moving: false, running: false, speed: Number(p.character && p.character.animationSpeed) || 1 };
         remoteActors.set(p.id, actor);
       }
-      actor.target.set(Number(p.x) || 0, 3.372, Number(p.z) || 0);
+      actor.target.set(Number(p.x) || 0, 3.2, Number(p.z) || 0);
       actor.anchor.rotation.y = Number(p.yaw) || 0;
       actor.moving = Date.now() < (p.movingUntil || 0);
+      actor.running = actor.moving && !!p.running;
     });
     remoteActors.forEach(function (actor, id) {
       if (!live.has(id)) { removeActor(actor); remoteActors.delete(id); }
@@ -405,7 +406,8 @@
           lastPoseSent = now;
           lastPose = { x: pose.x, z: pose.z, yaw: pose.yaw };
           lastPoseArea = playerArea;
-          send('player:move', { x: pose.x, z: pose.z, yaw: pose.yaw, area: playerArea, moving: changed });
+          send('player:move', { x: pose.x, z: pose.z, yaw: pose.yaw, area: playerArea,
+            moving: pose.moving == null ? changed : !!pose.moving, running: !!pose.running });
         }
       } else if (lastPose && lastPoseArea === playerArea && now - lastHeartbeatAt > 1000) {
         // Do not invent a spawn pose while another deck/page is still loading.
@@ -417,7 +419,7 @@
     if (deck) {
       remoteActors.forEach(function (actor) {
         actor.anchor.position.lerp(actor.target, 0.34);
-        if (window.TitanCharacterRuntime) window.TitanCharacterRuntime.animateModel(actor.model, animationClock, actor.moving ? 1 : 0, actor.speed);
+        if (window.TitanCharacterRuntime) window.TitanCharacterRuntime.animateModel(actor.model, animationClock, actor.moving ? 1 : 0, actor.speed * (actor.running ? 1.32 : 1));
       });
     }
     setTimeout(tick, 50);

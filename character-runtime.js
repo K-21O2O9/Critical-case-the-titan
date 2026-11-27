@@ -99,6 +99,11 @@
     root.scale.setScalar(opts.scale || 1);
     root.scale.y *= cfg.height;
     root.userData.config = cfg;
+    // Keep the model root exclusively for world/network transforms. Animation
+    // bobbing belongs on this inner rig so it cannot overwrite remote positions.
+    var visualRoot = new THREE.Group();
+    visualRoot.name = 'TITAN_Character_Visual_Root';
+    root.add(visualRoot);
     var skin = material(THREE, cfg.skinColor, .78);
     var outfit = material(THREE, cfg.outfitColor, .68);
     var accent = material(THREE, cfg.accentColor, .48);
@@ -110,16 +115,16 @@
     var build = cfg.bodyBuild;
     var torsoPivot = new THREE.Group();
     torsoPivot.name = 'Torso_Pivot';
-    root.add(torsoPivot);
+    visualRoot.add(torsoPivot);
     sphere(THREE, outfit, torsoPivot, 'Torso', 0, 1.42, 0, .405 * build, .55, .255 * build);
-    sphere(THREE, outfit, root, 'Pelvis', 0, 1.00, 0, .31 * build, .25, .235 * build);
-    mesh(THREE, new THREE.BoxGeometry(.47 * build, .065, .28), accent, root, 'Belt', 0, 1.03, .004);
-    mesh(THREE, new THREE.BoxGeometry(.10, .105, .018), dark, root, 'Belt_Buckle', 0, 1.03, .147);
-    mesh(THREE, new THREE.CylinderGeometry(.115, .13, .17, 18), skin, root, 'Neck', 0, 1.83, 0);
+    sphere(THREE, outfit, visualRoot, 'Pelvis', 0, 1.00, 0, .31 * build, .25, .235 * build);
+    mesh(THREE, new THREE.BoxGeometry(.47 * build, .065, .28), accent, visualRoot, 'Belt', 0, 1.03, .004);
+    mesh(THREE, new THREE.BoxGeometry(.10, .105, .018), dark, visualRoot, 'Belt_Buckle', 0, 1.03, .147);
+    mesh(THREE, new THREE.CylinderGeometry(.115, .13, .17, 18), skin, visualRoot, 'Neck', 0, 1.83, 0);
     var headPivot = new THREE.Group();
     headPivot.name = 'Head_Pivot';
     headPivot.position.set(0, 2.08, 0);
-    root.add(headPivot);
+    visualRoot.add(headPivot);
     sphere(THREE, skin, headPivot, 'Head', 0, 0, 0, .305, .345, .29);
     makeHair(THREE, headPivot, hair, cfg.hairStyle);
     [-1, 1].forEach(function (side) {
@@ -146,7 +151,7 @@
       var shoulder = new THREE.Group();
       shoulder.name = label + '_Arm_Pivot';
       shoulder.position.set(side * .405 * build, 1.72, 0);
-      root.add(shoulder);
+      visualRoot.add(shoulder);
       sphere(THREE, outfit, shoulder, label + '_Shoulder', 0, -.04, 0, .135, .15, .14);
       var upper = makeLimb(THREE, shoulder, label + '_Upper_Arm', .118, .10, .39, outfit, -.12);
       sphere(THREE, outfit, shoulder, label + '_Sleeve_Cuff', 0, -.37, 0, .112, .075, .115);
@@ -169,7 +174,7 @@
       var hip = new THREE.Group();
       hip.name = label + '_Leg_Pivot';
       hip.position.set(side * .17 * build, .92, 0);
-      root.add(hip);
+      visualRoot.add(hip);
       makeLimb(THREE, hip, label + '_Thigh', .145, .125, .42, outfit, 0);
       var knee = new THREE.Group();
       knee.name = label + '_Knee_Pivot';
@@ -180,7 +185,7 @@
       sphere(THREE, shoeMat, knee, label + '_Shoe', 0, -.245, .075, .135, .085, .21);
       legs[label.toLowerCase()] = { hip: hip, knee: knee };
     });
-    var rig = { torso: torsoPivot, head: headPivot, arms: arms, legs: legs, action: null, actionStart: 0, eyes: [] };
+    var rig = { visualRoot: visualRoot, torso: torsoPivot, head: headPivot, arms: arms, legs: legs, action: null, actionStart: 0, eyes: [] };
     headPivot.traverse(function (o) { if (o.name === 'Eye_White') rig.eyes.push(o); });
     root.userData.rig = rig;
     root.userData.materials = [skin, outfit, accent, hair, eyes, white, dark, shoeMat];
@@ -192,7 +197,7 @@
     var t = (Number(time) || 0) * clamp(Number(speed) || 1, .5, 1.8);
     var walk = clamp(Number(movement) || 0, 0, 1);
     var stride = Math.sin(t * 8.2) * walk;
-    model.position.y = Math.abs(Math.sin(t * 4.1)) * (.012 + walk * .025);
+    if (rig.visualRoot) rig.visualRoot.position.y = Math.abs(Math.sin(t * 4.1)) * (.012 + walk * .025);
     rig.torso.scale.y = 1 + Math.sin(t * 2.1) * .012;
     rig.head.rotation.y = Math.sin(t * .72) * .075;
     rig.head.rotation.z = Math.sin(t * .9) * .018;

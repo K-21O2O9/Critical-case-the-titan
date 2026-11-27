@@ -7631,7 +7631,7 @@ const SceneManager = {
           performance.now() - (window.__titanMpPoseLastAt || 0) > 75) {
         window.__titanMpPoseLastAt = performance.now();
         try {
-          window.parent.postMessage({ source: "TITAN_MAIN_DECK", type: "POSE", pose: { x: pos.x, z: pos.z, yaw: this.walkYaw, area: "engine-room", moving: Math.abs(moveX) + Math.abs(moveZ) > 0.001 } }, window.location.origin);
+          window.parent.postMessage({ source: "TITAN_MAIN_DECK", type: "POSE", pose: { x: pos.x, z: pos.z, yaw: this.walkYaw, area: "engine-room", moving: Math.abs(moveX) + Math.abs(moveZ) > 0.001, running: false } }, window.location.origin);
         } catch (_) {}
       } else if (window.TitanMultiplayerRuntime && window.TitanMultiplayerRuntime.active &&
           performance.now() - (window.__titanMpPoseLastAt || 0) > 75) {
@@ -10595,6 +10595,7 @@ if (document.readyState === "loading") {
       actor.targetZ = Math.max(-6.6, Math.min(6.6, Number(p.z) || 0));
       actor.targetYaw = Number(p.yaw) || 0;
       actor.moving = Date.now() < (p.movingUntil || 0);
+      actor.running = actor.moving && !!p.running;
       actor.speed = Number(p.character?.animationSpeed) || 1;
     });
     for (const [id, actor] of mpCrewActors) {
@@ -10614,7 +10615,7 @@ if (document.readyState === "loading") {
       while (delta < -Math.PI) delta += Math.PI * 2;
       actor.anchor.rotation.y += delta * blend;
       if (window.TitanCharacterRuntime) {
-        window.TitanCharacterRuntime.animateModel(actor.model, t, actor.moving ? 1 : 0, actor.speed);
+        window.TitanCharacterRuntime.animateModel(actor.model, t, actor.moving ? 1 : 0, actor.speed * (actor.running ? 1.32 : 1));
       }
     });
   }

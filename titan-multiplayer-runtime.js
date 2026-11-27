@@ -33,6 +33,7 @@
   var remoteActors = new Map();
   var lastPoseSent = 0;
   var lastPose = null;
+  var lastPoseArea = null;
   var animationClock = 0;
   var enterTriggered = false;
 
@@ -195,7 +196,7 @@
     current.onopen = function () {
       clearTimeout(timeout);
       var character = defaultCharacter(next.name);
-      current.send(JSON.stringify({ type: 'join', code: next.code, team: next.team, name: next.name, deviceId: next.deviceId, character: character }));
+      current.send(JSON.stringify({ type: 'join', code: next.code, team: next.team, name: next.name, deviceId: next.deviceId, character: character, area: playerArea }));
       setStatus('Joining Room ' + next.code + ' · Ship ' + next.team + '…');
     };
     current.onerror = function () { if (current === socket) setStatus('Could not connect. Check your internet and the multiplayer server.', true); };
@@ -296,7 +297,7 @@
       var deckPose = window.TitanDeckGame.getPose();
       return { x: deckPose.x, z: deckPose.z, yaw: deckPose.yaw, area: 'main-deck', moving: false };
     }
-    return lastPose ? { x: lastPose.x, z: lastPose.z, yaw: lastPose.yaw, area: playerArea, moving: false } : null;
+    return lastPose && lastPoseArea === playerArea ? { x: lastPose.x, z: lastPose.z, yaw: lastPose.yaw, area: playerArea, moving: false } : null;
   }
   function withCurrentPose(payload) {
     var pose = currentPosePayload();
@@ -363,22 +364,29 @@
     var hud = document.getElementById('titan-mp-hud');
     if (hud && self) hud.firstElementChild.textContent = 'ROOM ' + session.code + ' · SHIP ' + session.team + ' · ' + String(state.status || 'LOBBY').toUpperCase();
   }
-  function setArea(area) {
+  function setArea(area, sourcePose) {
     if (['main-deck', 'engine-room', 'storage'].indexOf(area) === -1) return;
-    // Capture the live Main Deck pose before navigation unloads the page.
-    var deckPose = window.TitanDeckGame && typeof window.TitanDeckGame.getPose === 'function'
-      ? window.TitanDeckGame.getPose() : null;
+    var previousArea = playerArea;
+    // Snapshot source-area coordinates before changing membership. Destination
+    // coordinates are restored by the server from this player's area pose.
+    var deckPose = sourcePose || (previousArea === 'main-deck' && window.TitanDeckGame && typeof window.TitanDeckGame.getPose === 'function'
+      ? window.TitanDeckGame.getPose() : null);
     if (deckPose && Number.isFinite(Number(deckPose.x)) && Number.isFinite(Number(deckPose.z))) {
       lastPose = { x: Number(deckPose.x), z: Number(deckPose.z), yaw: Number(deckPose.yaw) || 0 };
+      lastPoseArea = previousArea;
+    }
+    if (joined && previousArea !== area && socket && socket.readyState === WebSocket.OPEN) {
+      var pose = lastPose && lastPoseArea === previousArea
+        ? { x: lastPose.x, z: lastPose.z, yaw: lastPose.yaw, area: previousArea, moving: false } : null;
+      send('player:area', { area: area, pose: pose });
     }
     playerArea = area;
-    if (joined && socket && socket.readyState === WebSocket.OPEN && lastPose) {
-      send('player:move', { x: lastPose.x, z: lastPose.z, yaw: lastPose.yaw, area: playerArea, moving: false, transition: true });
-    }
+    lastPoseSent = 0;
   }
   function setPose(x, z, yaw, area, moving) {
     if (area) playerArea = area;
     lastPose = { x: Number(x) || 0, z: Number(z) || 0, yaw: Number(yaw) || 0 };
+    lastPoseArea = playerArea;
     if (joined && socket && socket.readyState === WebSocket.OPEN && performance.now() - lastPoseSent > 70) {
       lastPoseSent = performance.now();
       send('player:move', { x: lastPose.x, z: lastPose.z, yaw: lastPose.yaw, area: playerArea, moving: !!moving });
@@ -396,9 +404,10 @@
         if ((changed && now - lastPoseSent > 80) || now - lastPoseSent > 1000) {
           lastPoseSent = now;
           lastPose = { x: pose.x, z: pose.z, yaw: pose.yaw };
+          lastPoseArea = playerArea;
           send('player:move', { x: pose.x, z: pose.z, yaw: pose.yaw, area: playerArea, moving: changed });
         }
-      } else if (lastPose && now - lastHeartbeatAt > 1000) {
+      } else if (lastPose && lastPoseArea === playerArea && now - lastHeartbeatAt > 1000) {
         // Do not invent a spawn pose while another deck/page is still loading.
         lastHeartbeatAt = now;
         send('player:move', { x: lastPose.x, z: lastPose.z, yaw: lastPose.yaw, area: playerArea, moving: false });
@@ -438,7 +447,7 @@
   function handleDeckMessage(payload) {
     if (!payload || typeof payload !== 'object') return;
     if (payload.type === 'POSE' || payload.type === 'DECK_READY') return;
-    if (payload.type === 'AREA_CHANGE') { setArea(payload.area); return; }
+    if (payload.type === 'AREA_CHANGE') { setArea(payload.area, payload.pose); return; }
     if (payload.type === 'INTERACTION') {
       var pose = payload.pose || currentPosePayload();
       if (payload.action === 'doorOpen' || payload.action === 'hatchOpen') {

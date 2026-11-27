@@ -827,7 +827,7 @@ html, body {
       const area = filename === 'engine-room.html' ? 'engine-room' : (filename === 'storage.html' ? 'storage' : 'main-deck');
       try {
         const pose = window.TitanDeckGame && typeof window.TitanDeckGame.getPose === 'function'
-          ? Object.assign({}, window.TitanDeckGame.getPose(), { area: area, moving: false }) : null;
+          ? Object.assign({}, window.TitanDeckGame.getPose(), { area: 'main-deck', moving: false }) : null;
         window.parent.postMessage({ source: 'TITAN_MAIN_DECK', type: 'AREA_CHANGE', area: area, pose: pose }, window.location.origin);
       } catch (_) {}
       target += '?multiplayer=1&team=' + encodeURIComponent(mpNav.get('team') || 'A') + '&room=' + encodeURIComponent(mpNav.get('room') || '') + '&player=' + encodeURIComponent(mpNav.get('player') || '');

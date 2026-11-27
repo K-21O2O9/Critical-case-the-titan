@@ -4451,6 +4451,13 @@ const Game = {
   lastFrame: 0,
   _uiRefreshAccumulator: 0,
   _topBarRefreshAccumulator: 0,
+  _rafId: 0,
+  _lastLoopAt: 0,
+  frameInterval: 1000 / 45,
+  _perfWindowTime: 0,
+  _perfWindowDelta: 0,
+  _perfWindowFrames: 0,
+  autoQuality: true,
 
   state: {
     fuelPercent: 100,
@@ -4501,15 +4508,49 @@ const Game = {
   },
 
   start() {
+    // Several legacy boot paths call start(); only one simulation/render loop
+    // may exist at a time.
+    if (this.running) return;
     this.running = true;
     this.lastFrame = performance.now();
-    requestAnimationFrame((t) => this.loop(t));
+    this._lastLoopAt = 0;
+    this._rafId = requestAnimationFrame((t) => this.loop(t));
+  },
+
+  stop() {
+    this.running = false;
+    if (this._rafId) cancelAnimationFrame(this._rafId);
+    this._rafId = 0;
   },
 
   loop(now) {
     if (!this.running) return;
+    const frameMs = Math.max(0, now - (this._lastLoopAt || 0));
+    if (this._lastLoopAt && frameMs < this.frameInterval - 1) {
+      this._rafId = requestAnimationFrame((t) => this.loop(t));
+      return;
+    }
+    this._lastLoopAt = now;
     const dt = Math.min((now - this.lastFrame) / 1000, 0.1);
+    this._perfWindowTime += dt;
+    this._perfWindowDelta += dt;
+    this._perfWindowFrames++;
+    if (this.autoQuality && this._perfWindowTime >= 4 && window.SceneManager && !SceneManager._fallback2D) {
+      const averageFrame = this._perfWindowDelta / Math.max(1, this._perfWindowFrames);
+      let nextQuality = null;
+      if (SceneManager.quality === 'high' && averageFrame > 0.031) nextQuality = 'med';
+      else if (SceneManager.quality === 'med' && averageFrame > 0.041) nextQuality = 'low';
+      if (nextQuality) {
+        SceneManager.setQuality(nextQuality);
+        const qBtn = document.getElementById('quality-btn');
+        if (qBtn) qBtn.textContent = 'Quality: ' + nextQuality.toUpperCase() + ' (AUTO)';
+      }
+      this._perfWindowTime = 0; this._perfWindowDelta = 0; this._perfWindowFrames = 0;
+    } else if (this._perfWindowTime >= 4) {
+      this._perfWindowTime = 0; this._perfWindowDelta = 0; this._perfWindowFrames = 0;
+    }
     this.lastFrame = now;
+    this._frameDt = dt;
     this.time += dt;
 
     // Systems in dependency order
@@ -4568,6 +4609,11 @@ const Game = {
       this.updateTopBar();
     }
 
+    // Engine-room crew interpolation and rudder demand share this one frame
+    // clock. They no longer run independent 50 ms / RAF loops.
+    try { if (typeof window.__titanTickEngineCrew === 'function') window.__titanTickEngineCrew(dt); } catch (_) {}
+    try { if (typeof window.__titanRudderPhysicsStep === 'function') window.__titanRudderPhysicsStep(dt); } catch (_) {}
+
     // 3D — never let a render error stop the sim loop
     if (window.SceneManager) {
       try {
@@ -4582,7 +4628,7 @@ const Game = {
       }
     }
 
-    requestAnimationFrame((t) => this.loop(t));
+    this._rafId = requestAnimationFrame((t) => this.loop(t));
   },
 
   updateTopBar() {
@@ -4915,6 +4961,16 @@ const LadderUI = {
         const team = session?.team || mp.get('team') || '';
         const name = session?.name || mp.get('name') || '';
         if (code && team) target += '?room=' + encodeURIComponent(code) + '&team=' + encodeURIComponent(team) + '&name=' + encodeURIComponent(name);
+      }
+      const destinationArea = filename === 'main-deck.html' ? 'main-deck' : (filename === 'storage.html' ? 'storage' : 'main-deck');
+      const sourcePose = SceneManager && SceneManager.walkCam ? {
+        x: SceneManager.walkCam.position.x, z: SceneManager.walkCam.position.z,
+        yaw: Number(SceneManager.walkYaw) || 0, area: 'engine-room', moving: false
+      } : null;
+      if (mp.get('multiplayer') === '1' && window.parent !== window) {
+        try { window.parent.postMessage({ source: 'TITAN_MAIN_DECK', type: 'AREA_CHANGE', area: destinationArea, pose: sourcePose }, window.location.origin); } catch (_) {}
+      } else if (window.TitanMultiplayerRuntime && window.TitanMultiplayerRuntime.active && typeof window.TitanMultiplayerRuntime.setArea === 'function') {
+        try { window.TitanMultiplayerRuntime.setArea(destinationArea, sourcePose); } catch (_) {}
       }
       try { window.location.assign(target); } catch (_) { window.location.href = target; }
     }
@@ -5694,6 +5750,12 @@ const SceneManager = {
   // References to animated parts
   parts: {},
   quality: "med",  // low | med | high
+  _initialized: false,
+  _externalBuilt: false,
+  _walkCameraInitialized: false,
+  _diegeticAccumulator: 0,
+  _walkForward: null,
+  _walkRight: null,
   smokeParticles: null,
   smokeGeometry: null,
   composer: null,
@@ -5707,25 +5769,32 @@ const SceneManager = {
   collisionBoxes: [],  // solid volumes the player cannot walk through
 
   init(container) {
+    if (this._initialized) return;
+    this._initialized = true;
+    // LOW is chosen before WebGL, shadows, bloom, particles or external-hull
+    // geometry are created, so a small device never allocates the high preset
+    // and then immediately tears it down.
     try {
       var _pp = "high-performance";
+      if (this.quality === "low") _pp = "low-power";
       try {
-        if ((navigator.deviceMemory || 8) <= 4 || ((navigator.hardwareConcurrency || 8) <= 4 && (("ontouchstart" in window) || navigator.maxTouchPoints > 0))) {
-          _pp = "low-power";
-        }
+        if ((navigator.deviceMemory || 8) <= 4 || ((navigator.hardwareConcurrency || 8) <= 4 && (("ontouchstart" in window) || navigator.maxTouchPoints > 0))) _pp = "low-power";
       } catch (_) {}
-      this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: _pp, alpha: false });
+      this.renderer = new THREE.WebGLRenderer({ antialias: this.quality !== "low", powerPreference: _pp, alpha: false });
     } catch (webglError) {
       console.warn("WebGL unavailable; starting the 2D compatibility view.", webglError);
       this._init2DFallback(container);
       return;
     }
     this._fallback2D = false;
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    const initialDpr = window.devicePixelRatio || 1;
+    const initialPixelRatio = this.quality === "low" ? Math.min(initialDpr, 1)
+      : this.quality === "high" ? Math.min(initialDpr, 1.75) : Math.min(initialDpr, 1.25);
+    this.renderer.setPixelRatio(initialPixelRatio);
     this.renderer.setSize(container.clientWidth, container.clientHeight);
     this.renderer.setClearColor(0x080b10);
-    this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.enabled = this.quality !== "low";
+    this.renderer.shadowMap.type = this.quality === "high" ? THREE.PCFSoftShadowMap : (THREE.BasicShadowMap || THREE.PCFShadowMap || 0);
     if (THREE.ACESFilmicToneMapping) {
       this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
       this.renderer.toneMappingExposure = 0.91;
@@ -5738,11 +5807,13 @@ const SceneManager = {
     this.clock = new THREE.Clock();
     this._buildMaterials();
     this._buildEngineRoom();
-    this._buildExternal();
+    // External hull is a secondary view; defer its geometry until requested.
     this._buildWalkCamera();
-    try { this._setupPostFX(); } catch (e) { console.warn(e); }
+    if (this.quality === "high") { try { this._setupPostFX(); } catch (e) { console.warn(e); } }
     try { this._setupDiegetic(); } catch (e) { console.warn(e); }
-    try { this._setupSteam(); } catch (e) { console.warn(e); }
+    if (this.quality !== "low") { try { this._setupSteam(); } catch (e) { console.warn(e); } }
+    this._walkForward = new THREE.Vector3();
+    this._walkRight = new THREE.Vector3();
 
     window.addEventListener("resize", () => this.onResize(container));
     window.addEventListener("keydown", (e) => { this.keys[e.code] = true; });
@@ -5960,7 +6031,9 @@ const SceneManager = {
     this.renderer.setSize(w, h, false);
     // Prefer client buffer size for crisp fullscreen
     try {
-      const pr = Math.min(window.devicePixelRatio || 1, this.quality === "high" ? 2 : 1.5);
+      const dpr = window.devicePixelRatio || 1;
+      const pr = this.quality === "high" ? Math.min(dpr, 1.75)
+        : (this.quality === "low" ? Math.min(dpr, 1) : Math.min(dpr, 1.25));
       this.renderer.setPixelRatio(pr);
     } catch (_) {}
     Object.values(this.cameras).forEach((cam) => {
@@ -6016,10 +6089,20 @@ const SceneManager = {
     this.mats.insulation = new M({ color: 0xd4c4a8, metalness: 0.02, roughness: 0.95 });
   },
 
-  // Helpers
+  // Helpers keep the same silhouettes but reduce curved-surface tessellation
+  // on constrained GPUs. Box geometry remains unchanged and inexpensive.
   box(w, h, d, mat) { return new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); },
-  cyl(rt, rb, h, mat, seg) { return new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, seg || 16), mat); },
-  sphere(r, mat) { return new THREE.Mesh(new THREE.SphereGeometry(r, 16, 12), mat); },
+  cyl(rt, rb, h, mat, seg) {
+    const requested = seg || 16;
+    const effective = this.quality === "low" ? Math.min(requested, 8)
+      : (this.quality === "med" ? Math.min(requested, 14) : requested);
+    return new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, effective), mat);
+  },
+  sphere(r, mat) {
+    const widthSegments = this.quality === "low" ? 10 : (this.quality === "med" ? 12 : 16);
+    const heightSegments = this.quality === "low" ? 8 : (this.quality === "med" ? 9 : 12);
+    return new THREE.Mesh(new THREE.SphereGeometry(r, widthSegments, heightSegments), mat);
+  },
 
   // Detailed motor / pump housing
   makePump(radius, length, mat) {
@@ -6869,6 +6952,9 @@ const SceneManager = {
 
   _updateDiegetic() {
     if (!this.diegeticCanvas || !this.diegeticTexture) return;
+    this._diegeticAccumulator = (this._diegeticAccumulator || 0) + (Game._frameDt || 0.016);
+    if (this._diegeticAccumulator < (this.quality === "low" ? 0.25 : 0.14)) return;
+    this._diegeticAccumulator = 0;
     try {
       const ctx = this.diegeticCanvas.getContext("2d");
       const s = Game.state.sensors;
@@ -7312,11 +7398,13 @@ const SceneManager = {
   },
 
   setQuality(level) {
+    level = ["low", "med", "high"].includes(level) ? level : "med";
     this.quality = level;
+    if (window.Game) Game.frameInterval = level === "low" ? 1000 / 30 : (level === "high" ? 1000 / 60 : 1000 / 45);
     const dpr = window.devicePixelRatio || 1;
-    // Harder clamp on low for ~3 GB devices: fewer pixels, fewer shadow samples
-    const pr = level === "high" ? Math.min(dpr, 2.0)
-             : level === "low" ? Math.min(dpr, 1) : Math.min(dpr, 1.5);
+    // Lower pixel budgets protect mobile GPUs and memory bandwidth.
+    const pr = level === "high" ? Math.min(dpr, 1.75)
+             : level === "low" ? Math.min(dpr, 1) : Math.min(dpr, 1.25);
     if (this.renderer && this.renderer.setPixelRatio) this.renderer.setPixelRatio(pr);
     if (this.renderer && this.renderer.shadowMap) {
       this.renderer.shadowMap.enabled = !this._fallback2D && (level !== "low");
@@ -7342,35 +7430,60 @@ const SceneManager = {
     if (this.renderer && this.renderer.toneMappingExposure !== undefined) {
       this.renderer.toneMappingExposure = level === "high" ? 0.97 : 0.91;
     }
-    // Drop bloom / composer on low — big RAM & GPU win
-    if (this.bloomPass) {
-      this.bloomPass.enabled = (level === "high");
+    // Allocate expensive post processing only when the player selects HIGH.
+    if (level === "high" && !this.composer) {
+      try { this._setupPostFX(); } catch (e) { console.warn(e); }
     }
-    if (level === "low" && this.composer) {
-      this._postFXSuspended = true;
-    } else {
-      this._postFXSuspended = false;
-    }
-    if (this.steamParticles) {
-      this.steamParticles.visible = this.steamParticles.visible && level !== "low";
+    if (this.bloomPass) this.bloomPass.enabled = (level === "high");
+    this._postFXSuspended = level !== "high";
+
+    if (level === "low") {
+      if (this.steamParticles) {
+        this.steamParticles.parent && this.steamParticles.parent.remove(this.steamParticles);
+        this.steamParticles.geometry && this.steamParticles.geometry.dispose();
+        this.steamParticles.material && this.steamParticles.material.dispose();
+        this.steamParticles = null; this.steamVelocities = null;
+      }
+      if (this.smokeParticles) {
+        this.smokeParticles.parent && this.smokeParticles.parent.remove(this.smokeParticles);
+        this.smokeParticles.geometry && this.smokeParticles.geometry.dispose();
+        this.smokeParticles.material && this.smokeParticles.material.dispose();
+        this.smokeParticles = null; this.smokeVelocities = null;
+      }
+      if (this.composer) {
+        try {
+          if (this.composer.renderTarget1) this.composer.renderTarget1.dispose();
+          if (this.composer.renderTarget2) this.composer.renderTarget2.dispose();
+          if (this.bloomPass && this.bloomPass.dispose) this.bloomPass.dispose();
+        } catch (_) {}
+        this.composer = null; this.bloomPass = null; this._renderPass = null;
+      }
+    } else if (!this.steamParticles) {
+      try { this._setupSteam(); } catch (e) { console.warn(e); }
     }
   },
 
   setView(name) {
+    if (name === "external" && !this._externalBuilt && !this._fallback2D) {
+      this._buildExternal();
+      this._externalBuilt = true;
+    }
     this.currentView = name;
     this.walkMode = (name === "walk");
     if (window.Joystick) Joystick.show(this.walkMode);
     if (this.controls) {
       this.controls.enabled = (name === "external");
     }
-    // Entering walk: place the player on the clear central walkway facing forward (-Z)
-    if (name === "walk" && this.walkCam) {
+    // Seed the walk camera once only. Re-entering the view must not reset the
+    // player's saved/current position or orientation.
+    if (name === "walk" && this.walkCam && !this._walkCameraInitialized) {
       this.walkCam.position.set(0, 1.7, 1.8);
       this.walkYaw = 0;
       this.walkPitch = 0;
       this.walkCam.rotation.order = "YXZ";
       this.walkCam.rotation.y = this.walkYaw;
       this.walkCam.rotation.x = this.walkPitch;
+      this._walkCameraInitialized = true;
     }
   },
 
@@ -7458,8 +7571,10 @@ const SceneManager = {
     // Walk movement with solid collision against machinery and walls
     if (this.walkMode && this.walkCam) {
       const moveSpeed = 2.8 * dt;
-      const forward = new THREE.Vector3(-Math.sin(this.walkYaw), 0, -Math.cos(this.walkYaw));
-      const right = new THREE.Vector3(Math.cos(this.walkYaw), 0, -Math.sin(this.walkYaw));
+      const forward = this._walkForward || (this._walkForward = new THREE.Vector3());
+      const right = this._walkRight || (this._walkRight = new THREE.Vector3());
+      forward.set(-Math.sin(this.walkYaw), 0, -Math.cos(this.walkYaw));
+      right.set(Math.cos(this.walkYaw), 0, -Math.sin(this.walkYaw));
 
       let moveX = 0, moveZ = 0;
       if (this.keys["KeyW"]) { moveX += forward.x * moveSpeed; moveZ += forward.z * moveSpeed; }
@@ -7573,6 +7688,10 @@ const SceneManager = {
 
   _updateSmoke(dt, sensors) {
     if (!this.scenes.engine) return;
+    if (this.quality === "low") {
+      if (this.smokeParticles) this.smokeParticles.visible = false;
+      return;
+    }
     const heatCrit = window.HeatEmergency && HeatEmergency.anyCritical();
     const critical = heatCrit || (Game.state.condition === "critical" && sensors.temperatureC > 90);
     if (!this.smokeParticles) {
@@ -9857,11 +9976,17 @@ function boot() {
         if (mem > 0 && mem <= 4) qIdx = 0;
         else if (cores <= 4 && touch) qIdx = 0;
         else if (touch && small) qIdx = 0;
+        else if (mem >= 8 && cores >= 8 && (!touch || !small)) qIdx = 2;
         else if (mem > 0 && mem <= 6 && cores <= 6) qIdx = 1;
       } catch (_) {}
+      // SceneManager.init consumes this value before allocating the renderer.
+      SceneManager.quality = levels[qIdx];
+      Game.autoQuality = true;
+      Game.frameInterval = qIdx === 0 ? 1000 / 30 : (qIdx === 2 ? 1000 / 60 : 1000 / 45);
       if (qBtn) {
         qBtn.textContent = "Quality: " + levels[qIdx].toUpperCase();
         qBtn.addEventListener("click", () => {
+          Game.autoQuality = false;
           qIdx = (qIdx + 1) % levels.length;
           const lv = levels[qIdx];
           qBtn.textContent = "Quality: " + lv.toUpperCase();
@@ -9873,8 +9998,8 @@ function boot() {
       const host = document.getElementById("canvas-host");
       SceneManager.init(host);
       SceneManager.attachControls(SceneManager.renderer.domElement);
+      SceneManager.setQuality(levels[qIdx]);
       SceneManager.setView("overview");
-      if (qIdx === 0) SceneManager.setQuality("low");
 
       status.textContent = SceneManager._fallback2D ? "Ready — 2D compatibility view." : "Ready.";
       btn.classList.remove("hidden");
@@ -10386,6 +10511,7 @@ if (document.readyState === "loading") {
 
 
 <script src="titan-ship-bus.js"></script>
+<script src="character-runtime.js"></script>
 <script src="titan-multiplayer-runtime.js"></script>
 <script>
 /* Titan Main-Deck ↔ Engine-Room real-time link */
@@ -10406,68 +10532,101 @@ if (document.readyState === "loading") {
   let mpPlayerId = mpQuery.get('player') || window.TitanMultiplayerRuntime?.playerId || '';
   const mpCrewActors = new Map();
   let mpCrewSnapshot = null;
+  let mpCrewNeedsReconcile = true;
+  let mpSelfPoseApplied = false;
+  function disposeEngineAvatar(actor) {
+    if (!actor) return;
+    try { actor.anchor.parent && actor.anchor.parent.remove(actor.anchor); } catch (_) {}
+    const geometries = new Set(), materials = new Set();
+    try {
+      actor.model.traverse(function (object) {
+        if (object.geometry) geometries.add(object.geometry);
+        if (object.material) (Array.isArray(object.material) ? object.material : [object.material]).forEach(function (m) { if (m) materials.add(m); });
+      });
+    } catch (_) {}
+    geometries.forEach(function (g) { try { g.dispose(); } catch (_) {} });
+    materials.forEach(function (m) { try { m.dispose(); } catch (_) {} });
+  }
   function makeEngineCrewActor(player) {
-    const group = new THREE.Group();
-    group.name = 'TITAN_MP_ENGINE_CREW_' + player.id;
-    const tint = /^#[0-9a-f]{6}$/i.test(String(player.character?.outfitColor || '')) ? player.character.outfitColor : (mpTeam === 'A' ? '#238fa7' : '#b98335');
-    const bodyMat = new THREE.MeshStandardMaterial({ color: tint, roughness: .76, metalness: .08 });
-    const skinMat = new THREE.MeshStandardMaterial({ color: player.character?.skinColor || '#d9a47f', roughness: .88 });
-    const darkMat = new THREE.MeshStandardMaterial({ color: '#26343b', roughness: .9 });
-    const body = new THREE.Mesh(new THREE.CylinderGeometry(.22, .27, .78, 8), bodyMat);
-    body.position.y = .93; body.castShadow = true; group.add(body);
-    const head = new THREE.Mesh(new THREE.SphereGeometry(.18, 10, 8), skinMat);
-    head.position.y = 1.43; head.castShadow = true; group.add(head);
-    const legs = [];
-    [-.12, .12].forEach(x => {
-      const leg = new THREE.Mesh(new THREE.CylinderGeometry(.075, .085, .48, 7), darkMat);
-      leg.position.set(x, .34, 0); leg.castShadow = true; group.add(leg); legs.push(leg);
-    });
-    group.userData.mpLegs = legs;
-    group.userData.mpBaseY = 0.02;
+    const anchor = new THREE.Group();
+    anchor.name = 'TITAN_MP_ENGINE_CREW_' + player.id;
+    const characterRuntime = window.TitanCharacterRuntime;
+    const model = characterRuntime
+      ? characterRuntime.createModel(THREE, player.character || {}, { scale: .78 })
+      : new THREE.Group();
+    model.name = 'TITAN_MP_ENGINE_AVATAR_' + player.id;
+    anchor.add(model);
+    anchor.position.set(Number(player.x) || 0, 0, Number(player.z) || 0);
     const scene = window.SceneManager?.scenes?.engine;
-    if (scene) scene.add(group);
-    return { group, bodyMat, skinMat, darkMat, targetX: Number(player.x) || 0, targetZ: Number(player.z) || 0 };
+    if (scene) scene.add(anchor);
+    return {
+      anchor, model,
+      targetX: Number(player.x) || 0,
+      targetZ: Number(player.z) || 0,
+      targetYaw: Number(player.yaw) || 0,
+      moving: false,
+      speed: Number(player.character?.animationSpeed) || 1
+    };
   }
   function updateEngineCrew() {
     if (!mpEnabled || !mpCrewSnapshot || !window.SceneManager?.scenes?.engine) return;
+    const players = mpCrewSnapshot.players || [];
+    const self = players.find(function (p) { return p.id === mpPlayerId; });
+    if (self && self.area === 'engine-room' && !mpSelfPoseApplied && SceneManager.walkCam) {
+      // Apply the server's room-specific saved pose once, never on routine snapshots.
+      SceneManager.walkCam.position.set(
+        Math.max(-13.2, Math.min(13.2, Number(self.x) || 0)),
+        1.7,
+        Math.max(-6.6, Math.min(6.6, Number(self.z) || 0))
+      );
+      SceneManager.walkYaw = Number(self.yaw) || 0;
+      SceneManager.walkCam.rotation.order = 'YXZ';
+      SceneManager.walkCam.rotation.y = SceneManager.walkYaw;
+      mpSelfPoseApplied = true;
+    }
     const live = new Set();
-    (mpCrewSnapshot.players || []).filter(p => p.team === mpTeam && p.id !== mpPlayerId && p.connected && p.area === 'engine-room').forEach(p => {
+    players.filter(function (p) {
+      return p.team === mpTeam && p.id !== mpPlayerId && p.connected && p.area === 'engine-room';
+    }).forEach(function (p) {
       live.add(p.id);
       let actor = mpCrewActors.get(p.id);
       if (!actor) { actor = makeEngineCrewActor(p); mpCrewActors.set(p.id, actor); }
       actor.targetX = Math.max(-13.2, Math.min(13.2, Number(p.x) || 0));
       actor.targetZ = Math.max(-6.6, Math.min(6.6, Number(p.z) || 0));
-      actor.group.rotation.y = Number(p.yaw) || 0;
-      actor.group.userData.mpMoving = Date.now() < (p.movingUntil || 0);
+      actor.targetYaw = Number(p.yaw) || 0;
+      actor.moving = Date.now() < (p.movingUntil || 0);
+      actor.speed = Number(p.character?.animationSpeed) || 1;
     });
     for (const [id, actor] of mpCrewActors) {
-      if (!live.has(id)) {
-        actor.group.parent?.remove(actor.group);
-        actor.group.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); });
-        mpCrewActors.delete(id);
-      }
+      if (!live.has(id)) { disposeEngineAvatar(actor); mpCrewActors.delete(id); }
     }
+    mpCrewNeedsReconcile = false;
   }
+  function tickEngineCrew(dt) {
+    if (mpCrewNeedsReconcile) updateEngineCrew();
+    const t = (window.Game ? Game.time : performance.now() / 1000);
+    const blend = 1 - Math.exp(-Math.max(0, dt || 0) * 12);
+    mpCrewActors.forEach(function (actor) {
+      actor.anchor.position.x += (actor.targetX - actor.anchor.position.x) * blend;
+      actor.anchor.position.z += (actor.targetZ - actor.anchor.position.z) * blend;
+      let delta = actor.targetYaw - actor.anchor.rotation.y;
+      while (delta > Math.PI) delta -= Math.PI * 2;
+      while (delta < -Math.PI) delta += Math.PI * 2;
+      actor.anchor.rotation.y += delta * blend;
+      if (window.TitanCharacterRuntime) {
+        window.TitanCharacterRuntime.animateModel(actor.model, t, actor.moving ? 1 : 0, actor.speed);
+      }
+    });
+  }
+  window.__titanTickEngineCrew = tickEngineCrew;
   if (mpEnabled) {
     window.addEventListener('message', event => {
       if (event.origin !== window.location.origin || !event.data || event.data.source !== 'TITAN_MULTIPLAYER' || event.data.type !== 'STATE') return;
       mpCrewSnapshot = event.data.packet?.state || null;
       mpPlayerId = event.data.packet?.playerId || window.TitanMultiplayerRuntime?.playerId || mpPlayerId;
+      mpCrewNeedsReconcile = true;
       updateEngineCrew();
     });
-    setInterval(() => {
-      updateEngineCrew();
-      const t = performance.now() / 1000;
-      mpCrewActors.forEach(actor => {
-        const moving = actor.group.userData.mpMoving;
-        const desiredY = actor.group.userData.mpBaseY + (moving ? Math.abs(Math.sin(t * 8)) * .035 : 0);
-        actor.group.position.y += (desiredY - actor.group.position.y) * .35;
-        const legs = actor.group.userData.mpLegs || [];
-        legs.forEach((leg, i) => { leg.rotation.x = moving ? Math.sin(t * 8 + i * Math.PI) * .32 : 0; });
-        actor.group.position.x += (actor.targetX - actor.group.position.x) * .45;
-        actor.group.position.z += (actor.targetZ - actor.group.position.z) * .45;
-      });
-    }, 50);
   }
 
   function snapshotFromGame() {
@@ -10530,6 +10689,8 @@ if (document.readyState === "loading") {
     };
   }
 
+  window.__titanEngineSnapshot = snapshotFromGame;
+
   function applyCommand(cmd) {
     if (!cmd || !cmd.action) return;
     const st = window.Game && Game.state;
@@ -10581,29 +10742,25 @@ if (document.readyState === "loading") {
 
   bus.setCommandHandler(applyCommand);
 
-  let _lastRudderTick = performance.now();
-  function rudderPhysics() {
+  function rudderPhysicsStep(dt) {
     const st = window.Game && Game.state;
-    if (st && st.sensors) {
-      const rudder = window._titanRudderDemand || st.sensors._rudderDemand || 0;
-      const spd = st.sensors.shipSpeedKn || 0;
-      if (Math.abs(rudder) > 0.5 && spd > 0.2) {
-        const dt = Math.min(0.1, (performance.now() - _lastRudderTick) / 1000);
-        const rate = rudder * 0.32 * (spd / 10);
-        st.sensors.headingDeg = ((st.sensors.headingDeg || 0) + rate * dt + 360) % 360;
-      }
+    if (!st || !st.sensors) return;
+    const rudder = window._titanRudderDemand || st.sensors._rudderDemand || 0;
+    const spd = st.sensors.shipSpeedKn || 0;
+    if (Math.abs(rudder) > 0.5 && spd > 0.2) {
+      const step = Math.min(0.1, Math.max(0, Number(dt) || 0));
+      const rate = rudder * 0.32 * (spd / 10);
+      st.sensors.headingDeg = ((st.sensors.headingDeg || 0) + rate * step + 360) % 360;
     }
-    _lastRudderTick = performance.now();
-    requestAnimationFrame(rudderPhysics);
   }
+  window.__titanRudderPhysicsStep = rudderPhysicsStep;
 
   function arm() {
     if (!window.Game || !Game.state) {
       setTimeout(arm, 400);
       return;
     }
-    bus.startEnginePublisher(snapshotFromGame, 350);
-    requestAnimationFrame(rudderPhysics);
+    bus.startEnginePublisher(snapshotFromGame, 500);
     console.log('[TitanBus] Engine Room telemetry publisher armed');
   }
 
@@ -10613,5 +10770,49 @@ if (document.readyState === "loading") {
 </script>
 
 
+
+<script>
+/* TITAN Engine Room lifecycle guard: one render loop, paused background work. */
+(function () {
+  let resumeAfterVisibility = false;
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) {
+      resumeAfterVisibility = !!(window.Game && Game.running);
+      if (window.Game && Game.stop) Game.stop();
+      if (window.TitanEngineBus && TitanEngineBus.stopEnginePublisher) TitanEngineBus.stopEnginePublisher();
+    } else {
+      if (resumeAfterVisibility && window.Game && Game.start) Game.start();
+      resumeAfterVisibility = false;
+      if (window.TitanEngineBus && TitanEngineBus.startEnginePublisher && window.Game && Game.state) {
+        TitanEngineBus.startEnginePublisher(function () {
+          return window.__titanEngineSnapshot ? window.__titanEngineSnapshot() : null;
+        }, 500);
+      }
+    }
+  });
+  window.addEventListener('pagehide', function (event) {
+    if (event && event.persisted) return;
+    try { if (window.Game && Game.stop) Game.stop(); } catch (_) {}
+    try { if (window.TitanEngineBus && TitanEngineBus.destroy) TitanEngineBus.destroy(); } catch (_) {}
+    try {
+      const seenGeo = new Set(), seenMat = new Set();
+      Object.values(window.SceneManager && SceneManager.scenes || {}).forEach(function (scene) {
+        if (!scene || !scene.traverse) return;
+        scene.traverse(function (o) {
+          if (o.geometry && !seenGeo.has(o.geometry)) { seenGeo.add(o.geometry); o.geometry.dispose(); }
+          if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach(function (m) {
+            if (m && !seenMat.has(m)) { seenMat.add(m); m.dispose(); }
+          });
+        });
+      });
+      if (window.SceneManager && SceneManager.composer) {
+        if (SceneManager.composer.renderTarget1) SceneManager.composer.renderTarget1.dispose();
+        if (SceneManager.composer.renderTarget2) SceneManager.composer.renderTarget2.dispose();
+      }
+      if (window.SceneManager && SceneManager.renderer) SceneManager.renderer.dispose();
+    } catch (_) {}
+  });
+})();
+</script>
 </body>
 </html>

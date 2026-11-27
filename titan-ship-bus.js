@@ -249,8 +249,16 @@
     this._cmdHandler = fn;
   };
 
+  TitanShipBus.prototype.stopEnginePublisher = function () {
+    if (this._heartbeat) clearInterval(this._heartbeat);
+    this._heartbeat = null;
+  };
+
   TitanShipBus.prototype.startEnginePublisher = function (getSnapshot, intervalMs) {
     if (this.role !== 'engine') return;
+    // Re-arming after visibility changes or room restoration must not create
+    // multiple telemetry intervals.
+    this.stopEnginePublisher();
     this._publishFn = (force) => {
       try {
         const snap = typeof getSnapshot === 'function' ? getSnapshot() : getSnapshot;
@@ -283,7 +291,7 @@
   };
 
   TitanShipBus.prototype.destroy = function () {
-    if (this._heartbeat) clearInterval(this._heartbeat);
+    this.stopEnginePublisher();
     try { if (this._bc) this._bc.close(); } catch (e) {}
     try { window.removeEventListener('storage', this._storageHandler); } catch (e) {}
     try { if (this._mpStateHandler) window.removeEventListener('message', this._mpStateHandler); } catch (e) {}

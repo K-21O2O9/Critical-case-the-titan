@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>THE TITAN — Engine Room</title>
+  <script src="titan-shared-settings.js"></script>
 <style>
 /*This document was made by me, K210209,  any distribution, copy or modification must be approved first. */
 
@@ -2082,6 +2083,12 @@ body.layout-edit #layout-edit-bar { display: flex; }
       </div>
     </div>
   </div>
+  <div id="engine-character-editor" class="character-editor-panel" hidden style="position:fixed;inset:0;z-index:100200;background:rgba(0,0,0,.84);display:flex;align-items:center;justify-content:center;padding:2vh 2vw">
+    <div style="width:min(1500px,96vw);height:min(94vh,1000px);background:#071725;border:1px solid var(--border);border-radius:12px;overflow:hidden;display:flex;flex-direction:column">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:#121218;color:#fff;font-size:.72rem;letter-spacing:.1em"><span>PLAYER AVATAR WORKSHOP</span><button type="button" id="engine-character-close" class="menu-btn ghost">CLOSE</button></div>
+      <iframe id="engine-character-frame" title="TITAN character customisation" src="character-creator.html?embedded=1" style="border:0;width:100%;height:100%;background:#071522"></iframe>
+    </div>
+  </div>
 
   <div id="game" class="hidden">
     <header id="top-bar">
@@ -2122,6 +2129,12 @@ body.layout-edit #layout-edit-bar { display: flex; }
         </div>
         <div class="settings-body">
           <section class="settings-section">
+            <h3>Graphics & performance</h3>
+            <label class="settings-toggle"><span>Quality preset</span><select id="set-quality-preset" style="margin-left:auto;max-width:145px;background:#080a0e;color:var(--text);border:1px solid var(--border);border-radius:6px;padding:7px"><option value="low">LOW</option><option value="med">MED</option><option value="high">HIGH</option></select></label>
+            <label class="settings-toggle"><input type="checkbox" id="set-shadows" checked /><span>Dynamic shadows</span></label>
+            <p class="settings-hint">LOW is recommended for phones with around 3 GB of RAM. Graphics choices are shared with the Main Deck.</p>
+          </section>
+          <section class="settings-section">
             <h3>On-screen controls</h3>
             <label class="settings-toggle">
               <input type="checkbox" id="set-joystick" checked />
@@ -2151,12 +2164,17 @@ body.layout-edit #layout-edit-bar { display: flex; }
             <p class="settings-hint">Field of view (like Minecraft). Higher values see more of the room; lower values zoom in.</p>
             <div class="slider-row" style="margin:0.35rem 0 0.25rem;">
               <label for="set-fov">FOV</label>
-              <input type="range" min="30" max="370" value="70" id="set-fov" />
+              <input type="range" min="45" max="100" value="70" id="set-fov" />
               <span id="val-fov">70°</span>
             </div>
             <div class="settings-actions">
               <button type="button" class="menu-btn ghost" id="fov-reset">Reset FOV (70°)</button>
             </div>
+          </section>
+          <section class="settings-section">
+            <h3>Character customisation</h3>
+            <p class="settings-hint">Open the same avatar workshop available on the Main Deck. Appearance is saved to your player profile and shared with the current multiplayer session.</p>
+            <div class="settings-actions"><button type="button" class="menu-btn" id="engine-customize-character">Customize character</button></div>
           </section>
           <section class="settings-section">
             <h3>Controller (Bluetooth / wired)</h3>
@@ -7400,6 +7418,7 @@ const SceneManager = {
   setQuality(level) {
     level = ["low", "med", "high"].includes(level) ? level : "med";
     this.quality = level;
+    if (window.TitanSharedSettings) TitanSharedSettings.set('quality', level.toUpperCase());
     if (window.Game) Game.frameInterval = level === "low" ? 1000 / 30 : (level === "high" ? 1000 / 60 : 1000 / 45);
     const dpr = window.devicePixelRatio || 1;
     // Lower pixel budgets protect mobile GPUs and memory bandwidth.
@@ -7407,7 +7426,7 @@ const SceneManager = {
              : level === "low" ? Math.min(dpr, 1) : Math.min(dpr, 1.25);
     if (this.renderer && this.renderer.setPixelRatio) this.renderer.setPixelRatio(pr);
     if (this.renderer && this.renderer.shadowMap) {
-      this.renderer.shadowMap.enabled = !this._fallback2D && (level !== "low");
+      this.renderer.shadowMap.enabled = !this._fallback2D && (level !== "low") && (!window.TitanSharedSettings || TitanSharedSettings.get('shadows') !== false);
       if (this.renderer.shadowMap.type !== undefined) {
         this.renderer.shadowMap.type = (level === "high" && THREE.PCFSoftShadowMap)
           ? THREE.PCFSoftShadowMap
@@ -8786,10 +8805,15 @@ const TitanSettings = {
     } catch (_) {
       this.data = JSON.parse(JSON.stringify(this.defaults));
     }
+    if (window.TitanSharedSettings) {
+      const common = TitanSharedSettings.getControls();
+      this.data = { ...this.data, ...common, bindings: { ...this.data.bindings, ...common.bindings } };
+    }
     return this.data;
   },
   save() {
     try { localStorage.setItem(this.KEY, JSON.stringify(this.data)); } catch (_) {}
+    if (window.TitanSharedSettings) TitanSharedSettings.setControls(this.data);
   },
   get(k) { if (!this.data) this.load(); return this.data[k]; },
   set(k, v) { if (!this.data) this.load(); this.data[k] = v; this.save(); },
@@ -9969,6 +9993,10 @@ function boot() {
       const levels = ["low", "med", "high"];
       let qIdx = 1;
       try {
+        const savedQuality = window.TitanSharedSettings && TitanSharedSettings.get('quality');
+        if (savedQuality && levels.includes(String(savedQuality).toLowerCase())) qIdx = levels.indexOf(String(savedQuality).toLowerCase());
+      } catch (_) {}
+      try {
         const mem = navigator.deviceMemory || 0;
         const cores = navigator.hardwareConcurrency || 4;
         const touch = ("ontouchstart" in window) || (navigator.maxTouchPoints > 0);
@@ -9991,8 +10019,16 @@ function boot() {
           const lv = levels[qIdx];
           qBtn.textContent = "Quality: " + lv.toUpperCase();
           if (window.SceneManager) SceneManager.setQuality(lv);
+          const qualitySelect = document.getElementById("set-quality-preset"); if (qualitySelect) qualitySelect.value = lv;
         });
       }
+      const qualitySelect = document.getElementById("set-quality-preset");
+      if (qualitySelect) {
+        qualitySelect.value = levels[qIdx];
+        qualitySelect.addEventListener("change", () => { qIdx = levels.indexOf(qualitySelect.value); Game.autoQuality = false; if (window.SceneManager) SceneManager.setQuality(qualitySelect.value); if (qBtn) qBtn.textContent = "Quality: " + qualitySelect.value.toUpperCase(); });
+      }
+      const shadowsToggle = document.getElementById("set-shadows");
+      if (shadowsToggle) { shadowsToggle.checked = !window.TitanSharedSettings || TitanSharedSettings.get('shadows') !== false; shadowsToggle.addEventListener('change', () => { if(window.TitanSharedSettings)TitanSharedSettings.set('shadows',shadowsToggle.checked); if(window.SceneManager)SceneManager.setQuality(SceneManager.quality||levels[qIdx]); }); }
       Dashboard.init();
 
       const host = document.getElementById("canvas-host");
@@ -10391,19 +10427,18 @@ if (document.readyState === "loading") {
   /* ----- FOV control (walk camera) ----- */
   var FovControl = {
     KEY: 'titan-walk-fov-v1',
-    MIN: 30,
-    MAX: 370,
+    MIN: 45,
+    MAX: 100,
     DEFAULT: 70,
     get: function () {
-      try {
-        var v = parseFloat(localStorage.getItem(this.KEY));
-        if (isFinite(v)) return Math.max(this.MIN, Math.min(this.MAX, v));
-      } catch (e) {}
+      if (window.TitanSharedSettings) return Math.max(this.MIN, Math.min(this.MAX, Number(TitanSharedSettings.get('fov')) || this.DEFAULT));
+      try { var v = parseFloat(localStorage.getItem(this.KEY)); if (isFinite(v)) return Math.max(this.MIN, Math.min(this.MAX, v)); } catch (e) {}
       return this.DEFAULT;
     },
     set: function (v) {
       v = Math.max(this.MIN, Math.min(this.MAX, Number(v) || this.DEFAULT));
       try { localStorage.setItem(this.KEY, String(v)); } catch (e) {}
+      if (window.TitanSharedSettings) TitanSharedSettings.set('fov', v);
       this.apply(v);
       var label = document.getElementById('val-fov');
       if (label) label.textContent = Math.round(v) + '°';
@@ -10532,6 +10567,21 @@ if (document.readyState === "loading") {
   let mpPlayerId = mpQuery.get('player') || window.TitanMultiplayerRuntime?.playerId || '';
   const mpCrewActors = new Map();
   let mpCrewSnapshot = null;
+  function applyEngineCharacter(character) {
+    if (!window.TitanCharacterRuntime) return;
+    const cfg = window.TitanCharacterRuntime.normalize(character || window.TitanCharacterRuntime.readCharacter());
+    if (window.TitanMultiplayerRuntime && mpDirect && typeof window.TitanMultiplayerRuntime.updateCharacter === 'function') window.TitanMultiplayerRuntime.updateCharacter(cfg);
+    else if (mpEmbedded) window.parent.postMessage({ source: 'TITAN_ENGINE_ROOM', type: 'CHARACTER', character: cfg }, window.location.origin);
+  }
+  window.addEventListener('message', function(event) {
+    if (event.origin !== window.location.origin || !event.data || event.data.source !== 'TITAN_CHARACTER_CREATOR') return;
+    if (event.data.type === 'CLOSE') { const panel=document.getElementById('engine-character-editor'); if(panel)panel.hidden=true; return; }
+    if (event.data.type === 'SAVED') applyEngineCharacter(event.data.character);
+  });
+  const engineCharacterOpen = document.getElementById('engine-customize-character');
+  const engineCharacterClose = document.getElementById('engine-character-close');
+  if (engineCharacterOpen) engineCharacterOpen.addEventListener('click', function(){ const panel=document.getElementById('engine-character-editor'); if(panel)panel.hidden=false; });
+  if (engineCharacterClose) engineCharacterClose.addEventListener('click', function(){ const panel=document.getElementById('engine-character-editor'); if(panel)panel.hidden=true; });
   let mpCrewNeedsReconcile = true;
   let mpSelfPoseApplied = false;
   function disposeEngineAvatar(actor) {
@@ -10590,12 +10640,16 @@ if (document.readyState === "loading") {
     }).forEach(function (p) {
       live.add(p.id);
       let actor = mpCrewActors.get(p.id);
-      if (!actor) { actor = makeEngineCrewActor(p); mpCrewActors.set(p.id, actor); }
+      const appearanceKey = JSON.stringify(p.character || {});
+      if (actor && actor.appearanceKey !== appearanceKey) { disposeEngineAvatar(actor); mpCrewActors.delete(p.id); actor = null; }
+      if (!actor) { actor = makeEngineCrewActor(p); actor.appearanceKey = appearanceKey; mpCrewActors.set(p.id, actor); }
       actor.targetX = Math.max(-13.2, Math.min(13.2, Number(p.x) || 0));
       actor.targetZ = Math.max(-6.6, Math.min(6.6, Number(p.z) || 0));
       actor.targetYaw = Number(p.yaw) || 0;
       actor.moving = Date.now() < (p.movingUntil || 0);
       actor.running = actor.moving && !!p.running;
+      actor.moveForward = actor.moving ? (Number(p.moveForward) || 0) : 0;
+      actor.moveStrafe = actor.moving ? (Number(p.moveStrafe) || 0) : 0;
       actor.speed = Number(p.character?.animationSpeed) || 1;
     });
     for (const [id, actor] of mpCrewActors) {
@@ -10615,7 +10669,7 @@ if (document.readyState === "loading") {
       while (delta < -Math.PI) delta += Math.PI * 2;
       actor.anchor.rotation.y += delta * blend;
       if (window.TitanCharacterRuntime) {
-        window.TitanCharacterRuntime.animateModel(actor.model, t, actor.moving ? 1 : 0, actor.speed * (actor.running ? 1.32 : 1));
+        window.TitanCharacterRuntime.animateModel(actor.model, t, actor.moving ? 1 : 0, actor.speed * (actor.running ? 1.32 : 1), { moveForward: actor.moveForward, moveStrafe: actor.moveStrafe });
       }
     });
   }

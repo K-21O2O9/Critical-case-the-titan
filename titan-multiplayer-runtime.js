@@ -327,6 +327,8 @@
     }).forEach(function (p) {
       live.add(p.id);
       var actor = remoteActors.get(p.id);
+      var appearanceKey = JSON.stringify(p.character || {});
+      if (actor && actor.appearanceKey !== appearanceKey) { removeActor(actor); remoteActors.delete(p.id); actor = null; }
       if (!actor) {
         var model = window.TitanCharacterRuntime && window.TitanCharacterRuntime.createModel(window.THREE, p.character || { name: p.name }, { scale: 0.78 });
         if (!model) return;
@@ -334,13 +336,15 @@
         anchor.name = 'TITAN_REMOTE_PLAYER_' + p.id;
         anchor.add(model);
         deck.ship.add(anchor);
-        actor = { anchor: anchor, model: model, target: new window.THREE.Vector3(), moving: false, running: false, speed: Number(p.character && p.character.animationSpeed) || 1 };
+        actor = { anchor: anchor, model: model, appearanceKey: appearanceKey, target: new window.THREE.Vector3(), moving: false, running: false, moveForward: 0, moveStrafe: 0, speed: Number(p.character && p.character.animationSpeed) || 1 };
         remoteActors.set(p.id, actor);
       }
       actor.target.set(Number(p.x) || 0, 3.2, Number(p.z) || 0);
       actor.anchor.rotation.y = Number(p.yaw) || 0;
       actor.moving = Date.now() < (p.movingUntil || 0);
       actor.running = actor.moving && !!p.running;
+      actor.moveForward = actor.moving ? (Number(p.moveForward) || 0) : 0;
+      actor.moveStrafe = actor.moving ? (Number(p.moveStrafe) || 0) : 0;
     });
     remoteActors.forEach(function (actor, id) {
       if (!live.has(id)) { removeActor(actor); remoteActors.delete(id); }
@@ -420,7 +424,7 @@
     if (deck) {
       remoteActors.forEach(function (actor) {
         actor.anchor.position.lerp(actor.target, 0.34);
-        if (window.TitanCharacterRuntime) window.TitanCharacterRuntime.animateModel(actor.model, animationClock, actor.moving ? 1 : 0, actor.speed * (actor.running ? 1.32 : 1));
+        if (window.TitanCharacterRuntime) window.TitanCharacterRuntime.animateModel(actor.model, animationClock, actor.moving ? 1 : 0, actor.speed * (actor.running ? 1.32 : 1), { moveForward: actor.moveForward, moveStrafe: actor.moveStrafe });
       });
     }
     setTimeout(tick, 50);
@@ -447,6 +451,12 @@
     }
   }
 
+  function updateCharacter(character) {
+    var cfg = window.TitanCharacterRuntime ? window.TitanCharacterRuntime.normalize(character || {}) : (character || {});
+    try { if (window.TitanCharacterRuntime) window.TitanCharacterRuntime.saveCharacter(cfg); else localStorage.setItem(CHARACTER_KEY, JSON.stringify(cfg)); } catch (_) {}
+    if (joined && socket && socket.readyState === WebSocket.OPEN) send('player:character', { character: cfg });
+    return cfg;
+  }
   function handleDeckMessage(payload) {
     if (!payload || typeof payload !== 'object') return;
     if (payload.type === 'POSE') {
@@ -457,6 +467,7 @@
       setPose(pose.x, pose.z, pose.yaw, pose.area || 'main-deck', pose.moving, pose.running);
       return;
     }
+    if (payload.type === 'CHARACTER') { updateCharacter(payload.character); return; }
     if (payload.type === 'DECK_READY') return;
     if (payload.type === 'AREA_CHANGE') { setArea(payload.area, payload.pose); return; }
     if (payload.type === 'INTERACTION') {
@@ -498,6 +509,7 @@
     setArea: setArea,
     setPose: setPose,
     handleDeckMessage: handleDeckMessage,
+    updateCharacter: updateCharacter,
     handleBusCommand: handleBusCommand,
     handleEngineTelemetry: handleEngineTelemetry,
     leave: function () { var hud = document.getElementById('titan-mp-hud'); if (hud) hud.lastElementChild.click(); }

@@ -9,12 +9,11 @@
 
 ## Character system
 
-- `character-creator.html` is the only character editing page.
-- `character-runtime.js` builds a lightweight stylized humanoid using the included Three.js library.
-- Character name, colors, hairstyle, accessory, height, build, and animation speed are saved in browser local storage under `titan-character-v1`.
-- Profiles can be exported to and imported from JSON.
-- The Main Deck displays animated first-person arms that use the saved outfit and skin colors.
-- No character editor, floating character button, or avatar menu is injected into Engine Room, Projection, Storage, or Voice Core.
+- `character-creator.html` is the shared avatar workshop used by the Main Deck and Engine Room settings.
+- `character-runtime.js` builds the optimized procedural stylized humanoid with male/female profiles, outfit styles, hair, accessories, colours, height/build and animation speed.
+- Character appearance is saved in browser local storage under `titan-character-v1` and sent to the current multiplayer player record when connected.
+- The Main Deck uses the saved outfit/skin for its first-person arms; Main Deck and Engine Room both render remote players from the same appearance profile.
+- The avatar is a lightweight low-poly procedural model, not an externally authored photorealistic rigged asset.
 
 ## Project pages
 
@@ -38,3 +37,8 @@ Open `multiplayer.html` or choose **MULTIPLAYER RACE** from the main menu. The f
 ## Multiplayer Map + Direct Entry update
 
 The current multiplayer map route is `map.html` (fast rendering enabled by default). `projection.html` remains preserved as the map source/reference. Players can join an existing multiplayer room directly from the Main Deck top-bar **JOIN ROOM** control or with `main-deck.html?room=ROOMCODE&team=A/B`; the room code is required to enter the same shared session. See `MAP-AND-DIRECT-ENTRY-UPDATE.md` and `DEPLOY-THIS-BUILD.md`.
+
+
+## v10 host / movement / settings rework
+
+The host can join gameplay using the room's existing Captain actor while retaining the host controls. Multiplayer character orientation uses a canonical `-Z` forward axis, and signed movement/strafe axes are replicated for remote animation. Main Deck and Engine Room use `titan-shared-settings.js` for common graphics, camera, touch and controller preferences; assistant voice settings remain Engine Room-only. See `REWORK-V10-HOST-CHARACTER-SETTINGS.md` for the implementation summary and validation limits.

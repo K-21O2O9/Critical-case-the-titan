@@ -444,6 +444,8 @@ html, body {
   background: rgba(0,0,0,0.72);
 }
 .settings-panel[hidden] { display: none !important; }
+.settings-extra{border-top:1px solid var(--border);padding-top:12px;margin-top:12px}.settings-extra h3{font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:0 0 8px}.settings-field{display:grid;gap:5px;margin:8px 0;font-size:.78rem;color:var(--text)}.settings-field select,.settings-field input[type=range]{width:100%;min-height:34px;accent-color:var(--accent)}.settings-field select{background:#071725;color:var(--text);border:1px solid var(--border);border-radius:7px;padding:7px}.settings-extra .ui-btn{position:static;min-height:38px;width:100%;margin:5px 0}.deck-bind-grid{display:grid;gap:5px;margin:8px 0}.deck-bind-row{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:.72rem;color:var(--text);padding:5px 7px;border:1px solid var(--border);border-radius:7px;background:rgba(0,0,0,.12)}.deck-bind-row button{background:#102a3b;color:var(--accent-2);border:1px solid var(--border);border-radius:6px;padding:6px 9px;min-width:88px;font-size:.68rem;cursor:pointer}.deck-bind-row button.armed{border-color:var(--accent-2);background:rgba(54,191,192,.12)}.character-editor-panel{position:fixed;inset:0;z-index:2147483005;display:flex;align-items:center;justify-content:center;padding:2vh 2vw;background:rgba(0,0,0,.82)}.character-editor-panel[hidden]{display:none!important}.character-editor-shell{width:min(1500px,96vw);height:min(94vh,1000px);background:#071725;border:1px solid var(--border);border-radius:13px;overflow:hidden;display:flex;flex-direction:column}.character-editor-head{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:#102a3b;color:var(--text);font-size:.72rem;letter-spacing:.1em}.character-editor-head button{border:1px solid var(--border);background:transparent;color:var(--text);border-radius:7px;padding:6px 10px}.character-editor-shell iframe{width:100%;height:100%;border:0;background:#071522}.layout-edit-mode #btn-settings,.layout-edit-mode #quality-btn,.layout-edit-mode #btn-fullscreen,.layout-edit-mode #joystick-zone,.layout-edit-mode #mobile-controls{outline:2px dashed #59d5d0!important;outline-offset:3px;touch-action:none!important;cursor:move!important}
+
 .settings-card {
   width: min(420px, 96vw); max-height: min(88dvh, 680px); overflow: auto;
   background: linear-gradient(165deg, #102a3b, #071725);
@@ -771,21 +773,72 @@ html, body {
         <h3>Touch controls</h3>
         <label class="settings-toggle"><input type="checkbox" id="set-joystick" checked> Show joystick</label>
         <label class="settings-toggle"><input type="checkbox" id="set-use-btn" checked> Show USE button</label>
-        <label class="settings-toggle"><input type="checkbox" id="set-look-zone" checked> Look zone (right half)</label>
+        <label class="settings-toggle"><input type="checkbox" id="set-look-zone" checked> Touch look zone</label>
       </section>
-      <section class="settings-section">
-        <h3>Graphics</h3>
-        <label class="settings-toggle"><input type="checkbox" id="set-shadows" checked> Shadows</label>
-        <p style="font-size:0.8rem;color:var(--muted);margin-top:0.4rem;line-height:1.4">Quality cycles LOW → MED → HIGH. Multi-touch: move with left stick and look with the right side of the screen at the same time.</p>
+      <section class="settings-extra">
+        <h3>Graphics & performance</h3>
+        <label class="settings-field">Quality preset<select id="set-quality"><option value="LOW">LOW · 30 FPS / battery friendly</option><option value="MED">MED · balanced</option><option value="HIGH">HIGH · higher detail</option></select></label>
+        <label class="settings-toggle"><input type="checkbox" id="set-shadows" checked> Dynamic shadows</label>
+      </section>
+      <section class="settings-extra">
+        <h3>Display & camera</h3>
+        <label class="settings-field">Field of view <span id="set-fov-value">70°</span><input type="range" id="set-fov" min="45" max="100" value="70"></label>
+        <label class="settings-field">Look sensitivity <span id="set-sensitivity-value">1.00×</span><input type="range" id="set-sensitivity" min="0.35" max="2.5" step="0.05" value="1"></label>
+        <button type="button" class="ui-btn" id="deck-fullscreen-setting">Enter fullscreen</button>
+      </section>
+      <section class="settings-extra">
+        <h3>Controller</h3>
+        <label class="settings-field">Controller profile<select id="set-controller-profile"><option value="standard">Standard</option><option value="xbox">Xbox</option><option value="playstation">PlayStation</option><option value="custom">Custom bindings</option></select></label>
+        <label class="settings-field">Movement stick<select id="set-move-stick"><option value="left">Left stick</option><option value="right">Right stick</option></select></label>
+        <label class="settings-field">Look stick<select id="set-look-stick"><option value="right">Right stick</option><option value="left">Left stick</option></select></label>
+        <label class="settings-field">Stick deadzone <span id="set-deadzone-value">0.30</span><input type="range" id="set-controller-deadzone" min="0.16" max="0.5" step="0.01" value="0.3"></label>
+        <p id="deck-controller-status" class="muted" style="font-size:.72rem">Connect a gamepad to use controller movement and camera controls.</p>
+        <div class="deck-bind-grid" id="deck-bind-grid">
+          <div class="deck-bind-row"><span>Interact / USE</span><button type="button" data-bind-action="interact">Default</button></div>
+          <div class="deck-bind-row"><span>Move forward</span><button type="button" data-bind-action="forward">Not set</button></div>
+          <div class="deck-bind-row"><span>Move back</span><button type="button" data-bind-action="back">Not set</button></div>
+          <div class="deck-bind-row"><span>Strafe left</span><button type="button" data-bind-action="left">Not set</button></div>
+          <div class="deck-bind-row"><span>Strafe right</span><button type="button" data-bind-action="right">Not set</button></div>
+          <div class="deck-bind-row"><span>Look left</span><button type="button" data-bind-action="lookLeft">Not set</button></div>
+          <div class="deck-bind-row"><span>Look right</span><button type="button" data-bind-action="lookRight">Not set</button></div>
+          <div class="deck-bind-row"><span>Look up</span><button type="button" data-bind-action="lookUp">Not set</button></div>
+          <div class="deck-bind-row"><span>Look down</span><button type="button" data-bind-action="lookDown">Not set</button></div>
+          <div class="deck-bind-row"><span>Menu up</span><button type="button" data-bind-action="menuUp">Default</button></div>
+          <div class="deck-bind-row"><span>Menu down</span><button type="button" data-bind-action="menuDown">Default</button></div>
+          <div class="deck-bind-row"><span>Menu left</span><button type="button" data-bind-action="menuLeft">Default</button></div>
+          <div class="deck-bind-row"><span>Menu right</span><button type="button" data-bind-action="menuRight">Default</button></div>
+          <div class="deck-bind-row"><span>Menu confirm</span><button type="button" data-bind-action="menuConfirm">Default</button></div>
+          <div class="deck-bind-row"><span>Fullscreen</span><button type="button" data-bind-action="fullscreen">Default</button></div>
+        </div>
+        <p id="deck-bind-capture-status" class="muted" style="font-size:.68rem" aria-live="polite">Select a binding, release all controls, then press a controller button or move a stick.</p>
+        <p id="deck-controller-live" class="muted" style="font-size:.66rem">Axes: — · Buttons: —</p>
+        <button type="button" class="ui-btn" id="deck-bind-reset">Reset controller bindings</button>
+      </section>
+      <section class="settings-extra">
+        <h3>On-screen layout</h3>
+        <p class="muted" style="font-size:.72rem">Move the Settings, Quality, Fullscreen, Joystick and USE controls, then save the layout on this device.</p>
+        <button type="button" class="ui-btn" id="deck-layout-edit">Customize layout</button>
+        <button type="button" class="ui-btn" id="deck-layout-save">Save layout</button>
+        <button type="button" class="ui-btn" id="deck-layout-reset">Reset layout</button>
+        <p id="deck-layout-status" class="muted" style="font-size:.68rem">Default control positions.</p>
+      </section>
+      <section class="settings-extra">
+        <h3>Character</h3>
+        <p class="muted" style="font-size:.72rem">Edit your saved avatar. Appearance changes are sent to the active multiplayer session.</p>
+        <button type="button" class="ui-btn" id="deck-customize-character">Customize character</button>
       </section>
     </div>
   </div>
+</div>
+<div id="character-editor-panel" class="character-editor-panel" hidden>
+  <div class="character-editor-shell"><div class="character-editor-head"><span>PLAYER AVATAR WORKSHOP</span><button type="button" id="deck-character-close">CLOSE</button></div><iframe id="deck-character-frame" title="TITAN character customisation" src="character-creator.html?embedded=1"></iframe></div>
 </div>
 
 </div>
 
 <script src="three.min.js"></script>
 <script src="character-runtime.js"></script>
+<script src="titan-shared-settings.js"></script>
 <script src="titan-ship-bus.js"></script>
 <script src="titan-multiplayer-runtime.js"></script>
 <script>
@@ -860,7 +913,7 @@ html, body {
   const state = {
     entered: false,
     ready: false,
-    quality: 'MED',
+    quality: (window.TitanSharedSettings && window.TitanSharedSettings.get('quality')) || 'MED',
     playerLocal: { x: 0.85, y: PLAYER_EYE_LOCAL_Y, z: -14.35 },
     yaw: 0,
     pitch: -0.02,
@@ -3469,7 +3522,7 @@ html, body {
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0x8aa3ab);
     scene.fog = new THREE.Fog(0x9eb3b5, 100, 300);
-    camera = new THREE.PerspectiveCamera(70, w / h, 0.12, 450);
+    camera = new THREE.PerspectiveCamera((window.TitanSharedSettings && window.TitanSharedSettings.get('fov')) || 70, w / h, 0.12, 450);
     camera.position.set(0, PLAYER_EYE_LOCAL_Y * SHIP_SCALE, 3 * SHIP_SCALE);
     camera.rotation.order = 'YXZ';
     camera.rotation.set(state.pitch, state.yaw, 0);
@@ -3487,6 +3540,7 @@ html, body {
       if (lowEnd && state.quality !== 'LOW') {
         state.quality = 'LOW';
         try { localStorage.setItem('titan-quality', 'LOW'); } catch (_) {}
+        if (window.TitanSharedSettings) window.TitanSharedSettings.set('quality', 'LOW');
       }
     } catch (_) {}
 
@@ -3571,6 +3625,8 @@ html, body {
     renderer.setSize($('canvas-host').clientWidth, $('canvas-host').clientHeight, false);
     $('quality-btn').textContent = 'Quality: ' + q;
     try { localStorage.setItem('titan-deck-q', q); } catch (e) {}
+    if (window.TitanSharedSettings) window.TitanSharedSettings.update({ quality: q, shadows: sh });
+    const qualitySelect = $('set-quality'); if (qualitySelect) qualitySelect.value = q;
   }
 
   let waterAccumulator = 0;
@@ -3855,15 +3911,16 @@ html, body {
     players.forEach(p => {
       alive.add(p.id);
       let actor = mpRemoteActors.get(p.id);
+      const appearanceKey = JSON.stringify(p.character || {});
+      if (actor && actor.appearanceKey !== appearanceKey) { mpDisposeActor(actor); mpRemoteActors.delete(p.id); actor = null; }
       if (!actor) {
         const model = window.TitanCharacterRuntime.createModel(THREE, p.character || { name: p.name }, { scale: .78 });
         model.name = 'MP_REMOTE_' + p.id;
         ship.add(model);
         actor = {
-          model,
+          model, appearanceKey,
           target: new THREE.Vector3(Number(p.x) || 0, mpAvatarFloorY, Number(p.z) || 0),
-          targetYaw: Number(p.yaw) || 0,
-          moving: false,
+          targetYaw: Number(p.yaw) || 0, moving: false, moveForward: 0, moveStrafe: 0,
           speed: (p.character && p.character.animationSpeed) || 1
         };
         model.position.copy(actor.target);
@@ -3874,6 +3931,8 @@ html, body {
       actor.targetYaw = Number(p.yaw) || 0;
       actor.moving = Date.now() < (p.movingUntil || 0);
       actor.running = actor.moving && !!p.running;
+      actor.moveForward = actor.moving ? (Number(p.moveForward) || 0) : 0;
+      actor.moveStrafe = actor.moving ? (Number(p.moveStrafe) || 0) : 0;
       actor.speed = (p.character && p.character.animationSpeed) || 1;
     });
     for (const [id, actor] of mpRemoteActors) {
@@ -3893,7 +3952,7 @@ html, body {
       while (dy < -Math.PI) dy += Math.PI * 2;
       actor.model.rotation.y += dy * lerpFactor;
       if (window.TitanCharacterRuntime && window.TitanCharacterRuntime.animateModel) {
-        window.TitanCharacterRuntime.animateModel(actor.model, state.time, actor.moving ? 1 : 0, actor.speed * (actor.running ? 1.32 : 1));
+        window.TitanCharacterRuntime.animateModel(actor.model, state.time, actor.moving ? 1 : 0, actor.speed * (actor.running ? 1.32 : 1), { moveForward: actor.moveForward, moveStrafe: actor.moveStrafe });
       }
     }
   }
@@ -4293,13 +4352,15 @@ html, body {
     if (radarSweepMesh) radarSweepMesh.rotation.y = state.time * 1.65;
     if (ship) ship.rotation.z = Math.sin(state.time * 0.4) * 0.0014;
 
-    const settingsOpen = $('settings-panel') && !$('settings-panel').hidden;
+    pollDeckGamepad();
+    const settingsOpen = ($('settings-panel') && !$('settings-panel').hidden) || ($('character-editor-panel') && !$('character-editor-panel').hidden);
     if (!settingsOpen && !state.helmOpen && !state.tableFocused && !state.hatchPromptOpen && !state.sensorPanelOpen) {
       const mx = clamp((keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0) + (Joystick.dx || 0) + (Joystick._padX || 0), -1, 1);
       const mz = clamp((keys.KeyW ? 1 : 0) - (keys.KeyS ? 1 : 0) + (Joystick.dy || 0) - (Joystick._padY || 0), -1, 1);
       const look = Joystick.consumeLook();
-      state.yaw -= look.dx;
-      state.pitch = clamp(state.pitch - look.dy, -1.25, 0.95);
+      const sharedSensitivity = (window.TitanSharedSettings && window.TitanSharedSettings.get('sensitivity')) || 1;
+      state.yaw -= look.dx * sharedSensitivity;
+      state.pitch = clamp(state.pitch - look.dy * sharedSensitivity, -1.25, 0.95);
 
       const inputMag = Math.min(1, Math.hypot(mx, mz));
       titanWalkAmount = inputMag;
@@ -4331,6 +4392,136 @@ html, body {
     if (cssRenderer) cssRenderer.render(camera);
   }
 
+  function syncDeckSettingsUI() {
+    const shared = window.TitanSharedSettings;
+    const cfg = shared ? shared.load() : {};
+    [['set-joystick','showJoystick'],['set-use-btn','showUseBtn'],['set-look-zone','showLookZone'],['set-shadows','shadows']].forEach(([id,key]) => { const el=$(id); if(el) el.checked = cfg[key] !== false; });
+    if($('set-quality')) $('set-quality').value = cfg.quality || state.quality;
+    if($('set-fov')) $('set-fov').value = String(cfg.fov || 70);
+    if($('set-fov-value')) $('set-fov-value').textContent = Math.round(cfg.fov || 70) + '°';
+    if($('set-sensitivity')) $('set-sensitivity').value = String(cfg.sensitivity || 1);
+    if($('set-sensitivity-value')) $('set-sensitivity-value').textContent = Number(cfg.sensitivity || 1).toFixed(2) + '×';
+    if($('set-controller-profile')) $('set-controller-profile').value = cfg.padProfile || 'standard';
+    if($('set-move-stick')) $('set-move-stick').value = cfg.moveStick || 'left';
+    if($('set-look-stick')) $('set-look-stick').value = cfg.lookStick || 'right';
+    if($('set-controller-deadzone')) $('set-controller-deadzone').value = String(cfg.stickDeadzone || .30);
+    if($('set-deadzone-value')) $('set-deadzone-value').textContent = Number(cfg.stickDeadzone || .30).toFixed(2);
+    const bindingNames={interact:'Interact',forward:'Forward',back:'Back',left:'Left',right:'Right',lookLeft:'Look L',lookRight:'Look R',lookUp:'Look Up',lookDown:'Look Down',menuUp:'Menu Up',menuDown:'Menu Down',menuLeft:'Menu Left',menuRight:'Menu Right',menuConfirm:'Menu Confirm',fullscreen:'Fullscreen'};
+    document.querySelectorAll('[data-bind-action]').forEach(button=>{const action=button.dataset.bindAction,bind=(cfg.bindings||{})[action];button.textContent=bind?describeDeckBinding(bind):(action==='interact'?'Default · A':'Default');button.classList.toggle('armed',deckBindingCapture===action);button.title='Set controller binding for '+(bindingNames[action]||action);});
+  }
+  let deckBindingCapture=null, deckBindingCaptureReady=false, deckBindingReleaseGuard=null, deckMenuEdges={}, deckMenuFocusIndex=0, deckControllerLiveAt=0;
+  function describeDeckBinding(bind){if(!bind)return 'Default';if(bind.type==='button')return 'Button '+(Number(bind.index)+1);return 'Axis '+(Number(bind.index)+1)+(Number(bind.dir)>0?' +':' −');}
+  function deckGamepadBindDown(pads, bind) {
+    if(!bind) return false; const pad=pads[bind.pad||0]; if(!pad) return false;
+    if(bind.type==='button'){const b=pad.buttons[bind.index];return !!(b&&(b.pressed||b.value>.5));}
+    if(bind.type==='axis'){const v=Number(pad.axes[bind.index])||0;return bind.dir>0?v>.45:v<-.45;} return false;
+  }
+  let deckGamepadEdges = {};
+  function applyDeckPadProfile(profile){
+    const keys=['interact','forward','back','left','right','lookLeft','lookRight','lookUp','lookDown','menuUp','menuDown','menuLeft','menuRight','menuConfirm','fullscreen'];
+    const bindings={};keys.forEach(k=>bindings[k]=null);
+    if(profile!=='custom'){bindings.interact={type:'button',pad:0,index:0};bindings.fullscreen={type:'button',pad:0,index:9};}
+    if(window.TitanSharedSettings)window.TitanSharedSettings.setControls({padProfile:profile,moveStick:'left',lookStick:'right',stickDeadzone:.30,bindings});
+    syncDeckSettingsUI();
+  }
+  function deckMenuInput(pads,bindings){
+    const panel=$('settings-panel');if(!panel||panel.hidden)return false;
+    const targets=Array.from(panel.querySelectorAll('button:not(:disabled),select,input:not([type="hidden"]),[tabindex]:not([tabindex="-1"])')).filter(el=>!el.hidden&&el.offsetParent!==null);
+    if(!targets.length)return true;
+    let current=targets.indexOf(document.activeElement);if(current<0){current=Math.min(deckMenuFocusIndex,targets.length-1);targets[current].focus();}
+    const fallback={menuUp:{type:'button',pad:0,index:12},menuDown:{type:'button',pad:0,index:13},menuLeft:{type:'button',pad:0,index:14},menuRight:{type:'button',pad:0,index:15},menuConfirm:bindings.interact||{type:'button',pad:0,index:0}};
+    const down=key=>deckGamepadBindDown(pads,bindings[key]||fallback[key]);
+    const pulse=key=>{const now=down(key),fresh=now&&!deckMenuEdges[key];deckMenuEdges[key]=now;return fresh;};
+    let dir=0;
+    if(pulse('menuDown'))dir=1;else if(pulse('menuUp'))dir=-1;
+    if(dir){deckMenuFocusIndex=(current+dir+targets.length)%targets.length;targets[deckMenuFocusIndex].focus();}
+    const active=targets[deckMenuFocusIndex]||targets[current];
+    const step=(target,direction)=>{
+      if(!target)return;
+      if(target.tagName==='SELECT'){const n=target.options.length;if(n){target.selectedIndex=(target.selectedIndex+direction+n)%n;target.dispatchEvent(new Event('change',{bubbles:true}));}}
+      else if(target.type==='range'){const value=Number(target.value)||0,amount=Number(target.step)||1;target.value=String(clamp(value+direction*amount,Number(target.min)||0,Number(target.max)||100));target.dispatchEvent(new Event('input',{bubbles:true}));}
+      else if(target.type==='checkbox'){target.checked=!target.checked;target.dispatchEvent(new Event('change',{bubbles:true}));}
+    };
+    if(pulse('menuLeft'))step(active,-1);
+    if(pulse('menuRight'))step(active,1);
+    if(pulse('menuConfirm')){
+      if(active&&active.tagName==='SELECT')step(active,1);
+      else if(active&&active.type==='range')step(active,1);
+      else if(active)active.click();
+    }
+    return true;
+  }
+  function pollDeckGamepad() {
+    const shared = window.TitanSharedSettings;
+    if(!navigator.getGamepads || !window.Joystick) return;
+    const pads = Array.from(navigator.getGamepads() || []);
+    const cfg = shared ? shared.getControls() : {};
+    const gp = pads.find(Boolean);
+    if(!gp){Joystick._padX=Joystick._padY=Joystick._padLookX=Joystick._padLookY=0;if($('deck-controller-status'))$('deck-controller-status').textContent='No controller detected';return;}
+    if($('deck-controller-status'))$('deck-controller-status').textContent='Connected · '+(gp.id||'Gamepad');
+    if(performance.now()-deckControllerLiveAt>250){deckControllerLiveAt=performance.now();const axes=Array.from(gp.axes||[]).slice(0,6).map(v=>(Number(v)||0).toFixed(2)).join(', ');const pressed=Array.from(gp.buttons||[]).map((b,i)=>b&&(b.pressed||b.value>.72)?i+1:null).filter(Boolean).join(', ')||'—';if($('deck-controller-live'))$('deck-controller-live').textContent='Axes: '+(axes||'—')+' · Buttons: '+pressed;}
+    if(deckBindingCapture){
+      const anyActive=pads.some(p=>p&&(Array.from(p.buttons||[]).some(b=>b&&(b.pressed||b.value>.72))||Array.from(p.axes||[]).some(v=>Math.abs(Number(v)||0)>.72)));
+      if(!deckBindingCaptureReady){if(!anyActive)deckBindingCaptureReady=true;return;}
+      for(let pi=0;pi<pads.length;pi++){
+        const pad=pads[pi];if(!pad)continue;
+        let found=null;
+        for(let bi=0;bi<(pad.buttons||[]).length;bi++){const b=pad.buttons[bi];if(b&&(b.pressed||b.value>.72)){found={type:'button',pad:pi,index:bi};break;}}
+        if(!found)for(let ai=0;ai<(pad.axes||[]).length;ai++){const v=Number(pad.axes[ai])||0;if(Math.abs(v)>.78){found={type:'axis',pad:pi,index:ai,dir:v>0?1:-1};break;}}
+        if(found){const next=Object.assign({},cfg.bindings||{});next[deckBindingCapture]=found;shared.setControls({bindings:next,padProfile:'custom'});deckBindingReleaseGuard=found;deckBindingCapture=null;deckBindingCaptureReady=false;if($('deck-bind-capture-status'))$('deck-bind-capture-status').textContent='Binding saved.';syncDeckSettingsUI();break;}
+      }
+      return;
+    }
+    if(deckBindingReleaseGuard){if(deckGamepadBindDown(pads,deckBindingReleaseGuard))return;deckBindingReleaseGuard=null;}
+    if(deckMenuInput(pads,cfg.bindings||{}))return;
+    const readStick = which => { const start=which==='right'?2:0; let x=Number(gp.axes[start])||0,y=Number(gp.axes[start+1])||0; if(which==='right'&&Math.abs(x)<.01&&Math.abs(y)<.01&&gp.axes.length>5)y=Number(gp.axes[5])||0; const dz=Number(cfg.stickDeadzone)||.30; const dead=v=>Math.abs(v)<dz?0:Math.sign(v)*(Math.abs(v)-dz)/(1-dz);return {x:dead(x),y:dead(y)}; };
+    const move=readStick(cfg.moveStick==='right'?'right':'left'),look=readStick(cfg.lookStick==='left'?'left':'right');
+    let mx=move.x,my=move.y,lx=look.x,ly=look.y;
+    const b=cfg.bindings||{};
+    [['left',-1,'x'],['right',1,'x'],['forward',-1,'y'],['back',1,'y']].forEach(([key,dir,axis])=>{if(deckGamepadBindDown(pads,b[key])){if(axis==='x')mx+=dir;else my+=dir;}});
+    [['lookLeft',-1,'x'],['lookRight',1,'x'],['lookUp',-1,'y'],['lookDown',1,'y']].forEach(([key,dir,axis])=>{if(deckGamepadBindDown(pads,b[key])){if(axis==='x')lx+=dir;else ly+=dir;}});
+    Joystick._padX=clamp(mx,-1,1); Joystick._padY=clamp(my,-1,1);
+    Joystick._padLookX=clamp(lx,-1,1); Joystick._padLookY=clamp(ly,-1,1);
+    ['interact','fullscreen'].forEach(action=>{const down=deckGamepadBindDown(pads,b[action]||(action==='interact'?{type:'button',pad:0,index:0}:{type:'button',pad:0,index:9}));if(down&&!deckGamepadEdges[action]){if(action==='interact')performInteract();else Joystick.toggleFullscreen();}deckGamepadEdges[action]=down;});
+  }
+
+  const DECK_LAYOUT_TARGETS = ['btn-settings','quality-btn','btn-fullscreen','joystick-zone','mobile-controls'];
+  let deckLayoutEditing = false;
+  function applyDeckLayout() {
+    const layout = window.TitanSharedSettings && window.TitanSharedSettings.get('deckLayout'); if(!layout)return;
+    const host=$('canvas-host'); if(!host)return; const r=host.getBoundingClientRect();
+    DECK_LAYOUT_TARGETS.forEach(id=>{const pos=layout[id],el=$(id);if(!pos||!el)return;el.style.right='auto';el.style.bottom='auto';el.style.left=(Number(pos.leftPct)||0)+'%';el.style.top=(Number(pos.topPct)||0)+'%';});
+    if($('deck-layout-status'))$('deck-layout-status').textContent='Saved control layout loaded.';
+  }
+  function setDeckLayoutEditing(on) {
+    deckLayoutEditing=!!on; $('game').classList.toggle('layout-edit-mode',deckLayoutEditing);
+    if($('deck-layout-edit'))$('deck-layout-edit').textContent=deckLayoutEditing?'Finish moving controls':'Customize layout';
+    if(!deckLayoutEditing) DECK_LAYOUT_TARGETS.forEach(id=>{const el=$(id);if(el)el.onpointerdown=null;});
+    else DECK_LAYOUT_TARGETS.forEach(id=>{const el=$(id);if(!el)return;el.style.position='absolute';el.onpointerdown=e=>{if(!deckLayoutEditing)return;e.preventDefault();const host=$('canvas-host'),hr=host.getBoundingClientRect(),r=el.getBoundingClientRect(),startX=e.clientX,startY=e.clientY,left=r.left-hr.left,top=r.top-hr.top;el.setPointerCapture&&el.setPointerCapture(e.pointerId);const move=ev=>{el.style.right='auto';el.style.bottom='auto';el.style.left=clamp(left+ev.clientX-startX,0,hr.width-r.width)+'px';el.style.top=clamp(top+ev.clientY-startY,0,hr.height-r.height)+'px';};const stop=()=>{el.removeEventListener('pointermove',move);el.removeEventListener('pointerup',stop);el.removeEventListener('pointercancel',stop);};el.addEventListener('pointermove',move);el.addEventListener('pointerup',stop);el.addEventListener('pointercancel',stop);};});
+  }
+  function saveDeckLayout() {
+    const host=$('canvas-host');if(!host)return;const hr=host.getBoundingClientRect(),layout={};
+    DECK_LAYOUT_TARGETS.forEach(id=>{const el=$(id);if(!el)return;const r=el.getBoundingClientRect();layout[id]={leftPct:((r.left-hr.left)/Math.max(1,hr.width))*100,topPct:((r.top-hr.top)/Math.max(1,hr.height))*100};});
+    if(window.TitanSharedSettings)window.TitanSharedSettings.set('deckLayout',layout);if($('deck-layout-status'))$('deck-layout-status').textContent='Layout saved on this device.';setDeckLayoutEditing(false);
+  }
+  function resetDeckLayout() {
+    if(window.TitanSharedSettings)window.TitanSharedSettings.set('deckLayout',null);DECK_LAYOUT_TARGETS.forEach(id=>{const el=$(id);if(el){el.style.left='';el.style.top='';el.style.right='';el.style.bottom='';}});if($('deck-layout-status'))$('deck-layout-status').textContent='Default control positions restored.';setDeckLayoutEditing(false);
+  }
+  function openDeckCharacterEditor(){if($('character-editor-panel'))$('character-editor-panel').hidden=false;}
+  function applyDeckCharacter(character) {
+    if(!window.TitanCharacterRuntime)return;
+    const cfg=window.TitanCharacterRuntime.normalize(character||window.TitanCharacterRuntime.readCharacter());
+    window.TitanDeckCharacterConfig=cfg;
+    if(camera&&window.TitanDeckArms){camera.remove(window.TitanDeckArms);window.TitanDeckArms.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material)(Array.isArray(o.material)?o.material:[o.material]).forEach(m=>m&&m.dispose());});}
+    if(camera){window.TitanDeckArms=window.TitanCharacterRuntime.createFirstPersonArms(THREE,cfg);camera.add(window.TitanDeckArms);}
+    mpPost({type:'CHARACTER',character:cfg});
+  }
+  window.addEventListener('message',event=>{
+    if(event.origin!==window.location.origin||!event.data||event.data.source!=='TITAN_CHARACTER_CREATOR')return;
+    if(event.data.type==='CLOSE'){if($('character-editor-panel'))$('character-editor-panel').hidden=true;return;}
+    if(event.data.type==='SAVED'){applyDeckCharacter(event.data.character||{});}
+  });
+
   function enter() {
     if (state.entered) return;
     try {
@@ -4340,17 +4531,18 @@ html, body {
       }
     } catch (e) {}
     state.entered = true;
+    syncDeckSettingsUI();
     const mpJoinButton = $('btn-mp-join');
     const mpQueryAtEnter = new URLSearchParams(window.location.search);
     if (mpJoinButton && ((window.TitanMultiplayerRuntime && window.TitanMultiplayerRuntime.active) || mpQueryAtEnter.get('multiplayer') === '1')) mpJoinButton.hidden = true;
     $('loading-screen').classList.add('hidden');
     $('game').classList.remove('hidden');
-    try {
-      const q = localStorage.getItem('titan-deck-q');
-      if (['LOW', 'MED', 'HIGH'].includes(q)) state.quality = q;
-    } catch (e) {}
+    // Quality comes from the shared settings contract (which migrates the legacy key once).
+    if (window.TitanSharedSettings) state.quality = window.TitanSharedSettings.get('quality') || state.quality;
     initScene();
     applyQuality();
+    if (camera) { camera.fov = (window.TitanSharedSettings && window.TitanSharedSettings.get('fov')) || 70; camera.updateProjectionMatrix(); }
+    applyDeckLayout();
     Joystick.doInteract = performInteract;
     Joystick.init();
     Joystick.show();
@@ -4389,11 +4581,27 @@ html, body {
     $('btn-start').addEventListener('click', enter);
     $('btn-mp-join').addEventListener('click', () => { window.location.href = 'main-deck.html?multiplayer=join'; });
     $('btn-exit-table').addEventListener('click', () => setTableFocused(false));
-    $('btn-settings').addEventListener('click', () => { $('settings-panel').hidden = false; });
-    $('settings-close').addEventListener('click', () => { $('settings-panel').hidden = true; });
+    $('btn-settings').addEventListener('click', () => { syncDeckSettingsUI(); $('settings-panel').hidden = false; });
+    $('settings-close').addEventListener('click', () => { $('settings-panel').hidden = true; setDeckLayoutEditing(false); });
     $('settings-panel').addEventListener('click', (e) => {
-      if (e.target === $('settings-panel')) $('settings-panel').hidden = true;
+      if (e.target === $('settings-panel')) { $('settings-panel').hidden = true; setDeckLayoutEditing(false); }
     });
+    $('deck-fullscreen-setting').addEventListener('click', () => Joystick.toggleFullscreen());
+    $('deck-customize-character').addEventListener('click', openDeckCharacterEditor);
+    $('deck-character-close').addEventListener('click', () => { $('character-editor-panel').hidden = true; });
+    $('character-editor-panel').addEventListener('click', e => { if(e.target === $('character-editor-panel')) $('character-editor-panel').hidden = true; });
+    $('set-quality').addEventListener('change', e => { state.quality=e.target.value; applyQuality(); });
+    $('set-fov').addEventListener('input', e => { const v=clamp(Number(e.target.value)||70,45,100); if(camera){camera.fov=v;camera.updateProjectionMatrix();} if(window.TitanSharedSettings)window.TitanSharedSettings.set('fov',v); $('set-fov-value').textContent=Math.round(v)+'°'; });
+    $('set-sensitivity').addEventListener('input', e => { const v=clamp(Number(e.target.value)||1,.35,2.5); if(window.TitanSharedSettings)window.TitanSharedSettings.set('sensitivity',v); $('set-sensitivity-value').textContent=v.toFixed(2)+'×'; });
+    $('set-controller-profile').addEventListener('change',e=>applyDeckPadProfile(e.target.value));
+    $('set-move-stick').addEventListener('change',e=>{if(window.TitanSharedSettings)window.TitanSharedSettings.set('moveStick',e.target.value);});
+    $('set-look-stick').addEventListener('change',e=>{if(window.TitanSharedSettings)window.TitanSharedSettings.set('lookStick',e.target.value);});
+    $('set-controller-deadzone').addEventListener('input',e=>{const v=Number(e.target.value);if(window.TitanSharedSettings)window.TitanSharedSettings.set('stickDeadzone',v);$('set-deadzone-value').textContent=v.toFixed(2);});
+    document.querySelectorAll('[data-bind-action]').forEach(button=>button.addEventListener('click',()=>{deckBindingCapture=button.dataset.bindAction;deckBindingCaptureReady=false;document.querySelectorAll('[data-bind-action]').forEach(b=>b.classList.toggle('armed',b===button));if($('deck-bind-capture-status'))$('deck-bind-capture-status').textContent='Release all controller controls, then press a button or move a stick.';}));
+    $('deck-bind-reset').addEventListener('click',()=>{deckBindingCapture=null;deckBindingCaptureReady=false;deckBindingReleaseGuard=null;const bindings={};['interact','forward','back','left','right','lookLeft','lookRight','lookUp','lookDown','menuUp','menuDown','menuLeft','menuRight','menuConfirm','fullscreen'].forEach(k=>bindings[k]=null);if(window.TitanSharedSettings)window.TitanSharedSettings.setControls({bindings,padProfile:'standard',moveStick:'left',lookStick:'right',stickDeadzone:.30});if($('deck-bind-capture-status'))$('deck-bind-capture-status').textContent='Default controller bindings restored.';syncDeckSettingsUI();});
+    $('deck-layout-edit').addEventListener('click',()=>setDeckLayoutEditing(!deckLayoutEditing));
+    $('deck-layout-save').addEventListener('click',saveDeckLayout);
+    $('deck-layout-reset').addEventListener('click',resetDeckLayout);
 
     /* Deck Access Hatch Ladder Destination Modal Bindings
        Storage → storage.html · Engine Room → engine-room.html
@@ -4429,9 +4637,9 @@ html, body {
     $('btn-fullscreen').addEventListener('click', () => Joystick.toggleFullscreen());
 
     ['set-joystick', 'set-use-btn', 'set-look-zone'].forEach((id) => {
-      const el = $(id); if (el) el.addEventListener('change', () => Joystick.refreshVisibility());
+      const el = $(id); if (el) el.addEventListener('change', () => { Joystick.refreshVisibility(); if(window.TitanSharedSettings){const k=id==='set-joystick'?'showJoystick':(id==='set-use-btn'?'showUseBtn':'showLookZone');window.TitanSharedSettings.set(k,el.checked);} });
     });
-    const sh = $('set-shadows'); if (sh) sh.addEventListener('change', applyQuality);
+    const sh = $('set-shadows'); if (sh) sh.addEventListener('change', () => { if(window.TitanSharedSettings)window.TitanSharedSettings.set('shadows',sh.checked); applyQuality(); });
     window.addEventListener('resize', resize);
     window.addEventListener('orientationchange', () => setTimeout(resize, 150));
     document.addEventListener('fullscreenchange', () => {
@@ -4447,6 +4655,7 @@ html, body {
       if (e.code === 'KeyF' && !e.repeat) Joystick.toggleFullscreen();
       if (e.code === 'Escape') {
         $('settings-panel').hidden = true;
+        if($('character-editor-panel'))$('character-editor-panel').hidden=true;
         setHelmOpen(false);
         setEnginePanelOpen(false);
         setTableFocused(false);

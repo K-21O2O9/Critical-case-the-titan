@@ -167,7 +167,7 @@ function getSnapshot(room) {
     // Keep reconnecting crew visible briefly while an HTML room is replaced.
     connected: p.isHost ? !!room.hostWs && room.hostWs.readyState === WebSocket.OPEN : !!p.connected,
     isHost: !!p.isHost, x: p.x, z: p.z, yaw: p.yaw,
-    movingUntil: p.movingUntil || 0, character: p.character,
+    movingUntil: p.movingUntil || 0, running: !!p.running, character: p.character,
     area: p.area || 'main-deck', poses: p.poses || {}
   }));
   return {
@@ -249,6 +249,7 @@ function changePlayerArea(room, player, area) {
   player.z = clampNumber(nextPose.z, bounds.minZ, bounds.maxZ, 0);
   player.yaw = clampNumber(nextPose.yaw, -Math.PI, Math.PI, 0);
   player.movingUntil = 0;
+  player.running = false;
   player.poses[area] = { x: player.x, z: player.z, yaw: player.yaw };
   if (room) room.dirty = true;
   return true;
@@ -450,7 +451,7 @@ function addPlayer(room, ws, msg) {
       x: initialPose.x, z: initialPose.z, yaw: initialPose.yaw, area: requestedArea,
       poses: { [requestedArea]: { ...initialPose }, ...(requestedArea === 'main-deck' ? {} : { 'main-deck': mainDeckPose }) },
       character: safeCharacter(msg.character, name), ws: null,
-      reconnectTimer: null, visibilityTimer: null, reconnecting: false, lastMoveAt: 0
+      reconnectTimer: null, visibilityTimer: null, reconnecting: false, lastMoveAt: 0, running: false
     };
     room.players.set(deviceId, player);
   } else {
@@ -523,6 +524,7 @@ function setPlayerPose(room, player, msg, force = false) {
   if (player.area === 'main-deck') resolveMainDeckCollisions(room, player);
   player.yaw = clampNumber(msg.yaw, -Math.PI, Math.PI, player.yaw);
   player.movingUntil = msg.moving === false ? 0 : now + 450;
+  player.running = msg.moving === false ? false : !!msg.running;
   saveActiveAreaPose(player);
   room.dirty = true;
   return true;

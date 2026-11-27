@@ -16,7 +16,7 @@ test('character animation keeps the network-owned world transform intact', () =>
   vm.runInContext(runtimeSource, context);
   const rig = {
     visualRoot: { position: { y: 0 } },
-    torso: { scale: { y: 1 } },
+    torso: { scale: { y: 1 }, rotation: { x: 0, y: 0, z: 0 } },
     head: { rotation: { x: 0, y: 0, z: 0 } },
     arms: {
       left: { upper: { rotation: { x: 0, y: 0, z: 0 } }, elbow: { rotation: { x: 0, y: 0, z: 0 } } },
@@ -55,7 +55,9 @@ test('walking and sprint state is carried through the server snapshot for remote
   assert.match(main, /running: titanRunAmount > \.02/);
   assert.match(main, /actor\.running = actor\.moving && !!p\.running/);
   assert.match(server, /movingUntil: p\.movingUntil \|\| 0, running: !!p\.running/);
-  assert.match(server, /player\.running = msg\.moving === false \? false : !!msg\.running/);
+  assert.match(server, /player\.moveForward = clampNumber\(/);
+  assert.match(server, /player\.moveStrafe = clampNumber\(/);
+  assert.match(server, /player\.running = !!msg\.running/);
   assert.match(engine, /actor\.running = actor\.moving && !!p\.running/);
   assert.match(direct, /setPose\(pose\.x, pose\.z, pose\.yaw, playerArea,[\s\S]*?!!pose\.running\)/);
 });

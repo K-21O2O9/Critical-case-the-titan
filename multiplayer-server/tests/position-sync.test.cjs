@@ -56,7 +56,7 @@ test('direct and embedded multiplayer bridges forward interaction and transition
 
 test('server forced interaction pose bypasses movement throttle and commits bounded pose', () => {
   const server = read('multiplayer-server/server.js');
-  const helper = extractFunction(server, 'setPlayerPose');
+  const helper = [extractFunction(server, 'saveActiveAreaPose'), extractFunction(server, 'setPlayerPose')].join('\n');
   const context = {
     Date,
     DECK_BOUNDS: { minX: -3.9, maxX: 3.9, minZ: -17.65, maxZ: 22.1 },
@@ -99,4 +99,112 @@ test('server mutation handlers commit pose before the room broadcast', () => {
     assert.match(region, /commitActionPose\(room,/);
     assert.ok(region.indexOf('commitActionPose') < region.indexOf('broadcast(room)'), 'pose must be applied before broadcast');
   }
+});
+
+
+test('server stores and restores independent poses for every HTML room area', () => {
+  const server = read('multiplayer-server/server.js');
+  const helpers = [
+    extractFunction(server, 'saveActiveAreaPose'),
+    extractFunction(server, 'defaultAreaPose'),
+    extractFunction(server, 'changePlayerArea'),
+    extractFunction(server, 'setPlayerPose')
+  ].join('\n');
+  const context = {
+    Math, Date,
+    AREA_BOUNDS: {
+      'main-deck': { minX: -3.9, maxX: 3.9, minZ: -17.65, maxZ: 22.1 },
+      'engine-room': { minX: -13.2, maxX: 13.2, minZ: -6.6, maxZ: 6.6 },
+      storage: { minX: -3.9, maxX: 3.9, minZ: -17.65, maxZ: 22.1 }
+    },
+    clampNumber(value, min, max, fallback = 0) {
+      const n = Number(value);
+      return Number.isFinite(n) ? Math.max(min, Math.min(max, n)) : fallback;
+    },
+    teamCount() { return 0; },
+    resolveMainDeckCollisions() {}
+  };
+  vm.createContext(context);
+  vm.runInContext(`${helpers}\nthis.changePlayerArea=changePlayerArea; this.setPlayerPose=setPlayerPose;`, context);
+  const room = { dirty: false };
+  const player = { id: 'p1', team: 'A', x: 1.2, z: -8.4, yaw: 0.4, area: 'main-deck', lastMoveAt: 0, movingUntil: 0 };
+  assert.equal(context.changePlayerArea(room, player, 'engine-room'), true);
+  assert.equal(player.area, 'engine-room');
+  assert.deepEqual({ x: player.x, z: player.z, yaw: player.yaw }, { x: -2.2, z: 1.8, yaw: 0 });
+  context.setPlayerPose(room, player, { area: 'engine-room', x: 5.5, z: -2.2, yaw: 1.1, moving: true }, true);
+  assert.equal(context.changePlayerArea(room, player, 'main-deck'), true);
+  assert.deepEqual({ x: player.x, z: player.z, yaw: player.yaw }, { x: 1.2, z: -8.4, yaw: 0.4 });
+  assert.equal(context.changePlayerArea(room, player, 'engine-room'), true);
+  assert.deepEqual({ x: player.x, z: player.z, yaw: player.yaw }, { x: 5.5, z: -2.2, yaw: 1.1 });
+});
+
+test('legacy transition packets cannot reinterpret source coordinates as destination coordinates', () => {
+  const server = read('multiplayer-server/server.js');
+  const helpers = [extractFunction(server, 'saveActiveAreaPose'), extractFunction(server, 'defaultAreaPose'), extractFunction(server, 'changePlayerArea'), extractFunction(server, 'setPlayerPose')].join('\n');
+  const context = {
+    Math, Date,
+    AREA_BOUNDS: {
+      'main-deck': { minX: -3.9, maxX: 3.9, minZ: -17.65, maxZ: 22.1 },
+      'engine-room': { minX: -13.2, maxX: 13.2, minZ: -6.6, maxZ: 6.6 }, storage: { minX: -3.9, maxX: 3.9, minZ: -17.65, maxZ: 22.1 }
+    },
+    clampNumber(value, min, max, fallback = 0) { const n = Number(value); return Number.isFinite(n) ? Math.max(min, Math.min(max, n)) : fallback; },
+    teamCount() { return 0; }, resolveMainDeckCollisions() {}
+  };
+  vm.createContext(context);
+  vm.runInContext(`${helpers}\nthis.setPlayerPose=setPlayerPose;`, context);
+  const player = { id: 'p1', team: 'A', x: 2.8, z: -10.1, yaw: -0.6, area: 'main-deck', lastMoveAt: 0 };
+  context.setPlayerPose({ dirty: false }, player, { x: 2.8, z: -10.1, yaw: -0.6, area: 'engine-room', transition: true, moving: false }, true);
+  assert.equal(player.area, 'engine-room');
+  assert.deepEqual({ x: player.x, z: player.z, yaw: player.yaw }, { x: -2.2, z: 1.8, yaw: 0 });
+});
+
+test('Engine Room uses one idempotent frame loop and shared character scaling', () => {
+  const engine = read('engine-room.html');
+  const bus = read('titan-ship-bus.js');
+  assert.match(engine, /if \(this\.running\) return;/);
+  assert.match(engine, /window\.__titanTickEngineCrew = tickEngineCrew/);
+  assert.match(engine, /window\.__titanRudderPhysicsStep = rudderPhysicsStep/);
+  assert.doesNotMatch(engine, /requestAnimationFrame\(rudderPhysics\)/);
+  assert.doesNotMatch(engine, /setInterval\(\(\) => \{\s*updateEngineCrew/);
+  assert.match(engine, /createModel\(THREE, player\.character \|\| \{\}, \{ scale: \.78 \}\)/);
+  assert.match(engine, /<script src="character-runtime\.js"><\/script>/);
+  assert.match(bus, /startEnginePublisher[\s\S]*?this\.stopEnginePublisher\(\)/);
+});
+
+test('Engine Room low-quality profile is selected before renderer creation', () => {
+  const engine = read('engine-room.html');
+  assert.match(engine, /SceneManager\.quality = levels\[qIdx\];[\s\S]*?SceneManager\.init\(host\)/);
+  assert.match(engine, /antialias: this\.quality !== "low"/);
+  assert.match(engine, /if \(this\.quality === "high"\).*?_setupPostFX/s);
+  assert.match(engine, /if \(this\.quality !== "low"\).*?_setupSteam/s);
+  assert.match(engine, /if \(this\.quality === "low"\)[\s\S]*?return;[\s\S]*?const count = 60/);
+});
+
+test('reconnect snapshots retain short-lived player visibility and area poses', () => {
+  const server = read('multiplayer-server/server.js');
+  assert.match(server, /PLAYER_VISIBILITY_GRACE_MS = 3_500/);
+  assert.match(server, /connected: p\.isHost \?[\s\S]*?: !!p\.connected/);
+  assert.match(server, /player\.visibilityTimer = setTimeout/);
+  assert.match(server, /poses: p\.poses \|\| \{\}/);
+  assert.match(server, /msg\.type === 'player:area'/);
+});
+
+test('embedded and standalone navigation use explicit room-area membership changes', () => {
+  const server = read('multiplayer-server/server.js');
+  const lobby = read('multiplayer.html');
+  const engine = read('engine-room.html');
+  const storage = read('storage.html');
+  assert.match(server, /msg\.type === 'host:area'[\s\S]*?changePlayerArea\(room, hostActor, msg\.area\)/);
+  assert.match(lobby, /type:'host:area',area:d\.area,pose/);
+  assert.match(lobby, /type:'player:area',area:d\.area,pose/);
+  assert.match(engine, /type: 'AREA_CHANGE', area: destinationArea, pose: sourcePose/);
+  assert.match(storage, /type: 'AREA_CHANGE', area: destinationArea, pose: null/);
+});
+
+test('standalone area transition never reuses a pose cached for another area', () => {
+  const runtime = read('titan-multiplayer-runtime.js');
+  assert.match(runtime, /var lastPoseArea = null/);
+  assert.match(runtime, /lastPose && lastPoseArea === previousArea[\s\S]*?send\('player:area'/);
+  assert.match(runtime, /lastPose && lastPoseArea === playerArea/);
+  assert.match(runtime, /lastPoseArea = playerArea/);
 });
